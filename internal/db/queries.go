@@ -17,10 +17,12 @@ func getTables(ctx context.Context, db *DB, schemaName string) ([]string, error)
 	var tables []string
 	for rows.Next() {
 		var name string
-		rows.Scan(&name)
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
 		tables = append(tables, name)
 	}
-	return tables, nil
+	return tables, rows.Err()
 }
 
 func getColumns(ctx context.Context, db *DB, schemaName, tableName string) ([]types.Column, error) {
@@ -35,11 +37,13 @@ func getColumns(ctx context.Context, db *DB, schemaName, tableName string) ([]ty
 	for rows.Next() {
 		var col types.Column
 		var defaultVal *string
-		rows.Scan(&col.Name, &col.DataType, &defaultVal, &col.IsNullable)
+		if err := rows.Scan(&col.Name, &col.DataType, &defaultVal, &col.IsNullable); err != nil {
+			return nil, err
+		}
 		col.DefaultValue = defaultVal
 		columns = append(columns, col)
 	}
-	return columns, nil
+	return columns, rows.Err()
 }
 
 func getIndexes(ctx context.Context, db *DB, schemaName, tableName string) ([]types.Index, error) {
@@ -53,10 +57,12 @@ func getIndexes(ctx context.Context, db *DB, schemaName, tableName string) ([]ty
 	var indexes []types.Index
 	for rows.Next() {
 		var idx types.Index
-		rows.Scan(&idx.Name, &idx.IsUnique, &idx.IsPrimary, &idx.Definition)
+		if err := rows.Scan(&idx.Name, &idx.IsUnique, &idx.IsPrimary, &idx.Definition); err != nil {
+			return nil, err
+		}
 		indexes = append(indexes, idx)
 	}
-	return indexes, nil
+	return indexes, rows.Err()
 }
 
 func getConstraints(ctx context.Context, db *DB, schemaName, tableName string) ([]types.Constraint, error) {
@@ -70,10 +76,12 @@ func getConstraints(ctx context.Context, db *DB, schemaName, tableName string) (
 	var constraints []types.Constraint
 	for rows.Next() {
 		var cons types.Constraint
-		rows.Scan(&cons.Name, &cons.Type)
+		if err := rows.Scan(&cons.Name, &cons.Type); err != nil {
+			return nil, err
+		}
 		constraints = append(constraints, cons)
 	}
-	return constraints, nil
+	return constraints, rows.Err()
 }
 
 func getForeignKeys(ctx context.Context, db *DB, schemaName, tableName string) ([]types.ForeignKey, error) {
@@ -87,10 +95,12 @@ func getForeignKeys(ctx context.Context, db *DB, schemaName, tableName string) (
 	var fks []types.ForeignKey
 	for rows.Next() {
 		var fk types.ForeignKey
-		rows.Scan(&fk.Name, &fk.Columns, &fk.RefTable, &fk.RefColumns)
+		if err := rows.Scan(&fk.Name, &fk.Columns, &fk.RefTable, &fk.RefColumns); err != nil {
+			return nil, err
+		}
 		fks = append(fks, fk)
 	}
-	return fks, nil
+	return fks, rows.Err()
 }
 
 func getSequences(ctx context.Context, db *DB, schemaName string) ([]types.Sequence, error) {
@@ -104,10 +114,12 @@ func getSequences(ctx context.Context, db *DB, schemaName string) ([]types.Seque
 	var sequences []types.Sequence
 	for rows.Next() {
 		var seq types.Sequence
-		rows.Scan(&seq.Name)
+		if err := rows.Scan(&seq.Name); err != nil {
+			return nil, err
+		}
 		sequences = append(sequences, seq)
 	}
-	return sequences, nil
+	return sequences, rows.Err()
 }
 
 func filterColumns(columns []types.Column, ignorePatterns []string) []types.Column {
