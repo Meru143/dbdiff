@@ -49,9 +49,14 @@ func (g *SQLGenerator) Generate() string {
 
 	// Wrap in transaction if requested
 	if g.transaction && len(sql) > 0 {
-		transactionalSQL := []string{"BEGIN;"}
+		transactionalSQL := []string{"DO $$"}
+		transactionalSQL = append(transactionalSQL, "BEGIN")
 		transactionalSQL = append(transactionalSQL, sql...)
-		transactionalSQL = append(transactionalSQL, "COMMIT;")
+		transactionalSQL = append(transactionalSQL, "EXCEPTION WHEN OTHERS THEN")
+		transactionalSQL = append(transactionalSQL, "  RAISE NOTICE 'Migration failed: %', SQLERRM;")
+		transactionalSQL = append(transactionalSQL, "  ROLLBACK;")
+		transactionalSQL = append(transactionalSQL, "  RAISE;")
+		transactionalSQL = append(transactionalSQL, "END $$;")
 		return strings.Join(transactionalSQL, "\n")
 	}
 
