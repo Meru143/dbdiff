@@ -20,7 +20,7 @@ func TestFormatSQL(t *testing.T) {
 	}
 
 	// Check for expected content
-	expected := []string{"-- ADD TABLE: users", "-- ADD COLUMN: email", "-- Table: users"}
+	expected := []string{"-- Create table: users", "-- Add column: email to users"}
 	for _, exp := range expected {
 		if !contains(result, exp) {
 			t.Errorf("Expected to contain %q", exp)
