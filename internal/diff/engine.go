@@ -1,6 +1,11 @@
 package diff
 
-import "github.com/meru143/dbdiff/pkg/types"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/meru143/dbdiff/pkg/types"
+)
 
 // DiffEngine compares two schemas and generates differences
 type DiffEngine struct {
@@ -72,17 +77,81 @@ func (e *DiffEngine) compareTables() types.DiffList {
 	}
 
 	// Dropped tables (in target but not in source)
+	// Check for potential renames first
+	detectedRenames := make(map[string]string) // oldName -> newName
+	for targetName := range targetTables {
+		if _, exists := sourceTables[targetName]; !exists {
+			// Check if this might be a renamed table
+			sourceName := findPotentialRename(targetName, sourceTables, targetTables)
+			if sourceName != "" && detectedRenames[targetName] == "" {
+				// Check if source table also appears to be a rename
+				reverseName := findPotentialRename(sourceName, targetTables, sourceTables)
+				if reverseName == targetName {
+					detectedRenames[targetName] = sourceName
+					differences = append(differences, types.Diff{
+						Type:        types.DiffRename,
+						Object:      types.ObjectTable,
+						Name:        sourceName,
+						OldValue:    targetName,
+						NewValue:    sourceName,
+						Description: "Table renamed (heuristic: similar column structure)",
+					})
+				}
+			}
+		}
+	}
+
+	// Dropped tables (skip if it's a rename)
 	for name := range targetTables {
 		if _, exists := sourceTables[name]; !exists {
-			differences = append(differences, types.Diff{
-				Type:   types.DiffDrop,
-				Object: types.ObjectTable,
-				Name:   name,
-			})
+			if _, isRename := detectedRenames[name]; !isRename {
+				differences = append(differences, types.Diff{
+					Type:   types.DiffDrop,
+					Object: types.ObjectTable,
+					Name:   name,
+				})
+			}
 		}
 	}
 
 	return differences
+}
+
+// findPotentialRename finds if a dropped table might be renamed to a new table
+// by comparing column structures
+func findPotentialRename(droppedTable string, sourceTables, targetTables map[string]*types.Table) string {
+	dropped := targetTables[droppedTable]
+	if dropped == nil || len(dropped.Columns) == 0 {
+		return ""
+	}
+
+	var bestMatch string
+	bestMatchScore := 0
+
+	for name, table := range sourceTables {
+		if len(table.Columns) == 0 {
+			continue
+		}
+		// Compare column names
+		droppedCols := make(map[string]bool)
+		for _, c := range dropped.Columns {
+			droppedCols[c.Name] = true
+		}
+		matchScore := 0
+		for _, c := range table.Columns {
+			if droppedCols[c.Name] {
+				matchScore++
+			}
+		}
+		// If more than 70% columns match, consider it a potential rename
+		threshold := len(dropped.Columns) * 7 / 10
+		if matchScore > bestMatchScore && matchScore >= threshold {
+			bestMatchScore = matchScore
+			bestMatch = name
+		}
+	}
+
+	return bestMatch
 }
 
 func (e *DiffEngine) compareSequences() types.DiffList {
@@ -109,14 +178,14 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 				Name:   name,
 			})
 		} else {
-			// Compare sequence properties
+			// Compare sequence properties - fixed int to string
 			if sourceSeq.Start != targetSeq.Start {
 				differences = append(differences, types.Diff{
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: string(rune(targetSeq.Start)),
-					NewValue: string(rune(sourceSeq.Start)),
+					OldValue: strconv.FormatInt(targetSeq.Start, 10),
+					NewValue: strconv.FormatInt(sourceSeq.Start, 10),
 				})
 			}
 			if sourceSeq.Increment != targetSeq.Increment {
@@ -124,8 +193,28 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: "INCREMENT BY " + string(rune(targetSeq.Increment)),
-					NewValue: "INCREMENT BY " + string(rune(sourceSeq.Increment)),
+					OldValue: "INCREMENT BY " + strconv.FormatInt(targetSeq.Increment, 10),
+					NewValue: "INCREMENT BY " + strconv.FormatInt(sourceSeq.Increment, 10),
+				})
+			}
+			// Min value change
+			if sourceSeq.MinValue != targetSeq.MinValue {
+				differences = append(differences, types.Diff{
+					Type:     types.DiffAlter,
+					Object:   types.ObjectSequence,
+					Name:     name,
+					OldValue: "MINVALUE " + strconv.FormatInt(targetSeq.MinValue, 10),
+					NewValue: "MINVALUE " + strconv.FormatInt(sourceSeq.MinValue, 10),
+				})
+			}
+			// Max value change
+			if sourceSeq.MaxValue != targetSeq.MaxValue {
+				differences = append(differences, types.Diff{
+					Type:     types.DiffAlter,
+					Object:   types.ObjectSequence,
+					Name:     name,
+					OldValue: "MAXVALUE " + strconv.FormatInt(targetSeq.MaxValue, 10),
+					NewValue: "MAXVALUE " + strconv.FormatInt(sourceSeq.MaxValue, 10),
 				})
 			}
 		}
@@ -199,6 +288,24 @@ func compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
 		targetCols[c.Name] = c
 	}
 
+	// Get column order (only for columns that exist in both)
+	sourceColOrder := getExistingColumnOrder(sourceTable.Columns, targetCols)
+	targetColOrder := getExistingColumnOrder(targetTable.Columns, sourceCols)
+
+	// Check for column order changes only if both have same columns
+	if len(sourceColOrder) > 1 && len(sourceColOrder) == len(targetColOrder) && 
+	   !columnOrdersEqual(sourceColOrder, targetColOrder) {
+		differences = append(differences, types.Diff{
+			Type:        types.DiffAlter,
+			Object:      types.ObjectColumn,
+			Name:        "__column_order__",
+			TableName:   sourceTable.Name,
+			OldValue:    strings.Join(targetColOrder, ", "),
+			NewValue:    strings.Join(sourceColOrder, ", "),
+			Description: "Column order changed",
+		})
+	}
+
 	for name, sourceCol := range sourceCols {
 		if targetCol, exists := targetCols[name]; exists {
 			// Type change
@@ -269,6 +376,37 @@ func compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
 	return differences
 }
 
+func getColumnOrder(columns []types.Column) []string {
+	order := make([]string, len(columns))
+	for i, c := range columns {
+		order[i] = c.Name
+	}
+	return order
+}
+
+// getExistingColumnOrder returns column order only for columns that exist in both tables
+func getExistingColumnOrder(columns []types.Column, otherCols map[string]*types.Column) []string {
+	var order []string
+	for _, c := range columns {
+		if _, exists := otherCols[c.Name]; exists {
+			order = append(order, c.Name)
+		}
+	}
+	return order
+}
+
+func columnOrdersEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 	var differences types.DiffList
 	sourceIndexes := make(map[string]*types.Index)
@@ -295,7 +433,7 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 		} else {
 			// Index definition change
 			targetIdx := targetIndexes[name]
-			if idx.Definition != targetIdx.Definition {
+			if idx.Definition != targetIdx.Definition || !stringSlicesEqual(idx.Columns, targetIdx.Columns) {
 				differences = append(differences, types.Diff{
 					Type:      types.DiffAlter,
 					Object:    types.ObjectIndex,
@@ -322,6 +460,18 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 	return differences
 }
 
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func compareConstraints(sourceTable, targetTable *types.Table) types.DiffList {
 	var differences types.DiffList
 	sourceCons := make(map[string]*types.Constraint)
@@ -337,14 +487,29 @@ func compareConstraints(sourceTable, targetTable *types.Table) types.DiffList {
 	}
 
 	// New constraints
-	for name := range sourceCons {
-		if _, exists := targetCons[name]; !exists {
+	for name, srcCons := range sourceCons {
+		if tgtCons, exists := targetCons[name]; !exists {
 			differences = append(differences, types.Diff{
 				Type:      types.DiffAdd,
 				Object:    types.ObjectConstraint,
 				Name:      name,
 				TableName: sourceTable.Name,
 			})
+		} else {
+			// Check for column changes in PRIMARY KEY
+			if srcCons.Type == "PRIMARY KEY" && tgtCons.Type == "PRIMARY KEY" {
+				if !stringSlicesEqual(srcCons.Columns, tgtCons.Columns) {
+					differences = append(differences, types.Diff{
+						Type:      types.DiffAlter,
+						Object:    types.ObjectConstraint,
+						Name:      name,
+						TableName: sourceTable.Name,
+						OldValue:  strings.Join(tgtCons.Columns, ", "),
+						NewValue:  strings.Join(srcCons.Columns, ", "),
+						Description: "Primary key columns changed",
+					})
+				}
+			}
 		}
 	}
 
@@ -386,8 +551,9 @@ func compareForeignKeys(sourceTable, targetTable *types.Table) types.DiffList {
 				TableName: sourceTable.Name,
 			})
 		} else {
-			// FK definition change
 			targetFK := targetFKs[name]
+			
+			// Reference table change
 			if fk.RefTable != targetFK.RefTable {
 				differences = append(differences, types.Diff{
 					Type:      types.DiffAlter,
@@ -396,6 +562,46 @@ func compareForeignKeys(sourceTable, targetTable *types.Table) types.DiffList {
 					TableName: sourceTable.Name,
 					OldValue:  targetFK.RefTable,
 					NewValue:  fk.RefTable,
+					Description: "Referenced table changed",
+				})
+			}
+			
+			// FK columns change
+			if !stringSlicesEqual(fk.Columns, targetFK.Columns) {
+				differences = append(differences, types.Diff{
+					Type:      types.DiffAlter,
+					Object:    types.ObjectForeignKey,
+					Name:      name,
+					TableName: sourceTable.Name,
+					OldValue:  strings.Join(targetFK.Columns, ", "),
+					NewValue:  strings.Join(fk.Columns, ", "),
+					Description: "Foreign key columns changed",
+				})
+			}
+			
+			// ON DELETE change
+			if fk.OnDelete != targetFK.OnDelete {
+				differences = append(differences, types.Diff{
+					Type:      types.DiffAlter,
+					Object:    types.ObjectForeignKey,
+					Name:      name,
+					TableName: sourceTable.Name,
+					OldValue:  "ON DELETE " + targetFK.OnDelete,
+					NewValue:  "ON DELETE " + fk.OnDelete,
+					Description: "ON DELETE action changed",
+				})
+			}
+			
+			// ON UPDATE change
+			if fk.OnUpdate != targetFK.OnUpdate {
+				differences = append(differences, types.Diff{
+					Type:      types.DiffAlter,
+					Object:    types.ObjectForeignKey,
+					Name:      name,
+					TableName: sourceTable.Name,
+					OldValue:  "ON UPDATE " + targetFK.OnUpdate,
+					NewValue:  "ON UPDATE " + fk.OnUpdate,
+					Description: "ON UPDATE action changed",
 				})
 			}
 		}

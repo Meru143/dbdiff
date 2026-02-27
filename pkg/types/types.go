@@ -68,9 +68,10 @@ type Type struct {
 type DiffType string
 
 const (
-	DiffAdd   DiffType = "ADD"
-	DiffDrop  DiffType = "DROP"
-	DiffAlter DiffType = "ALTER"
+	DiffAdd    DiffType = "ADD"
+	DiffDrop   DiffType = "DROP"
+	DiffAlter  DiffType = "ALTER"
+	DiffRename DiffType = "RENAME"
 )
 
 type DiffObject string
@@ -86,13 +87,14 @@ const (
 )
 
 type Diff struct {
-	Type      DiffType   `json:"type"`
-	Object    DiffObject `json:"object"`
-	Name      string     `json:"name"`
-	TableName string     `json:"table_name,omitempty"`
-	OldValue  string     `json:"old_value,omitempty"`
-	NewValue  string     `json:"new_value,omitempty"`
-	SQL       string     `json:"sql,omitempty"`
+	Type       DiffType   `json:"type"`
+	Object     DiffObject `json:"object"`
+	Name       string     `json:"name"`
+	TableName  string     `json:"table_name,omitempty"`
+	OldValue   string     `json:"old_value,omitempty"`
+	NewValue   string     `json:"new_value,omitempty"`
+	SQL        string     `json:"sql,omitempty"`
+	Description string    `json:"description,omitempty"`
 }
 
 type DiffList []Diff
