@@ -25,6 +25,9 @@ type Config struct {
 	BackupDir       string
 	MaxBackups      int
 	ProtectedObjects []string
+	LogLevel        string
+	LogJSON         bool
+	LogFile         string
 }
 
 func Load(flags map[string]interface{}) (*Config, error) {
@@ -40,6 +43,9 @@ func Load(flags map[string]interface{}) (*Config, error) {
 	v.SetDefault("debug", false)
 	v.SetDefault("ssl-mode", "disable")
 	v.SetDefault("backup-dir", "")
+	v.SetDefault("log-level", "info")
+	v.SetDefault("log-json", false)
+	v.SetDefault("log-file", "")
 	v.SetDefault("max-backups", 5)
 	v.SetDefault("protected-objects", []string{})
 
@@ -81,6 +87,9 @@ func Load(flags map[string]interface{}) (*Config, error) {
 		Debug:           v.GetBool("debug"),
 		SSLMode:         v.GetString("ssl-mode"),
 		BackupDir:       v.GetString("backup-dir"),
+		LogLevel:        v.GetString("log-level"),
+		LogJSON:         v.GetBool("log-json"),
+		LogFile:         v.GetString("log-file"),
 		MaxBackups:      v.GetInt("max-backups"),
 		ProtectedObjects: v.GetStringSlice("protected-objects"),
 	}, nil
