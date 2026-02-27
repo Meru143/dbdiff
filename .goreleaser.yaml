@@ -46,12 +46,16 @@ release:
   draft: false
   prerelease: auto
 
-brew:
-  github:
-    owner: Meru143
-    name: homebrew-dbdiff
-  tap:
-    owner: Meru143
-    name: homebrew-dbdiff
-  folder: Formula
-  name: dbdiff
+brews:
+  - repository:
+      owner: Meru143
+      name: homebrew-dbdiff
+      branch: main
+    folder: Formula
+    name: dbdiff
+    commit_author:
+      name: github-actions
+    commit_message: |
+      {{ .ProjectName }} {{ .Tag }}
+      
+      Download: {{ .AssetURL }}
