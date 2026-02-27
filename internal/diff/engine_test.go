@@ -145,3 +145,40 @@ func TestCompare_TypeChange(t *testing.T) {
 		t.Errorf("Expected new value bigint, got %s", result[0].NewValue)
 	}
 }
+
+func TestCompare_IndexDiff(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Indexes: []types.Index{
+					{Name: "users_email_idx", Definition: "CREATE INDEX users_email_idx ON users(email)"},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Indexes: []types.Index{},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+
+	// Should have 1 diff for the new index
+	found := false
+	for _, diff := range result {
+		if diff.Object == types.ObjectIndex && diff.Name == "users_email_idx" {
+			found = true
+			if diff.Type != types.DiffAdd {
+				t.Errorf("Expected ADD, got %s", diff.Type)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("Expected index diff, got %v", result)
+	}
+}
