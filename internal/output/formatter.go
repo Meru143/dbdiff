@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	dbdiff "github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -23,6 +24,7 @@ type FormatOptions struct {
 // Formatter handles output formatting
 type Formatter struct {
 	options FormatOptions
+	sourceSchema *types.Schema
 }
 
 // NewFormatter creates a new formatter
@@ -34,13 +36,27 @@ func NewFormatter(format string) *Formatter {
 			IncludeMeta: true,
 			UseColors:   isTTY(),
 		},
+		sourceSchema: nil,
 	}
 }
 
 // NewFormatterWithOptions creates a formatter with custom options
 func NewFormatterWithOptions(opts FormatOptions) *Formatter {
 	opts.UseColors = opts.UseColors && isTTY()
-	return &Formatter{options: opts}
+	return &Formatter{options: opts, sourceSchema: nil}
+}
+
+// NewFormatterWithSchema creates a formatter with source schema for full SQL generation
+func NewFormatterWithSchema(format string, sourceSchema *types.Schema) *Formatter {
+	return &Formatter{
+		options: FormatOptions{
+			Format:      format,
+			PrettyPrint: true,
+			IncludeMeta: true,
+			UseColors:   isTTY(),
+		},
+		sourceSchema: sourceSchema,
+	}
 }
 
 // Format formats diffs based on configured format
@@ -174,8 +190,16 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 }
 
 func (f *Formatter) formatDiffSQL(diff *types.Diff) string {
-	// Placeholder - actual SQL generation is in diff/generator.go
-	return "-- SQL generation handled by diff engine\n"
+	// Use SQLGenerator for proper SQL generation
+	// Disable transaction wrapper since FormatMigration handles that
+	var generator *dbdiff.SQLGenerator
+	if f.sourceSchema != nil {
+		generator = dbdiff.NewSQLGeneratorWithSchema(types.DiffList{*diff}, f.options.SourceDB, f.sourceSchema)
+	} else {
+		generator = dbdiff.NewSQLGenerator(types.DiffList{*diff}, f.options.SourceDB)
+	}
+	generator.SetTransaction(false)
+	return generator.Generate()
 }
 
 // formatTable creates ASCII table output

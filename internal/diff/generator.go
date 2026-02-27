@@ -11,6 +11,7 @@ import (
 // SQLGenerator generates SQL statements from diffs
 type SQLGenerator struct {
 	diffs        types.DiffList
+	sourceSchema *types.Schema
 	schemaName   string
 	lockTimeout  string
 	concurrently bool
@@ -21,11 +22,29 @@ type SQLGenerator struct {
 func NewSQLGenerator(diffs types.DiffList, schemaName string) *SQLGenerator {
 	return &SQLGenerator{
 		diffs:        diffs,
+		sourceSchema: nil,
 		schemaName:   schemaName,
 		lockTimeout:  "10s",
 		concurrently: true,
 		transaction:  true,
 	}
+}
+
+// NewSQLGeneratorWithSchema creates a new SQL generator with source schema for full SQL generation
+func NewSQLGeneratorWithSchema(diffs types.DiffList, schemaName string, sourceSchema *types.Schema) *SQLGenerator {
+	return &SQLGenerator{
+		diffs:        diffs,
+		sourceSchema: sourceSchema,
+		schemaName:   schemaName,
+		lockTimeout:  "10s",
+		concurrently: true,
+		transaction:  true,
+	}
+}
+
+// SetTransaction controls transaction wrapping
+func (g *SQLGenerator) SetTransaction(useTransaction bool) {
+	g.transaction = useTransaction
 }
 
 // Generate produces SQL statements
@@ -161,10 +180,16 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 	schema := schemaPrefix(g.schemaName)
 	switch diff.Type {
 	case types.DiffAdd:
-		// For full CREATE TABLE with columns, we need the source table schema
-		// This is a placeholder that creates empty table
-		// TODO: Pass full source table to generate proper CREATE TABLE
-		return fmt.Sprintf("-- Create table: %s\n-- WARNING: Empty table created. Add columns manually.\nCREATE TABLE IF NOT EXISTS %s%s ();", diff.Name, schema, diff.Name)
+		// Try to get full table definition from source schema
+		if g.sourceSchema != nil {
+			for _, table := range g.sourceSchema.Tables {
+				if table.Name == diff.Name {
+					return g.generateFullCreateTable(&table, schema)
+				}
+			}
+		}
+		// Fallback if no source schema
+		return fmt.Sprintf("-- Create table: %s\nCREATE TABLE IF NOT EXISTS %s%s ();", diff.Name, schema, diff.Name)
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
 	case types.DiffRename:
@@ -173,6 +198,98 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 	default:
 		return ""
 	}
+}
+
+// generateFullCreateTable generates a complete CREATE TABLE statement with columns and constraints
+func (g *SQLGenerator) generateFullCreateTable(table *types.Table, schema string) string {
+	var parts []string
+	
+	// Generate column definitions
+	var colDefs []string
+	for _, col := range table.Columns {
+		colDef := g.generateColumnDefinition(col)
+		colDefs = append(colDefs, colDef)
+	}
+	
+	// Generate table-level constraints (UNIQUE, CHECK)
+	for _, cons := range table.Constraints {
+		if cons.Type == "UNIQUE" || cons.Type == "CHECK" {
+			colDefs = append(colDefs, g.generateConstraintDefinition(cons, table.Name))
+		}
+	}
+	
+	if len(colDefs) > 0 {
+		parts = append(parts, strings.Join(colDefs, ",\n  "))
+	}
+	
+	// Generate primary key
+	for _, cons := range table.Constraints {
+		if cons.Type == "PRIMARY KEY" {
+			parts = append(parts, fmt.Sprintf("  PRIMARY KEY (%s)", strings.Join(cons.Columns, ", ")))
+		}
+	}
+	
+	// Generate foreign keys
+	for _, fk := range table.ForeignKeys {
+		parts = append(parts, g.generateForeignKeyDefinition(fk))
+	}
+	
+	// Build the CREATE TABLE statement
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("-- Create table: %s\n", table.Name))
+	sb.WriteString(fmt.Sprintf("CREATE TABLE %s%s (\n  %s\n);", schema, table.Name, strings.Join(parts, ",\n  ")))
+	
+	return sb.String()
+}
+
+// generateColumnDefinition generates a column definition
+func (g *SQLGenerator) generateColumnDefinition(col types.Column) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s %s", col.Name, col.DataType))
+	
+	// Add default value
+	if col.DefaultValue != nil && *col.DefaultValue != "" {
+		sb.WriteString(fmt.Sprintf(" DEFAULT %s", *col.DefaultValue))
+	}
+	
+	// Add null constraint
+	if !col.IsNullable {
+		sb.WriteString(" NOT NULL")
+	}
+	
+	return sb.String()
+}
+
+// generateConstraintDefinition generates a table-level constraint definition
+func (g *SQLGenerator) generateConstraintDefinition(cons types.Constraint, tableName string) string {
+	switch cons.Type {
+	case "UNIQUE":
+		return fmt.Sprintf("UNIQUE (%s)", strings.Join(cons.Columns, ", "))
+	case "CHECK":
+		// Check constraints need a definition - use placeholder if not available
+		return fmt.Sprintf("CONSTRAINT %s CHECK (%s)", cons.Name, strings.Join(cons.Columns, " AND "))
+	default:
+		return fmt.Sprintf("CONSTRAINT %s", cons.Name)
+	}
+}
+
+// generateForeignKeyDefinition generates a foreign key constraint
+func (g *SQLGenerator) generateForeignKeyDefinition(fk types.ForeignKey) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s(%s)", 
+		fk.Name, 
+		strings.Join(fk.Columns, ", "),
+		fk.RefTable,
+		strings.Join(fk.RefColumns, ", ")))
+	
+	if fk.OnDelete != "" && fk.OnDelete != "NO ACTION" {
+		sb.WriteString(fmt.Sprintf(" ON DELETE %s", fk.OnDelete))
+	}
+	if fk.OnUpdate != "" && fk.OnUpdate != "NO ACTION" {
+		sb.WriteString(fmt.Sprintf(" ON UPDATE %s", fk.OnUpdate))
+	}
+	
+	return sb.String()
 }
 
 func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
