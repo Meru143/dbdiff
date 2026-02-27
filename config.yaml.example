@@ -1,0 +1,41 @@
+# DBDiff Configuration Example
+# Copy to config.yaml and customize
+
+# Source database connection string
+source: postgres://user:password@localhost:5432/dbname
+
+# Target database connection string
+target: postgres://user:password@localhost:5432/dbname
+
+# Output file path (default: stdout)
+output: ./migrations/001.sql
+
+# Output format: sql, table, json
+format: sql
+
+# Schema to compare (default: public)
+schema: public
+
+# Dry-run mode (default: true)
+dry-run: true
+
+# Wrap migrations in transaction (default: true)
+transaction: true
+
+# Query timeout in seconds (default: 30)
+timeout: 30
+
+# SSL mode: disable, require, verify-ca, verify-full
+ssl-mode: disable
+
+# Columns to ignore (supports wildcards)
+ignore_patterns:
+  - "_created_at"
+  - "_updated_at"
+  - "migration_*"
+
+# Enable verbose output
+verbose: false
+
+# Enable debug mode
+debug: false
