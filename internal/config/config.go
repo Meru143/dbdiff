@@ -13,6 +13,7 @@ type Config struct {
 	Output         string
 	Format         string
 	DryRun         bool
+	Force          bool
 	ConfigFile     string
 	IgnorePatterns []string
 	Schema         string
@@ -64,6 +65,7 @@ func Load(flags map[string]interface{}) (*Config, error) {
 		Output:         v.GetString("output"),
 		Format:         v.GetString("format"),
 		DryRun:         v.GetBool("dry-run"),
+		Force:          v.GetBool("force"),
 		ConfigFile:     v.GetString("config"),
 		IgnorePatterns: v.GetStringSlice("ignore-patterns"),
 		Schema:         v.GetString("schema"),

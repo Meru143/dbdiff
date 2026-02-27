@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/meru143/dbdiff/internal/db"
 	"github.com/meru143/dbdiff/internal/diff"
@@ -10,6 +13,25 @@ import (
 	"github.com/meru143/dbdiff/internal/output"
 	"github.com/spf13/cobra"
 )
+
+// confirmPrompt asks the user for confirmation
+func confirmPrompt() bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Do you want to proceed? (yes/no/abort): ")
+	response, _ := reader.ReadString('\n')
+	response = strings.ToLower(strings.TrimSpace(response))
+	
+	switch response {
+	case "yes", "y":
+		return true
+	case "no", "n":
+		return false
+	case "abort", "a":
+		fmt.Println("Aborted.")
+		os.Exit(0)
+	}
+	return false
+}
 
 var MigrateCmd = &cobra.Command{
 	Use:   "migrate [source] [target]",
@@ -77,6 +99,15 @@ var MigrateCmd = &cobra.Command{
 
 		header := fmt.Sprintf("-- DBDiff Migration\n-- Source: %s\n-- Target: %s\n-- Schema: %s\n\n", source, target, cfg.Schema)
 		fullSQL := header + migrationSQL
+
+		// Confirmation prompt (only for non-dry-run, non-force)
+		if !cfg.DryRun && !cfg.Force && cfg.Output != "stdout" {
+			fmt.Printf("\nMigration will write to: %s\n", cfg.Output)
+			if !confirmPrompt() {
+				logging.Info("Migration cancelled")
+				return nil
+			}
+		}
 
 		if cfg.Output == "stdout" {
 			fmt.Println(fullSQL)
