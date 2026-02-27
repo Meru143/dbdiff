@@ -179,3 +179,58 @@ func TestSequence_JSON(t *testing.T) {
 func strPtr(s string) *string {
 	return &s
 }
+
+func TestIndex_JSON(t *testing.T) {
+	idx := Index{
+		Name:       "users_email_idx",
+		Columns:    []string{"email"},
+		IsUnique:   true,
+		IsPrimary: false,
+		Definition: "CREATE UNIQUE INDEX users_email_idx ON users(email)",
+	}
+
+	data, err := json.Marshal(idx)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+
+	var decoded Index
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	if decoded.Name != "users_email_idx" {
+		t.Errorf("Expected 'users_email_idx', got %s", decoded.Name)
+	}
+	if len(decoded.Columns) != 1 || decoded.Columns[0] != "email" {
+		t.Errorf("Expected columns [email], got %v", decoded.Columns)
+	}
+	if !decoded.IsUnique {
+		t.Errorf("Expected unique index")
+	}
+}
+
+func TestConstraint_JSON(t *testing.T) {
+	cons := Constraint{
+		Name:    "users_email_key",
+		Type:    "UNIQUE",
+		Columns: []string{"email"},
+	}
+
+	data, err := json.Marshal(cons)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+
+	var decoded Constraint
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	if decoded.Name != "users_email_key" {
+		t.Errorf("Expected 'users_email_key', got %s", decoded.Name)
+	}
+	if decoded.Type != "UNIQUE" {
+		t.Errorf("Expected type UNIQUE, got %s", decoded.Type)
+	}
+}

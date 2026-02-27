@@ -182,3 +182,211 @@ func TestCompare_IndexDiff(t *testing.T) {
 		t.Errorf("Expected index diff, got %v", result)
 	}
 }
+
+func TestCompare_DroppedColumn(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Columns: []types.Column{
+					{Name: "id", DataType: "integer"},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Columns: []types.Column{
+					{Name: "id", DataType: "integer"},
+					{Name: "email", DataType: "varchar"},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+
+	// Should detect dropped column
+	found := false
+	for _, diff := range result {
+		if diff.Object == types.ObjectColumn && diff.Type == types.DiffDrop && diff.Name == "email" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected dropped column diff for 'email', got %v", result)
+	}
+}
+
+func TestCompare_DefaultValueChange(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "posts",
+				Columns: []types.Column{
+					{Name: "id", DataType: "integer"},
+					{Name: "published", DataType: "bool", DefaultValue: strPtr("true")},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "posts",
+				Columns: []types.Column{
+					{Name: "id", DataType: "integer"},
+					{Name: "published", DataType: "bool"},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+
+	found := false
+	for _, diff := range result {
+		if diff.Object == types.ObjectColumn && diff.Type == types.DiffAlter && diff.Name == "published" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected default value change diff, got %v", result)
+	}
+}
+
+func TestCompare_DroppedIndex(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Indexes: []types.Index{},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Indexes: []types.Index{
+					{Name: "users_email_idx", Columns: []string{"email"}},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+
+	found := false
+	for _, diff := range result {
+		if diff.Object == types.ObjectIndex && diff.Type == types.DiffDrop && diff.Name == "users_email_idx" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected dropped index diff, got %v", result)
+	}
+}
+
+func TestCompare_NewForeignKey(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "posts",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}},
+				ForeignKeys: []types.ForeignKey{
+					{
+						Name:       "posts_user_fk",
+						Columns:    []string{"user_id"},
+						RefTable:   "users",
+						RefColumns: []string{"id"},
+					},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "posts",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+
+	found := false
+	for _, diff := range result {
+		if diff.Object == types.ObjectForeignKey && diff.Type == types.DiffAdd && diff.Name == "posts_user_fk" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected new FK diff, got %v", result)
+	}
+}
+
+func TestCompare_DroppedForeignKey(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "posts",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "posts",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}},
+				ForeignKeys: []types.ForeignKey{
+					{
+						Name:       "posts_user_fk",
+						Columns:    []string{"user_id"},
+						RefTable:   "users",
+						RefColumns: []string{"id"},
+					},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+
+	found := false
+	for _, diff := range result {
+		if diff.Object == types.ObjectForeignKey && diff.Type == types.DiffDrop && diff.Name == "posts_user_fk" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected dropped FK diff, got %v", result)
+	}
+}
+
+func TestCompare_Sequence(t *testing.T) {
+	source := &types.Schema{
+		Sequences: []types.Sequence{
+			{Name: "users_id_seq", Start: 100, Increment: 2},
+		},
+	}
+	target := &types.Schema{
+		Sequences: []types.Sequence{
+			{Name: "users_id_seq", Start: 1, Increment: 1},
+		},
+	}
+
+	result := Compare(source, target)
+
+	if len(result) == 0 {
+		t.Errorf("Expected sequence differences")
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}

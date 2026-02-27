@@ -168,3 +168,94 @@ func TestLoad_BackupConfig(t *testing.T) {
 		t.Errorf("Expected 2 protected objects, got %d", len(cfg.ProtectedObjects))
 	}
 }
+
+func TestLoad_FromEnv(t *testing.T) {
+	// Set environment variables
+	os.Setenv("DBDIFF_SOURCE", "postgres://envuser:envpass@localhost/envdb")
+	os.Setenv("DBDIFF_SCHEMA", "envschema")
+	os.Setenv("DBDIFF_TIMEOUT", "60s")
+	defer os.Unsetenv("DBDIFF_SOURCE")
+	defer os.Unsetenv("DBDIFF_SCHEMA")
+	defer os.Unsetenv("DBDIFF_TIMEOUT")
+
+	cfg, err := Load(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.Source != "postgres://envuser:envpass@localhost/envdb" {
+		t.Errorf("Expected source from env, got %s", cfg.Source)
+	}
+	if cfg.Schema != "envschema" {
+		t.Errorf("Expected schema from env, got %s", cfg.Schema)
+	}
+}
+
+func TestLoad_Validation(t *testing.T) {
+	// Test that empty source/target is allowed (commands handle validation)
+	cfg, err := Load(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Default values should be set
+	if cfg.Timeout == 0 {
+		t.Errorf("Expected timeout to be set")
+	}
+	if cfg.MaxBackups == 0 {
+		t.Errorf("Expected max-backups to have default")
+	}
+}
+
+func TestLoad_AllFlags(t *testing.T) {
+	flags := map[string]interface{}{
+		"source":            "postgres://a:b@localhost:5432/db",
+		"target":            "postgres://c:d@localhost:5432/db2",
+		"output":           "/tmp/out.sql",
+		"format":           "table",
+		"dry-run":          "false",
+		"force":            "true",
+		"schema":           "custom",
+		"timeout":          "120s",
+		"transaction":      "false",
+		"verbose":          "true",
+		"debug":            "true",
+		"ssl-mode":         "require",
+		"backup-dir":       "/backups",
+		"max-backups":      "20",
+		"protected-objects": []string{"critical_table"},
+	}
+
+	cfg, err := Load(flags)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify all values
+	tests := []struct {
+		got, want interface{}
+		name     string
+	}{
+		{cfg.Source, "postgres://a:b@localhost:5432/db", "source"},
+		{cfg.Target, "postgres://c:d@localhost:5432/db2", "target"},
+		{cfg.Output, "/tmp/out.sql", "output"},
+		{cfg.Format, "table", "format"},
+		{cfg.DryRun, false, "dry-run"},
+		{cfg.Force, true, "force"},
+		{cfg.Schema, "custom", "schema"},
+		{cfg.Timeout.Seconds(), 120.0, "timeout"},
+		{cfg.Transaction, false, "transaction"},
+		{cfg.Verbose, true, "verbose"},
+		{cfg.Debug, true, "debug"},
+		{cfg.SSLMode, "require", "ssl-mode"},
+		{cfg.BackupDir, "/backups", "backup-dir"},
+		{cfg.MaxBackups, 20, "max-backups"},
+		{len(cfg.ProtectedObjects), 1, "protected-objects"},
+	}
+
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("Expected %s = %v, got %v", tt.name, tt.want, tt.got)
+		}
+	}
+}
