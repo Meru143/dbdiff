@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/meru143/dbdiff/internal/config"
 	"github.com/meru143/dbdiff/internal/db"
@@ -11,7 +10,7 @@ import (
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/meru143/dbdiff/internal/output"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/spf13/pflag"
 )
 
 var CompareCmd = &cobra.Command{
@@ -89,7 +88,7 @@ var CompareCmd = &cobra.Command{
 
 func loadConfig(cmd *cobra.Command) (*config.Config, error) {
 	flags := make(map[string]interface{})
-	cmd.Flags().VisitAll(func(f *cobra.Flag) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if f.Changed {
 			flags[f.Name] = f.Value.String()
 		}
@@ -101,8 +100,5 @@ func getConfigValue(args []string, index int, flagVal string, flagName string) s
 	if len(args) > index {
 		return args[index]
 	}
-	if flagVal != "" {
-		return flagVal
-	}
-	return viper.GetString(flagName)
+	return flagVal
 }

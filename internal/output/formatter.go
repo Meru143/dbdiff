@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/meru143/dbdiff/pkg/types"
-	"github.com/olekukonko/tablewriter"
 )
 
 type Formatter struct {
@@ -58,25 +57,32 @@ func (f *Formatter) formatSQL(diffs types.DiffList) string {
 
 func (f *Formatter) formatTable(diffs types.DiffList) string {
 	var sb strings.Builder
-	table := tablewriter.NewWriter(&sb)
-	table.SetHeader([]string{"Type", "Object", "Name", "Table", "Details"})
-	table.SetBorder(true)
+	sb.WriteString("\n+------+--------+--------------+---------------+---------------------------+\n")
+	sb.WriteString("| Type | Object | Name         | Table         | Details                   |\n")
+	sb.WriteString("+------+--------+--------------+---------------+---------------------------+\n")
 
 	for _, diff := range diffs {
 		details := ""
 		if diff.OldValue != "" && diff.NewValue != "" {
-			details = fmt.Sprintf("%s → %s", diff.OldValue, diff.NewValue)
+			details = fmt.Sprintf("%s -> %s", diff.OldValue, diff.NewValue)
 		}
-		table.Append([]string{
-			string(diff.Type),
-			string(diff.Object),
-			diff.Name,
-			diff.TableName,
-			details,
-		})
+		sb.WriteString(fmt.Sprintf("| %-4s | %-6s | %-12s | %-13s | %-25s |\n",
+			truncate(string(diff.Type), 4),
+			truncate(string(diff.Object), 6),
+			truncate(diff.Name, 12),
+			truncate(diff.TableName, 13),
+			truncate(details, 25),
+		))
 	}
-	table.Render()
+	sb.WriteString("+------+--------+--------------+---------------+---------------------------+\n")
 	return sb.String()
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) > maxLen {
+		return s[:maxLen-2] + ".."
+	}
+	return s
 }
 
 func (f *Formatter) formatJSON(diffs types.DiffList) string {

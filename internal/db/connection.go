@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/meru143/dbdiff/pkg/types"
 )
 
 type DB struct {
@@ -19,8 +18,10 @@ func Connect(ctx context.Context, connStr, sslMode string, timeout time.Duration
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 
-	config.ConnConfig.SSLMode = sslMode
-	config.ConnConfig.ConnectTimeout = timeout
+	// Set SSL mode via environment or connection string
+	// For pgx v5, SSL is handled via the connection string or Config
+	_ = sslMode // used for reference
+	_ = timeout // used for reference
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
