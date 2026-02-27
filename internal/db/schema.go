@@ -2,45 +2,76 @@ package db
 
 import (
 	"context"
+	"fmt"
+	"log"
 
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
-func Introspect(ctx context.Context, db *DB, schemaName string, ignorePatterns []string) (*types.Schema, error) {
+// Introspector handles database schema introspection
+type Introspector struct {
+	db             *DB
+	schemaName     string
+	ignorePatterns []string
+	verbose        bool
+}
+
+// NewIntrospector creates a new Introspector
+func NewIntrospector(db *DB, schemaName string, ignorePatterns []string, verbose bool) *Introspector {
+	return &Introspector{
+		db:             db,
+		schemaName:     schemaName,
+		ignorePatterns: ignorePatterns,
+		verbose:        verbose,
+	}
+}
+
+// Introspect performs full schema introspection
+func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	schema := &types.Schema{
 		Tables:    make([]types.Table, 0),
 		Sequences: make([]types.Sequence, 0),
+		Types:     make([]types.Type, 0),
 	}
 
-	tables, err := getTables(ctx, db, schemaName)
+	// Get tables
+	if i.verbose {
+		log.Println("Introspecting tables...")
+	}
+	tables, err := getTables(ctx, i.db, i.schemaName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get tables: %w", err)
 	}
 
-	for _, tableName := range tables {
-		columns, err := getColumns(ctx, db, schemaName, tableName)
-		if err != nil {
-			return nil, err
+	// Process each table
+	for idx, tableName := range tables {
+		if i.verbose {
+			log.Printf("Processing table %d/%d: %s", idx+1, len(tables), tableName)
 		}
 
-		filteredColumns := filterColumns(columns, ignorePatterns)
+		columns, err := getColumns(ctx, i.db, i.schemaName, tableName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get columns for %s: %w", tableName, err)
+		}
+
+		filteredColumns := filterColumns(columns, i.ignorePatterns)
 		if len(filteredColumns) == 0 {
 			continue
 		}
 
-		indexes, err := getIndexes(ctx, db, schemaName, tableName)
+		indexes, err := getIndexes(ctx, i.db, i.schemaName, tableName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get indexes for %s: %w", tableName, err)
 		}
 
-		constraints, err := getConstraints(ctx, db, schemaName, tableName)
+		constraints, err := getConstraints(ctx, i.db, i.schemaName, tableName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get constraints for %s: %w", tableName, err)
 		}
 
-		fks, err := getForeignKeys(ctx, db, schemaName, tableName)
+		fks, err := getForeignKeys(ctx, i.db, i.schemaName, tableName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get foreign keys for %s: %w", tableName, err)
 		}
 
 		table := types.Table{
@@ -54,13 +85,38 @@ func Introspect(ctx context.Context, db *DB, schemaName string, ignorePatterns [
 		schema.Tables = append(schema.Tables, table)
 	}
 
-	sequences, err := getSequences(ctx, db, schemaName)
+	// Get sequences
+	if i.verbose {
+		log.Println("Introspecting sequences...")
+	}
+	sequences, err := getSequences(ctx, i.db, i.schemaName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get sequences: %w", err)
 	}
 	schema.Sequences = sequences
 
+	// Get custom types
+	if i.verbose {
+		log.Println("Introspecting custom types...")
+	}
+	customTypes, err := getCustomTypes(ctx, i.db, i.schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get custom types: %w", err)
+	}
+	schema.Types = customTypes
+
+	if i.verbose {
+		log.Printf("Introspection complete: %d tables, %d sequences, %d types",
+			len(schema.Tables), len(schema.Sequences), len(schema.Types))
+	}
+
 	return schema, nil
+}
+
+// Introspect performs full schema introspection (legacy function)
+func Introspect(ctx context.Context, db *DB, schemaName string, ignorePatterns []string) (*types.Schema, error) {
+	introspector := NewIntrospector(db, schemaName, ignorePatterns, false)
+	return introspector.Introspect(ctx)
 }
 
 func ListTables(ctx context.Context, db *DB, schemaName string) ([]string, error) {

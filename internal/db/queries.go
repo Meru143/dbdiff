@@ -104,7 +104,7 @@ func getForeignKeys(ctx context.Context, db *DB, schemaName, tableName string) (
 }
 
 func getSequences(ctx context.Context, db *DB, schemaName string) ([]types.Sequence, error) {
-	query := `SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = $1`
+	query := `SELECT sequence_name, start_value, minimum_value, maximum_value, increment, cache_size, cycle FROM information_schema.sequences WHERE sequence_schema = $1`
 	rows, err := db.Query(ctx, query, schemaName)
 	if err != nil {
 		return nil, err
@@ -114,12 +114,83 @@ func getSequences(ctx context.Context, db *DB, schemaName string) ([]types.Seque
 	var sequences []types.Sequence
 	for rows.Next() {
 		var seq types.Sequence
-		if err := rows.Scan(&seq.Name); err != nil {
+		if err := rows.Scan(&seq.Name, &seq.Start, &seq.MinValue, &seq.MaxValue, &seq.Increment, &seq.Cache, &seq.Cycle); err != nil {
 			return nil, err
 		}
 		sequences = append(sequences, seq)
 	}
 	return sequences, rows.Err()
+}
+
+// getCustomTypes returns user-defined types in the schema
+func getCustomTypes(ctx context.Context, db *DB, schemaName string) ([]types.Type, error) {
+	// Get enum types
+	enumQuery := `SELECT t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE n.nspname = $1 AND t.typtype = 'e'`
+	rows, err := db.Query(ctx, enumQuery, schemaName)
+	if err != nil {
+		return nil, err
+	}
+
+	var customTypes []types.Type
+	for rows.Next() {
+		var typeName string
+		if err := rows.Scan(&typeName); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		// Get enum values
+		vals, err := getEnumValues(ctx, db, typeName)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		customTypes = append(customTypes, types.Type{
+			Name:   typeName,
+			Kind:   "enum",
+			Values: vals,
+		})
+	}
+	rows.Close()
+
+	// Get composite types
+	compQuery := `SELECT t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE n.nspname = $1 AND t.typtype = 'c' AND t.typname NOT LIKE '_%'`
+	rows, err = db.Query(ctx, compQuery, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var typeName string
+		if err := rows.Scan(&typeName); err != nil {
+			return nil, err
+		}
+		customTypes = append(customTypes, types.Type{
+			Name: typeName,
+			Kind: "composite",
+		})
+	}
+
+	return customTypes, rows.Err()
+}
+
+func getEnumValues(ctx context.Context, db *DB, enumName string) ([]string, error) {
+	query := `SELECT enumlabel FROM pg_enum WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = $1) ORDER BY enumsortorder`
+	rows, err := db.Query(ctx, query, enumName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var values []string
+	for rows.Next() {
+		var val string
+		if err := rows.Scan(&val); err != nil {
+			return nil, err
+		}
+		values = append(values, val)
+	}
+	return values, rows.Err()
 }
 
 func filterColumns(columns []types.Column, ignorePatterns []string) []types.Column {
