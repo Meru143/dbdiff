@@ -376,14 +376,6 @@ func compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
 	return differences
 }
 
-func getColumnOrder(columns []types.Column) []string {
-	order := make([]string, len(columns))
-	for i, c := range columns {
-		order[i] = c.Name
-	}
-	return order
-}
-
 // getExistingColumnOrder returns column order only for columns that exist in both tables
 func getExistingColumnOrder(columns []types.Column, otherCols map[string]*types.Column) []string {
 	var order []string
