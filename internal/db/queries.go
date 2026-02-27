@@ -2,11 +2,16 @@ package db
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
-func getTables(ctx context.Context, db *DB, schemaName string) ([]string, error) {
+// Default ignore patterns for columns
+var DefaultIgnorePatterns = []string{"_created_at", "_updated_at", "_modified_at", "_deleted_at"}
+
+func getTables(ctx context.Context, db *DB, schemaName string, ignorePatterns []string) ([]string, error) {
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_type = 'BASE TABLE' ORDER BY table_name`
 	rows, err := db.Query(ctx, query, schemaName)
 	if err != nil {
@@ -20,13 +25,34 @@ func getTables(ctx context.Context, db *DB, schemaName string) ([]string, error)
 		if err := rows.Scan(&name); err != nil {
 			return nil, err
 		}
-		tables = append(tables, name)
+		// Filter by ignore patterns at table level
+		if !matchesIgnorePatterns(name, ignorePatterns) {
+			tables = append(tables, name)
+		}
 	}
 	return tables, rows.Err()
 }
 
 func getColumns(ctx context.Context, db *DB, schemaName, tableName string) ([]types.Column, error) {
-	query := `SELECT column_name, data_type, column_default, is_nullable FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`
+	// Get columns with primary key info
+	query := `
+		SELECT 
+			c.column_name, 
+			c.data_type, 
+			c.column_default, 
+			c.is_nullable,
+			CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key
+		FROM information_schema.columns c
+		LEFT JOIN (
+			SELECT ku.column_name
+			FROM information_schema.table_constraints tc
+			JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
+			WHERE tc.table_schema = $1 
+				AND tc.table_name = $2 
+				AND tc.constraint_type = 'PRIMARY KEY'
+		) pk ON c.column_name = pk.column_name
+		WHERE c.table_schema = $1 AND c.table_name = $2 
+		ORDER BY c.ordinal_position`
 	rows, err := db.Query(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
@@ -36,18 +62,34 @@ func getColumns(ctx context.Context, db *DB, schemaName, tableName string) ([]ty
 	var columns []types.Column
 	for rows.Next() {
 		var col types.Column
-		var defaultVal *string
-		if err := rows.Scan(&col.Name, &col.DataType, &defaultVal, &col.IsNullable); err != nil {
+		var nullable string
+		if err := rows.Scan(&col.Name, &col.DataType, &col.DefaultValue, &nullable, &col.IsPrimaryKey); err != nil {
 			return nil, err
 		}
-		col.DefaultValue = defaultVal
+		// Convert "YES"/"NO" to boolean
+		col.IsNullable = nullable == "YES"
 		columns = append(columns, col)
 	}
 	return columns, rows.Err()
 }
 
 func getIndexes(ctx context.Context, db *DB, schemaName, tableName string) ([]types.Index, error) {
-	query := `SELECT i.relname, ix.indisunique, ix.indisprimary, pg_get_indexdef(ix.indexrelid) FROM pg_class t JOIN pg_index ix ON t.oid = ix.indrelid JOIN pg_class i ON i.oid = ix.indexrelid WHERE t.relname = $2 AND t.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = $1)`
+	// Get ALL indexes (not just PK/unique) with their columns
+	query := `
+		SELECT 
+			i.relname as index_name,
+			ix.indisunique,
+			ix.indisprimary,
+			pg_get_indexdef(ix.indexrelid) as index_def,
+			COALESCE(array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)), ARRAY[]::text[]) as columns
+		FROM pg_class t
+		JOIN pg_index ix ON t.oid = ix.indrelid
+		JOIN pg_class i ON i.oid = ix.indexrelid
+		LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+		WHERE t.relname = $2 
+			AND t.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = $1)
+		GROUP BY i.relname, ix.indisunique, ix.indisprimary, pg_get_indexdef(ix.indexrelid)
+		ORDER BY i.relname`
 	rows, err := db.Query(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
@@ -57,7 +99,7 @@ func getIndexes(ctx context.Context, db *DB, schemaName, tableName string) ([]ty
 	var indexes []types.Index
 	for rows.Next() {
 		var idx types.Index
-		if err := rows.Scan(&idx.Name, &idx.IsUnique, &idx.IsPrimary, &idx.Definition); err != nil {
+		if err := rows.Scan(&idx.Name, &idx.IsUnique, &idx.IsPrimary, &idx.Definition, &idx.Columns); err != nil {
 			return nil, err
 		}
 		indexes = append(indexes, idx)
@@ -79,13 +121,67 @@ func getConstraints(ctx context.Context, db *DB, schemaName, tableName string) (
 		if err := rows.Scan(&cons.Name, &cons.Type); err != nil {
 			return nil, err
 		}
+		// Get constraint columns
+		cols, err := getConstraintColumns(ctx, db, schemaName, tableName, cons.Name)
+		if err != nil {
+			return nil, err
+		}
+		cons.Columns = cols
 		constraints = append(constraints, cons)
 	}
 	return constraints, rows.Err()
 }
 
+func getConstraintColumns(ctx context.Context, db *DB, schemaName, tableName, constraintName string) ([]string, error) {
+	query := `SELECT column_name FROM information_schema.key_column_usage WHERE table_schema = $1 AND table_name = $2 AND constraint_name = $3 ORDER BY ordinal_position`
+	rows, err := db.Query(ctx, query, schemaName, tableName, constraintName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var columns []string
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			return nil, err
+		}
+		columns = append(columns, col)
+	}
+	return columns, rows.Err()
+}
+
 func getForeignKeys(ctx context.Context, db *DB, schemaName, tableName string) ([]types.ForeignKey, error) {
-	query := `SELECT tc.constraint_name, kcu.column_name, ccu.table_name, ccu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name WHERE tc.table_schema = $1 AND tc.table_name = $2 AND tc.constraint_type = 'FOREIGN KEY'`
+	// Get FKs with multi-column support, unique_constraint_name, and ON DELETE/UPDATE
+	query := `
+		SELECT 
+			tc.constraint_name,
+			ARRAY_AGG(kcu.column_name ORDER BY kcu.ordinal_position) as fk_columns,
+			ccu.table_name as reference_table,
+			ARRAY_AGG(ccu.column_name ORDER BY kcu.ordinal_position) as reference_columns,
+			rc.unique_constraint_name,
+			rc.delete_rule,
+			rc.update_rule
+		FROM information_schema.table_constraints tc
+		JOIN information_schema.key_column_usage kcu 
+			ON tc.constraint_name = kcu.constraint_name 
+			AND tc.table_schema = kcu.table_schema
+		JOIN information_schema.constraint_column_usage ccu 
+			ON tc.constraint_name = ccu.constraint_name
+		JOIN (
+			SELECT 
+				r.conname as constraint_name,
+				r.confrelid,
+				r.delete_rule,
+				r.update_rule,
+				r.conname as unique_constraint_name
+			FROM pg_catalog.pg_constraint r
+			WHERE r.contype = 'f'
+		) rc ON tc.constraint_name = rc.constraint_name
+		WHERE tc.table_schema = $1 
+			AND tc.table_name = $2 
+			AND tc.constraint_type = 'FOREIGN KEY'
+		GROUP BY tc.constraint_name, ccu.table_name, rc.unique_constraint_name, rc.delete_rule, rc.update_rule`
 	rows, err := db.Query(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
@@ -95,7 +191,15 @@ func getForeignKeys(ctx context.Context, db *DB, schemaName, tableName string) (
 	var fks []types.ForeignKey
 	for rows.Next() {
 		var fk types.ForeignKey
-		if err := rows.Scan(&fk.Name, &fk.Columns, &fk.RefTable, &fk.RefColumns); err != nil {
+		if err := rows.Scan(
+			&fk.Name, 
+			&fk.Columns, 
+			&fk.RefTable, 
+			&fk.RefColumns,
+			&fk.UniqueConstraintName,
+			&fk.OnDelete,
+			&fk.OnUpdate,
+		); err != nil {
 			return nil, err
 		}
 		fks = append(fks, fk)
@@ -193,20 +297,54 @@ func getEnumValues(ctx context.Context, db *DB, enumName string) ([]string, erro
 	return values, rows.Err()
 }
 
+// matchesIgnorePatterns checks if a name matches any of the ignore patterns
+// Supports: exact match, *suffix, prefix*, *middle*, and ? for single char
+func matchesIgnorePatterns(name string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matchPattern(name, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchPattern implements glob-style matching (*, ?)
+func matchPattern(name, pattern string) bool {
+	// Exact match
+	if name == pattern {
+		return true
+	}
+	
+	// Use filepath.Match for glob patterns
+	matched, _ := filepath.Match(pattern, name)
+	if matched {
+		return true
+	}
+	
+	// Handle * in pattern (filepath.Match should handle this, but just in case)
+	if strings.Contains(pattern, "*") {
+		parts := strings.Split(pattern, "*")
+		if len(parts) == 2 {
+			// prefix*suffix
+			return strings.HasPrefix(name, parts[0]) && strings.HasSuffix(name, parts[1])
+		}
+	}
+	
+	return false
+}
+
+// filterColumns filters columns based on ignore patterns
 func filterColumns(columns []types.Column, ignorePatterns []string) []types.Column {
 	if len(ignorePatterns) == 0 {
 		return columns
 	}
+	
+	// Add default patterns if not specified
+	allPatterns := append(DefaultIgnorePatterns, ignorePatterns...)
+	
 	var filtered []types.Column
 	for _, col := range columns {
-		matched := false
-		for _, pattern := range ignorePatterns {
-			if col.Name == pattern || (len(pattern) > 0 && pattern[0] == '*' && len(col.Name) >= len(pattern)-1 && col.Name[len(col.Name)-(len(pattern)-1):] == pattern[1:]) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
+		if !matchesIgnorePatterns(col.Name, allPatterns) {
 			filtered = append(filtered, col)
 		}
 	}

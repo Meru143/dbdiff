@@ -39,12 +39,13 @@ type Constraint struct {
 }
 
 type ForeignKey struct {
-	Name       string   `json:"name"`
-	Columns    []string `json:"columns"`
-	RefTable   string   `json:"reference_table"`
-	RefColumns []string `json:"reference_columns"`
-	OnDelete   string   `json:"on_delete,omitempty"`
-	OnUpdate   string   `json:"on_update,omitempty"`
+	Name                string   `json:"name"`
+	Columns             []string `json:"columns"`
+	RefTable           string   `json:"reference_table"`
+	RefColumns         []string `json:"reference_columns"`
+	UniqueConstraintName string  `json:"unique_constraint_name,omitempty"`
+	OnDelete           string   `json:"on_delete,omitempty"`
+	OnUpdate           string   `json:"on_update,omitempty"`
 }
 
 type Sequence struct {

@@ -35,7 +35,7 @@ var TablesCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		tables, err := db.ListTables(ctx, conn, cfg.Schema)
+		tables, err := db.ListTables(ctx, conn, cfg.Schema, cfg.IgnorePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to list tables: %w", err)
 		}

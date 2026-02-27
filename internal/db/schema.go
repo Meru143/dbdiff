@@ -38,7 +38,7 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	if i.verbose {
 		log.Println("Introspecting tables...")
 	}
-	tables, err := getTables(ctx, i.db, i.schemaName)
+	tables, err := getTables(ctx, i.db, i.schemaName, i.ignorePatterns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tables: %w", err)
 	}
@@ -119,8 +119,8 @@ func Introspect(ctx context.Context, db *DB, schemaName string, ignorePatterns [
 	return introspector.Introspect(ctx)
 }
 
-func ListTables(ctx context.Context, db *DB, schemaName string) ([]string, error) {
-	return getTables(ctx, db, schemaName)
+func ListTables(ctx context.Context, db *DB, schemaName string, ignorePatterns []string) ([]string, error) {
+	return getTables(ctx, db, schemaName, ignorePatterns)
 }
 
 type ServerInfo struct {
