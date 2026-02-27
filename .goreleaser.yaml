@@ -21,7 +21,7 @@ builds:
 
 archives:
   - id: default
-    format: tarball
+    format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
