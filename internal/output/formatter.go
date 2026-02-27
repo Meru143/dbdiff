@@ -164,6 +164,12 @@ func (f *Formatter) formatDiffSQL(diff *types.Diff) string {
 func (f *Formatter) formatTable(diffs types.DiffList) string {
 	var sb strings.Builder
 
+	// Color codes
+	green := "\033[32m"
+	red := "\033[31m"
+	yellow := "\033[33m"
+	reset := "\033[0m"
+
 	// Header
 	sb.WriteString("\n")
 	sb.WriteString("┌──────┬──────────┬──────────────┬───────────────┬────────────────────────────┐\n")
@@ -178,6 +184,18 @@ func (f *Formatter) formatTable(diffs types.DiffList) string {
 
 		typeStr := string(diff.Type)
 		objStr := string(diff.Object)
+
+		// Apply colors if enabled
+		if f.options.UseColors {
+			switch diff.Type {
+			case types.DiffAdd:
+				typeStr = green + typeStr + reset
+			case types.DiffDrop:
+				typeStr = red + typeStr + reset
+			case types.DiffAlter:
+				typeStr = yellow + typeStr + reset
+			}
+		}
 
 		sb.WriteString(fmt.Sprintf("│ %-4s │ %-8s │ %-12s │ %-13s │ %-26s │\n",
 			typeStr,
