@@ -8,20 +8,23 @@ import (
 )
 
 type Config struct {
-	Source         string
-	Target         string
-	Output         string
-	Format         string
-	DryRun         bool
-	Force          bool
-	ConfigFile     string
-	IgnorePatterns []string
-	Schema         string
-	Timeout        time.Duration
-	Transaction    bool
-	Verbose        bool
-	Debug          bool
-	SSLMode        string
+	Source          string
+	Target          string
+	Output          string
+	Format          string
+	DryRun          bool
+	Force           bool
+	ConfigFile      string
+	IgnorePatterns  []string
+	Schema          string
+	Timeout         time.Duration
+	Transaction     bool
+	Verbose         bool
+	Debug           bool
+	SSLMode         string
+	BackupDir       string
+	MaxBackups      int
+	ProtectedObjects []string
 }
 
 func Load(flags map[string]interface{}) (*Config, error) {
@@ -36,6 +39,9 @@ func Load(flags map[string]interface{}) (*Config, error) {
 	v.SetDefault("verbose", false)
 	v.SetDefault("debug", false)
 	v.SetDefault("ssl-mode", "disable")
+	v.SetDefault("backup-dir", "")
+	v.SetDefault("max-backups", 5)
+	v.SetDefault("protected-objects", []string{})
 
 	for key, value := range flags {
 		if value != nil {
@@ -60,19 +66,22 @@ func Load(flags map[string]interface{}) (*Config, error) {
 	}
 
 	return &Config{
-		Source:         v.GetString("source"),
-		Target:         v.GetString("target"),
-		Output:         v.GetString("output"),
-		Format:         v.GetString("format"),
-		DryRun:         v.GetBool("dry-run"),
-		Force:          v.GetBool("force"),
-		ConfigFile:     v.GetString("config"),
-		IgnorePatterns: v.GetStringSlice("ignore-patterns"),
-		Schema:         v.GetString("schema"),
-		Timeout:        timeout,
-		Transaction:    v.GetBool("transaction"),
-		Verbose:        v.GetBool("verbose"),
-		Debug:          v.GetBool("debug"),
-		SSLMode:        v.GetString("ssl-mode"),
+		Source:          v.GetString("source"),
+		Target:          v.GetString("target"),
+		Output:          v.GetString("output"),
+		Format:          v.GetString("format"),
+		DryRun:          v.GetBool("dry-run"),
+		Force:           v.GetBool("force"),
+		ConfigFile:      v.GetString("config"),
+		IgnorePatterns:  v.GetStringSlice("ignore-patterns"),
+		Schema:          v.GetString("schema"),
+		Timeout:         timeout,
+		Transaction:     v.GetBool("transaction"),
+		Verbose:         v.GetBool("verbose"),
+		Debug:           v.GetBool("debug"),
+		SSLMode:         v.GetString("ssl-mode"),
+		BackupDir:       v.GetString("backup-dir"),
+		MaxBackups:      v.GetInt("max-backups"),
+		ProtectedObjects: v.GetStringSlice("protected-objects"),
 	}, nil
 }

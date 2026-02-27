@@ -11,6 +11,8 @@ import (
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/meru143/dbdiff/internal/output"
+	"github.com/meru143/dbdiff/internal/safety"
+	"github.com/meru143/dbdiff/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -91,6 +93,34 @@ var MigrateCmd = &cobra.Command{
 
 		logging.Info(fmt.Sprintf("Found %d differences", len(differences)))
 
+		// Validate and filter protected objects
+		if len(cfg.ProtectedObjects) > 0 {
+			validator := safety.NewValidator(cfg.ProtectedObjects, cfg.DryRun)
+			validation := validator.ValidateDiffs(differences)
+			
+			if len(validation.Errors) > 0 {
+				for _, err := range validation.Errors {
+					logging.Error(err)
+				}
+				return fmt.Errorf("migration contains protected objects")
+			}
+			
+			// Filter out protected diffs
+			var filteredDiffs []types.Diff
+			for _, d := range differences {
+				if !validator.IsProtected(d.Name) {
+					filteredDiffs = append(filteredDiffs, d)
+				}
+			}
+			differences = filteredDiffs
+			
+			if len(validation.Warnings) > 0 {
+				for _, warn := range validation.Warnings {
+					logging.Warn(warn)
+				}
+			}
+		}
+
 		formatter := output.NewFormatter("sql")
 		migrationSQL, err := formatter.FormatMigration(differences, cfg.Transaction)
 		if err != nil {
@@ -106,6 +136,22 @@ var MigrateCmd = &cobra.Command{
 			if !confirmPrompt() {
 				logging.Info("Migration cancelled")
 				return nil
+			}
+		}
+
+		// Create backup before writing
+		if cfg.BackupDir != "" && cfg.Output != "stdout" && !cfg.DryRun {
+			backupMgr := safety.NewBackupManager(cfg.BackupDir, cfg.MaxBackups)
+			
+			// Check if target file exists
+			if _, err := os.Stat(cfg.Output); err == nil {
+				existingContent, _ := os.ReadFile(cfg.Output)
+				backupPath, err := backupMgr.Backup("migration", existingContent)
+				if err != nil {
+					logging.Warn(fmt.Sprintf("Failed to create backup: %v", err))
+				} else {
+					logging.Info(fmt.Sprintf("Backup created: %s", backupPath))
+				}
 			}
 		}
 

@@ -68,6 +68,9 @@ func init() {
 	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("ssl-mode", rootCmd.PersistentFlags().Lookup("ssl-mode"))
+	_ = viper.BindPFlag("backup-dir", rootCmd.PersistentFlags().Lookup("backup-dir"))
+	_ = viper.BindPFlag("max-backups", rootCmd.PersistentFlags().Lookup("max-backups"))
+	_ = viper.BindPFlag("protected-objects", rootCmd.PersistentFlags().Lookup("protected-objects"))
 
 	// Set custom templates
 	rootCmd.SetUsageTemplate(customUsageTemplate)
@@ -138,6 +141,9 @@ func main() {
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().Bool("debug", false, "Debug mode")
 	rootCmd.PersistentFlags().String("ssl-mode", "disable", "SSL mode")
+	rootCmd.PersistentFlags().String("backup-dir", "", "Backup directory for migrations")
+	rootCmd.PersistentFlags().Int("max-backups", 5, "Maximum number of backups to keep")
+	rootCmd.PersistentFlags().StringSlice("protected-objects", nil, "Protected objects (skip in migration)")
 
 	// Add subcommands
 	rootCmd.AddCommand(cmd.CompareCmd)
