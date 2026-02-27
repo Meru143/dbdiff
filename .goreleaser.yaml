@@ -29,33 +29,17 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-snapshot:
-  name_template: "{{ .Tag }}-next"
-
 changelog:
   filters:
     exclude:
       - '^docs:'
       - '^test:'
       - '^chore:'
+      - '^fix:'
 
 release:
   github:
     owner: Meru143
     name: dbdiff
   draft: false
-  prerelease: auto
-
-brews:
-  - repository:
-      owner: Meru143
-      name: homebrew-dbdiff
-      branch: main
-    folder: Formula
-    name: dbdiff
-    commit_author:
-      name: github-actions
-    commit_message: |
-      {{ .ProjectName }} {{ .Tag }}
-      
-      Download: {{ .AssetURL }}
+  prerelease: false
