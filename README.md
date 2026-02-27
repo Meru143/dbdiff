@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/meru143/dbdiff/actions/workflows/ci.yml/badge.svg)](https://github.com/meru143/dbdiff/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/meru143/dbdiff)](https://github.com/meru143/dbdiff/releases)
+[![Coverage](https://codecov.io/gh/meru143/dbdiff/branch/main/graph/badge.svg)](https://codecov.io/gh/meru143/dbdiff)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/meru143/dbdiff)](https://github.com/meru143/dbdiff)
 
 PostgreSQL schema comparison and migration CLI tool.
