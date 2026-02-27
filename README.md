@@ -1,8 +1,8 @@
 # DBDiff
 
 [![Build](https://github.com/meru143/dbdiff/actions/workflows/ci.yml/badge.svg)](https://github.com/meru143/dbdiff/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/meru143/dbdiff/branch/main/graph/badge.svg)](https://codecov.io/gh/meru143/dbdiff)
 [![Release](https://img.shields.io/github/v/release/meru143/dbdiff)](https://github.com/meru143/dbdiff/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/meru143/dbdiff)](https://github.com/meru143/dbdiff)
 
 PostgreSQL schema comparison and migration CLI tool.
 
@@ -24,8 +24,7 @@ PostgreSQL schema comparison and migration CLI tool.
 go install github.com/meru143/dbdiff@latest
 
 # Via Homebrew
-brew tap meru143/dbdiff
-brew install dbdiff
+brew install meru143/homebrew-dbdiff/dbdiff
 
 # Via binary
 curl -L https://github.com/meru143/dbdiff/releases/latest/download/dbdiff-linux-amd64 -o dbdiff
@@ -65,6 +64,37 @@ ignore_patterns:
   - "_created_at"
   - "_updated_at"
 ```
+
+## Flags
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| --source | -s | Source database URL | |
+| --target | -t | Target database URL | |
+| --output | -o | Output file path | stdout |
+| --format | | Output format: sql, table, json | sql |
+| --schema | | PostgreSQL schema | public |
+| --dry-run | | Dry-run mode (don't write) | true |
+| --force | -f | Skip confirmation prompt | false |
+| --timeout | | Query timeout | 30s |
+| --transaction | | Wrap in transaction | true |
+| --ssl-mode | | SSL mode: disable, require, verify-ca, verify-full | disable |
+| --backup-dir | | Backup directory for migrations | |
+| --max-backups | | Maximum backups to keep | 5 |
+| --protected-objects | | Protected objects (skip in migration) | |
+| --ignore-patterns | | Columns to ignore | |
+| --verbose | -v | Verbose output | |
+| --debug | | Debug output | |
+| --config | -c | Config file path | |
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| DBDIFF_SOURCE | Source database URL |
+| DBDIFF_TARGET | Target database URL |
+| DBDIFF_LOG_LEVEL | Log level: debug, info, warn, error |
+| DBDIFF_CONFIG | Config file path |
 
 ## License
 
