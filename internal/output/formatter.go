@@ -66,7 +66,7 @@ func (f *Formatter) FormatMigration(diffs types.DiffList, transaction bool) (str
 	return sql, nil
 }
 
-// formatSQL generates formatted SQL with comments
+// formatSQL generates formatted SQL with comments and basic indentation
 func (f *Formatter) formatSQL(diffs types.DiffList) string {
 	var sb strings.Builder
 
@@ -102,6 +102,8 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 			sb.WriteString(fmt.Sprintf("-- Create table: %s\n", diff.Name))
 		case types.DiffDrop:
 			sb.WriteString(fmt.Sprintf("-- Drop table: %s\n", diff.Name))
+		case types.DiffRename:
+			sb.WriteString(fmt.Sprintf("-- Rename table: %s -> %s\n", diff.OldValue, diff.NewValue))
 		}
 	case types.ObjectColumn:
 		switch diff.Type {
@@ -118,6 +120,8 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 			sb.WriteString(fmt.Sprintf("-- Create index: %s\n", diff.Name))
 		case types.DiffDrop:
 			sb.WriteString(fmt.Sprintf("-- Drop index: %s\n", diff.Name))
+		case types.DiffAlter:
+			sb.WriteString(fmt.Sprintf("-- Alter index: %s\n", diff.Name))
 		}
 	case types.ObjectConstraint:
 		switch diff.Type {
@@ -125,6 +129,8 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 			sb.WriteString(fmt.Sprintf("-- Add constraint: %s\n", diff.Name))
 		case types.DiffDrop:
 			sb.WriteString(fmt.Sprintf("-- Drop constraint: %s\n", diff.Name))
+		case types.DiffAlter:
+			sb.WriteString(fmt.Sprintf("-- Alter constraint: %s\n", diff.Name))
 		}
 	case types.ObjectForeignKey:
 		switch diff.Type {
@@ -132,6 +138,8 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 			sb.WriteString(fmt.Sprintf("-- Add foreign key: %s\n", diff.Name))
 		case types.DiffDrop:
 			sb.WriteString(fmt.Sprintf("-- Drop foreign key: %s\n", diff.Name))
+		case types.DiffAlter:
+			sb.WriteString(fmt.Sprintf("-- Alter foreign key: %s\n", diff.Name))
 		}
 	case types.ObjectSequence:
 		switch diff.Type {
@@ -142,9 +150,19 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 		case types.DiffAlter:
 			sb.WriteString(fmt.Sprintf("-- Alter sequence: %s\n", diff.Name))
 		}
+	case types.ObjectType:
+		switch diff.Type {
+		case types.DiffAdd:
+			sb.WriteString(fmt.Sprintf("-- Create type: %s\n", diff.Name))
+		case types.DiffDrop:
+			sb.WriteString(fmt.Sprintf("-- Drop type: %s\n", diff.Name))
+		}
 	}
 
 	// Add old/new values as comments
+	if diff.Description != "" {
+		sb.WriteString(fmt.Sprintf("-- %s\n", diff.Description))
+	}
 	if diff.OldValue != "" {
 		sb.WriteString(fmt.Sprintf("-- Old: %s\n", diff.OldValue))
 	}

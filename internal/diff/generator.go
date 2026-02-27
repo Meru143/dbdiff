@@ -161,9 +161,10 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 	schema := schemaPrefix(g.schemaName)
 	switch diff.Type {
 	case types.DiffAdd:
-		// Note: Full CREATE TABLE with columns requires the full table schema
-		// For now, create empty table - actual implementation would need source table schema
-		return fmt.Sprintf("-- Create table: %s\nCREATE TABLE %s%s ();", diff.Name, schema, diff.Name)
+		// For full CREATE TABLE with columns, we need the source table schema
+		// This is a placeholder that creates empty table
+		// TODO: Pass full source table to generate proper CREATE TABLE
+		return fmt.Sprintf("-- Create table: %s\n-- WARNING: Empty table created. Add columns manually.\nCREATE TABLE IF NOT EXISTS %s%s ();", diff.Name, schema, diff.Name)
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
 	case types.DiffRename:
@@ -178,10 +179,13 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 	schema := schemaPrefix(g.schemaName)
 	switch diff.Type {
 	case types.DiffAdd:
-		// For new columns, we'd need the full column definition
-		// This is a placeholder
-		return fmt.Sprintf("-- Add column: %s to %s\nALTER TABLE %s%s ADD COLUMN %s TYPE text;",
-			diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
+		// NewValue contains the data type from comparison
+		dataType := diff.NewValue
+		if dataType == "" {
+			dataType = "text" // fallback
+		}
+		return fmt.Sprintf("-- Add column: %s to %s\nALTER TABLE %s%s ADD COLUMN %s %s;",
+			diff.Name, diff.TableName, schema, diff.TableName, diff.Name, dataType)
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop column: %s from %s\nALTER TABLE %s%s DROP COLUMN IF EXISTS %s CASCADE;",
 			diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
