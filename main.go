@@ -53,20 +53,20 @@ func init() {
 	viper.SetEnvPrefix("DBDIFF")
 	viper.AutomaticEnv()
 
-	// Bind flags to viper
-	viper.BindPFlag("source", rootCmd.PersistentFlags().Lookup("source"))
-	viper.BindPFlag("target", rootCmd.PersistentFlags().Lookup("target"))
-	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
-	viper.BindPFlag("dry-run", rootCmd.PersistentFlags().Lookup("dry-run"))
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	viper.BindPFlag("ignore-patterns", rootCmd.PersistentFlags().Lookup("ignore-patterns"))
-	viper.BindPFlag("schema", rootCmd.PersistentFlags().Lookup("schema"))
-	viper.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
-	viper.BindPFlag("transaction", rootCmd.PersistentFlags().Lookup("transaction"))
-	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("ssl-mode", rootCmd.PersistentFlags().Lookup("ssl-mode"))
+	// Bind flags to viper with error checking
+	_ = viper.BindPFlag("source", rootCmd.PersistentFlags().Lookup("source"))
+	_ = viper.BindPFlag("target", rootCmd.PersistentFlags().Lookup("target"))
+	_ = viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
+	_ = viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
+	_ = viper.BindPFlag("dry-run", rootCmd.PersistentFlags().Lookup("dry-run"))
+	_ = viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	_ = viper.BindPFlag("ignore-patterns", rootCmd.PersistentFlags().Lookup("ignore-patterns"))
+	_ = viper.BindPFlag("schema", rootCmd.PersistentFlags().Lookup("schema"))
+	_ = viper.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
+	_ = viper.BindPFlag("transaction", rootCmd.PersistentFlags().Lookup("transaction"))
+	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	_ = viper.BindPFlag("ssl-mode", rootCmd.PersistentFlags().Lookup("ssl-mode"))
 
 	// Set custom templates
 	rootCmd.SetUsageTemplate(customUsageTemplate)
@@ -84,7 +84,7 @@ func init() {
 
 		// Set up colored output if terminal supports it
 		if isTerminal() {
-			cmd.SetOutput(os.Stdout)
+			cmd.SetOut(os.Stdout)
 		}
 	}
 
