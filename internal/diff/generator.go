@@ -135,6 +135,7 @@ func (g *SQLGenerator) topologicalSort() types.DiffList {
 			types.ObjectType:             6,
 			types.ObjectView:             7,
 			types.ObjectMaterializedView: 8,
+			types.ObjectFunction:         9,
 		}
 		return order[alters[i].Object] < order[alters[j].Object]
 	})
@@ -177,6 +178,8 @@ func (g *SQLGenerator) generateStatement(diff *types.Diff) string {
 		return g.generateViewDiff(diff)
 	case types.ObjectMaterializedView:
 		return g.generateMaterializedViewDiff(diff)
+	case types.ObjectFunction:
+		return g.generateFunctionDiff(diff)
 	default:
 		return ""
 	}
