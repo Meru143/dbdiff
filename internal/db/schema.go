@@ -29,10 +29,11 @@ func NewIntrospector(db *DB, schemaName string, ignorePatterns []string, verbose
 // Introspect performs full schema introspection
 func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	schema := &types.Schema{
-		Tables:    make([]types.Table, 0),
-		Sequences: make([]types.Sequence, 0),
-		Types:     make([]types.Type, 0),
-		Views:     make([]types.View, 0),
+		Tables:            make([]types.Table, 0),
+		Sequences:         make([]types.Sequence, 0),
+		Types:             make([]types.Type, 0),
+		Views:             make([]types.View, 0),
+		MaterializedViews: make([]types.MaterializedView, 0),
 	}
 
 	// Get tables
@@ -116,9 +117,19 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	}
 	schema.Views = views
 
+	// Get materialized views
 	if i.verbose {
-		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views",
-			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views))
+		log.Println("Introspecting materialized views...")
+	}
+	matViews, err := getMaterializedViews(ctx, i.db, i.schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get materialized views: %w", err)
+	}
+	schema.MaterializedViews = matViews
+
+	if i.verbose {
+		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views",
+			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews))
 	}
 
 	return schema, nil

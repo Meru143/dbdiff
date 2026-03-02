@@ -5,10 +5,11 @@ import (
 )
 
 type Schema struct {
-	Tables    []Table    `json:"tables"`
-	Sequences []Sequence `json:"sequences,omitempty"`
-	Types     []Type     `json:"types,omitempty"`
-	Views     []View     `json:"views,omitempty"`
+	Tables            []Table            `json:"tables"`
+	Sequences         []Sequence         `json:"sequences,omitempty"`
+	Types             []Type             `json:"types,omitempty"`
+	Views             []View             `json:"views,omitempty"`
+	MaterializedViews []MaterializedView `json:"materialized_views,omitempty"`
 }
 
 type Table struct {
@@ -74,6 +75,12 @@ type View struct {
 	Definition string `json:"definition"`
 }
 
+// MaterializedView represents a PostgreSQL materialized view
+type MaterializedView struct {
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
+}
+
 type DiffType string
 
 const (
@@ -86,14 +93,15 @@ const (
 type DiffObject string
 
 const (
-	ObjectTable      DiffObject = "TABLE"
-	ObjectColumn     DiffObject = "COLUMN"
-	ObjectIndex      DiffObject = "INDEX"
-	ObjectConstraint DiffObject = "CONSTRAINT"
-	ObjectForeignKey DiffObject = "FOREIGN_KEY"
-	ObjectSequence   DiffObject = "SEQUENCE"
-	ObjectType       DiffObject = "TYPE"
-	ObjectView       DiffObject = "VIEW"
+	ObjectTable            DiffObject = "TABLE"
+	ObjectColumn           DiffObject = "COLUMN"
+	ObjectIndex            DiffObject = "INDEX"
+	ObjectConstraint       DiffObject = "CONSTRAINT"
+	ObjectForeignKey       DiffObject = "FOREIGN_KEY"
+	ObjectSequence         DiffObject = "SEQUENCE"
+	ObjectType             DiffObject = "TYPE"
+	ObjectView             DiffObject = "VIEW"
+	ObjectMaterializedView DiffObject = "MATERIALIZED_VIEW"
 )
 
 type Diff struct {

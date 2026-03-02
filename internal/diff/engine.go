@@ -37,6 +37,9 @@ func (e *DiffEngine) Compare() types.DiffList {
 	// View comparison
 	differences = append(differences, e.compareViews()...)
 
+	// Materialized View comparison
+	differences = append(differences, e.compareMaterializedViews()...)
+
 	return differences
 }
 
@@ -665,6 +668,56 @@ func (e *DiffEngine) compareViews() types.DiffList {
 			differences = append(differences, types.Diff{
 				Type:   types.DiffDrop,
 				Object: types.ObjectView,
+				Name:   name,
+			})
+		}
+	}
+
+	return differences
+}
+
+func (e *DiffEngine) compareMaterializedViews() types.DiffList {
+	var differences types.DiffList
+
+	sourceViews := make(map[string]*types.MaterializedView)
+	targetViews := make(map[string]*types.MaterializedView)
+
+	for i := range e.source.MaterializedViews {
+		v := &e.source.MaterializedViews[i]
+		sourceViews[v.Name] = v
+	}
+	for i := range e.target.MaterializedViews {
+		v := &e.target.MaterializedViews[i]
+		targetViews[v.Name] = v
+	}
+
+	// New and altered materialized views
+	for name, sourceView := range sourceViews {
+		if targetView, exists := targetViews[name]; !exists {
+			differences = append(differences, types.Diff{
+				Type:     types.DiffAdd,
+				Object:   types.ObjectMaterializedView,
+				Name:     name,
+				NewValue: sourceView.Definition,
+			})
+		} else if sourceView.Definition != targetView.Definition {
+			// Definition changed
+			differences = append(differences, types.Diff{
+				Type:     types.DiffAlter,
+				Object:   types.ObjectMaterializedView,
+				Name:     name,
+				OldValue: targetView.Definition,
+				NewValue: sourceView.Definition,
+			})
+		}
+	}
+
+	// Dropped materialized views
+	for name := range targetViews {
+		if _, exists := sourceViews[name]; !exists {
+			differences = append(differences, types.Diff{
+				Type:   types.DiffDrop,
+				Object: types.ObjectMaterializedView,
 				Name:   name,
 			})
 		}

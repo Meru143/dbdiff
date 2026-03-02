@@ -369,3 +369,22 @@ func getViews(ctx context.Context, db *DB, schemaName string) ([]types.View, err
 	}
 	return views, rows.Err()
 }
+
+func getMaterializedViews(ctx context.Context, db *DB, schemaName string) ([]types.MaterializedView, error) {
+	query := `SELECT matviewname, definition FROM pg_matviews WHERE schemaname = $1`
+	rows, err := db.Query(ctx, query, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var matViews []types.MaterializedView
+	for rows.Next() {
+		var mv types.MaterializedView
+		if err := rows.Scan(&mv.Name, &mv.Definition); err != nil {
+			return nil, err
+		}
+		matViews = append(matViews, mv)
+	}
+	return matViews, rows.Err()
+}

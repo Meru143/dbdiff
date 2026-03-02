@@ -127,13 +127,14 @@ func (g *SQLGenerator) topologicalSort() types.DiffList {
 	sort.SliceStable(alters, func(i, j int) bool {
 		// Columns before constraints
 		order := map[types.DiffObject]int{
-			types.ObjectColumn:     1,
-			types.ObjectIndex:      2,
-			types.ObjectConstraint: 3,
-			types.ObjectForeignKey: 4,
-			types.ObjectSequence:   5,
-			types.ObjectType:       6,
-			types.ObjectView:       7,
+			types.ObjectColumn:           1,
+			types.ObjectIndex:            2,
+			types.ObjectConstraint:       3,
+			types.ObjectForeignKey:       4,
+			types.ObjectSequence:         5,
+			types.ObjectType:             6,
+			types.ObjectView:             7,
+			types.ObjectMaterializedView: 8,
 		}
 		return order[alters[i].Object] < order[alters[j].Object]
 	})
@@ -174,6 +175,8 @@ func (g *SQLGenerator) generateStatement(diff *types.Diff) string {
 		return g.generateTypeDiff(diff)
 	case types.ObjectView:
 		return g.generateViewDiff(diff)
+	case types.ObjectMaterializedView:
+		return g.generateMaterializedViewDiff(diff)
 	default:
 		return ""
 	}
@@ -445,6 +448,25 @@ func (g *SQLGenerator) generateViewDiff(diff *types.Diff) string {
 			diff.Name, schema, diff.Name, definition)
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop view: %s\nDROP VIEW IF EXISTS %s%s CASCADE;",
+			diff.Name, schema, diff.Name)
+	default:
+		return ""
+	}
+}
+
+func (g *SQLGenerator) generateMaterializedViewDiff(diff *types.Diff) string {
+	schema := schemaPrefix(g.schemaName)
+	definition := strings.TrimRight(diff.NewValue, " \t\r\n;")
+	switch diff.Type {
+	case types.DiffAdd:
+		return fmt.Sprintf("-- Create materialized view: %s\nCREATE MATERIALIZED VIEW %s%s AS\n%s;",
+			diff.Name, schema, diff.Name, definition)
+	case types.DiffAlter:
+		// Drop and recreate for materialized views since CREATE OR REPLACE is not supported for them in PostgreSQL
+		return fmt.Sprintf("-- Alter materialized view: %s\nDROP MATERIALIZED VIEW IF EXISTS %s%s CASCADE;\nCREATE MATERIALIZED VIEW %s%s AS\n%s;",
+			diff.Name, schema, diff.Name, schema, diff.Name, definition)
+	case types.DiffDrop:
+		return fmt.Sprintf("-- Drop materialized view: %s\nDROP MATERIALIZED VIEW IF EXISTS %s%s CASCADE;",
 			diff.Name, schema, diff.Name)
 	default:
 		return ""
