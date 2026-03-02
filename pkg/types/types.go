@@ -10,6 +10,7 @@ type Schema struct {
 	Types             []Type             `json:"types,omitempty"`
 	Views             []View             `json:"views,omitempty"`
 	MaterializedViews []MaterializedView `json:"materialized_views,omitempty"`
+	Functions         []Function         `json:"functions,omitempty"`
 }
 
 type Table struct {
@@ -81,6 +82,13 @@ type MaterializedView struct {
 	Definition string `json:"definition"`
 }
 
+// Function represents a PostgreSQL stored procedure or function
+type Function struct {
+	Name       string `json:"name"`
+	Arguments  string `json:"arguments"`
+	Definition string `json:"definition"`
+}
+
 type DiffType string
 
 const (
@@ -102,6 +110,7 @@ const (
 	ObjectType             DiffObject = "TYPE"
 	ObjectView             DiffObject = "VIEW"
 	ObjectMaterializedView DiffObject = "MATERIALIZED_VIEW"
+	ObjectFunction         DiffObject = "FUNCTION"
 )
 
 type Diff struct {

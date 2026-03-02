@@ -473,6 +473,25 @@ func (g *SQLGenerator) generateMaterializedViewDiff(diff *types.Diff) string {
 	}
 }
 
+func (g *SQLGenerator) generateFunctionDiff(diff *types.Diff) string {
+	schema := schemaPrefix(g.schemaName)
+	definition := strings.TrimRight(diff.NewValue, " \t\r\n;")
+	// Notice: diff.Name contains func_name(args) to handle overloads specifically for drop
+	switch diff.Type {
+	case types.DiffAdd:
+		return fmt.Sprintf("-- Create function: %s\n%s;",
+			diff.Name, definition)
+	case types.DiffAlter:
+		return fmt.Sprintf("-- Alter function: %s\n%s;",
+			diff.Name, definition)
+	case types.DiffDrop:
+		return fmt.Sprintf("-- Drop function: %s\nDROP FUNCTION IF EXISTS %s%s CASCADE;",
+			diff.Name, schema, diff.Name)
+	default:
+		return ""
+	}
+}
+
 // GenerateSQL is a legacy function
 func GenerateSQL(diffs types.DiffList, schemaName string) string {
 	gen := NewSQLGenerator(diffs, schemaName)

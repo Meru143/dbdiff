@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,9 @@ func (e *DiffEngine) Compare() types.DiffList {
 
 	// Materialized View comparison
 	differences = append(differences, e.compareMaterializedViews()...)
+
+	// Function comparison
+	differences = append(differences, e.compareFunctions()...)
 
 	return differences
 }
@@ -719,6 +723,58 @@ func (e *DiffEngine) compareMaterializedViews() types.DiffList {
 				Type:   types.DiffDrop,
 				Object: types.ObjectMaterializedView,
 				Name:   name,
+			})
+		}
+	}
+
+	return differences
+}
+
+func (e *DiffEngine) compareFunctions() types.DiffList {
+	var differences types.DiffList
+
+	sourceFuncs := make(map[string]*types.Function)
+	targetFuncs := make(map[string]*types.Function)
+
+	for i := range e.source.Functions {
+		f := &e.source.Functions[i]
+		key := fmt.Sprintf("%s(%s)", f.Name, f.Arguments)
+		sourceFuncs[key] = f
+	}
+	for i := range e.target.Functions {
+		f := &e.target.Functions[i]
+		key := fmt.Sprintf("%s(%s)", f.Name, f.Arguments)
+		targetFuncs[key] = f
+	}
+
+	// New and altered functions
+	for key, sourceFunc := range sourceFuncs {
+		if targetFunc, exists := targetFuncs[key]; !exists {
+			differences = append(differences, types.Diff{
+				Type:     types.DiffAdd,
+				Object:   types.ObjectFunction,
+				Name:     key,                   // key includes func_name(args)
+				NewValue: sourceFunc.Definition, // complete CREATE OR REPLACE snippet
+			})
+		} else if sourceFunc.Definition != targetFunc.Definition {
+			// Definition changed
+			differences = append(differences, types.Diff{
+				Type:     types.DiffAlter,
+				Object:   types.ObjectFunction,
+				Name:     key,
+				OldValue: targetFunc.Definition,
+				NewValue: sourceFunc.Definition,
+			})
+		}
+	}
+
+	// Dropped functions
+	for key := range targetFuncs {
+		if _, exists := sourceFuncs[key]; !exists {
+			differences = append(differences, types.Diff{
+				Type:   types.DiffDrop,
+				Object: types.ObjectFunction,
+				Name:   key,
 			})
 		}
 	}

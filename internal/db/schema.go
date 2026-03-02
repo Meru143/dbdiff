@@ -34,6 +34,7 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 		Types:             make([]types.Type, 0),
 		Views:             make([]types.View, 0),
 		MaterializedViews: make([]types.MaterializedView, 0),
+		Functions:         make([]types.Function, 0),
 	}
 
 	// Get tables
@@ -127,9 +128,19 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	}
 	schema.MaterializedViews = matViews
 
+	// Get functions
 	if i.verbose {
-		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views",
-			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews))
+		log.Println("Introspecting functions...")
+	}
+	functions, err := getFunctions(ctx, i.db, i.schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get functions: %w", err)
+	}
+	schema.Functions = functions
+
+	if i.verbose {
+		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views, %d functions",
+			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews), len(schema.Functions))
 	}
 
 	return schema, nil

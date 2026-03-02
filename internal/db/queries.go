@@ -388,3 +388,31 @@ func getMaterializedViews(ctx context.Context, db *DB, schemaName string) ([]typ
 	}
 	return matViews, rows.Err()
 }
+
+func getFunctions(ctx context.Context, db *DB, schemaName string) ([]types.Function, error) {
+	// Query to extract functions, handling overloading correctly
+	query := `
+		SELECT 
+			p.proname as name,
+			pg_get_function_identity_arguments(p.oid) as arguments,
+			pg_get_functiondef(p.oid) as definition
+		FROM pg_proc p
+		JOIN pg_namespace n ON p.pronamespace = n.oid
+		WHERE n.nspname = $1
+	`
+	rows, err := db.Query(ctx, query, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var functions []types.Function
+	for rows.Next() {
+		var f types.Function
+		if err := rows.Scan(&f.Name, &f.Arguments, &f.Definition); err != nil {
+			return nil, err
+		}
+		functions = append(functions, f)
+	}
+	return functions, rows.Err()
+}
