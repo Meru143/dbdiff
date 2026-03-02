@@ -21,7 +21,11 @@ func NewWriter(cfg *config.Config) *Writer {
 
 // Write writes content to the configured output destination
 func (w *Writer) Write(content string) error {
-	if w.config.Output == "" || w.config.Output == "stdout" {
+	if w.config.DryRun {
+		content = "-- === DRY RUN: NO CHANGES WILL BE APPLIED ===\n" + content
+	}
+
+	if w.config.DryRun || w.config.Output == "" || w.config.Output == "stdout" {
 		fmt.Print(content)
 		return nil
 	}
