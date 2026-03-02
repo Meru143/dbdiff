@@ -86,7 +86,7 @@ func (g *SQLGenerator) Generate() string {
 func (g *SQLGenerator) topologicalSort() types.DiffList {
 	// Build dependency graph
 	dependencies := make(map[string][]string) // diffName -> depends on
-	
+
 	// Separate by type
 	var creates, alters, drops types.DiffList
 
@@ -127,12 +127,13 @@ func (g *SQLGenerator) topologicalSort() types.DiffList {
 	sort.SliceStable(alters, func(i, j int) bool {
 		// Columns before constraints
 		order := map[types.DiffObject]int{
-			types.ObjectColumn: 1,
-			types.ObjectIndex: 2,
+			types.ObjectColumn:     1,
+			types.ObjectIndex:      2,
 			types.ObjectConstraint: 3,
 			types.ObjectForeignKey: 4,
-			types.ObjectSequence: 5,
-			types.ObjectType: 6,
+			types.ObjectSequence:   5,
+			types.ObjectType:       6,
+			types.ObjectView:       7,
 		}
 		return order[alters[i].Object] < order[alters[j].Object]
 	})
@@ -171,6 +172,8 @@ func (g *SQLGenerator) generateStatement(diff *types.Diff) string {
 		return g.generateSequenceDiff(diff)
 	case types.ObjectType:
 		return g.generateTypeDiff(diff)
+	case types.ObjectView:
+		return g.generateViewDiff(diff)
 	default:
 		return ""
 	}
@@ -193,7 +196,7 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
 	case types.DiffRename:
-		return fmt.Sprintf("-- Rename table: %s -> %s\nALTER TABLE %s%s RENAME TO %s;", 
+		return fmt.Sprintf("-- Rename table: %s -> %s\nALTER TABLE %s%s RENAME TO %s;",
 			diff.OldValue, diff.NewValue, schema, diff.OldValue, diff.NewValue)
 	default:
 		return ""
@@ -203,42 +206,42 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 // generateFullCreateTable generates a complete CREATE TABLE statement with columns and constraints
 func (g *SQLGenerator) generateFullCreateTable(table *types.Table, schema string) string {
 	var parts []string
-	
+
 	// Generate column definitions
 	var colDefs []string
 	for _, col := range table.Columns {
 		colDef := g.generateColumnDefinition(col)
 		colDefs = append(colDefs, colDef)
 	}
-	
+
 	// Generate table-level constraints (UNIQUE, CHECK)
 	for _, cons := range table.Constraints {
 		if cons.Type == "UNIQUE" || cons.Type == "CHECK" {
 			colDefs = append(colDefs, g.generateConstraintDefinition(cons, table.Name))
 		}
 	}
-	
+
 	if len(colDefs) > 0 {
 		parts = append(parts, strings.Join(colDefs, ",\n  "))
 	}
-	
+
 	// Generate primary key
 	for _, cons := range table.Constraints {
 		if cons.Type == "PRIMARY KEY" {
 			parts = append(parts, fmt.Sprintf("  PRIMARY KEY (%s)", strings.Join(cons.Columns, ", ")))
 		}
 	}
-	
+
 	// Generate foreign keys
 	for _, fk := range table.ForeignKeys {
 		parts = append(parts, g.generateForeignKeyDefinition(fk))
 	}
-	
+
 	// Build the CREATE TABLE statement
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("-- Create table: %s\n", table.Name))
 	sb.WriteString(fmt.Sprintf("CREATE TABLE %s%s (\n  %s\n);", schema, table.Name, strings.Join(parts, ",\n  ")))
-	
+
 	return sb.String()
 }
 
@@ -246,17 +249,17 @@ func (g *SQLGenerator) generateFullCreateTable(table *types.Table, schema string
 func (g *SQLGenerator) generateColumnDefinition(col types.Column) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("%s %s", col.Name, col.DataType))
-	
+
 	// Add default value
 	if col.DefaultValue != nil && *col.DefaultValue != "" {
 		sb.WriteString(fmt.Sprintf(" DEFAULT %s", *col.DefaultValue))
 	}
-	
+
 	// Add null constraint
 	if !col.IsNullable {
 		sb.WriteString(" NOT NULL")
 	}
-	
+
 	return sb.String()
 }
 
@@ -276,19 +279,19 @@ func (g *SQLGenerator) generateConstraintDefinition(cons types.Constraint, table
 // generateForeignKeyDefinition generates a foreign key constraint
 func (g *SQLGenerator) generateForeignKeyDefinition(fk types.ForeignKey) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s(%s)", 
-		fk.Name, 
+	sb.WriteString(fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s(%s)",
+		fk.Name,
 		strings.Join(fk.Columns, ", "),
 		fk.RefTable,
 		strings.Join(fk.RefColumns, ", ")))
-	
+
 	if fk.OnDelete != "" && fk.OnDelete != "NO ACTION" {
 		sb.WriteString(fmt.Sprintf(" ON DELETE %s", fk.OnDelete))
 	}
 	if fk.OnUpdate != "" && fk.OnUpdate != "NO ACTION" {
 		sb.WriteString(fmt.Sprintf(" ON UPDATE %s", fk.OnUpdate))
 	}
-	
+
 	return sb.String()
 }
 
@@ -428,6 +431,24 @@ func schemaPrefix(schema string) string {
 		return ""
 	}
 	return schema + "."
+}
+
+func (g *SQLGenerator) generateViewDiff(diff *types.Diff) string {
+	schema := schemaPrefix(g.schemaName)
+	definition := strings.TrimRight(diff.NewValue, " \t\r\n;")
+	switch diff.Type {
+	case types.DiffAdd:
+		return fmt.Sprintf("-- Create view: %s\nCREATE OR REPLACE VIEW %s%s AS\n%s;",
+			diff.Name, schema, diff.Name, definition)
+	case types.DiffAlter:
+		return fmt.Sprintf("-- Alter view: %s\nCREATE OR REPLACE VIEW %s%s AS\n%s;",
+			diff.Name, schema, diff.Name, definition)
+	case types.DiffDrop:
+		return fmt.Sprintf("-- Drop view: %s\nDROP VIEW IF EXISTS %s%s CASCADE;",
+			diff.Name, schema, diff.Name)
+	default:
+		return ""
+	}
 }
 
 // GenerateSQL is a legacy function

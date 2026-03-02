@@ -10,22 +10,22 @@ import (
 // Validator validates migrations for safety
 type Validator struct {
 	protectedObjects []string
-	dryRun          bool
+	dryRun           bool
 }
 
 // NewValidator creates a new safety validator
 func NewValidator(protectedObjects []string, dryRun bool) *Validator {
 	return &Validator{
 		protectedObjects: protectedObjects,
-		dryRun:          dryRun,
+		dryRun:           dryRun,
 	}
 }
 
 // ValidationResult holds the result of a validation
 type ValidationResult struct {
-	Valid   bool
+	Valid    bool
 	Warnings []string
-	Errors  []string
+	Errors   []string
 }
 
 // ValidateDiff validates a diff for safety

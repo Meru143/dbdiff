@@ -160,7 +160,7 @@ func TestCompare_IndexDiff(t *testing.T) {
 	target := &types.Schema{
 		Tables: []types.Table{
 			{
-				Name: "users",
+				Name:    "users",
 				Indexes: []types.Index{},
 			},
 		},
@@ -261,7 +261,7 @@ func TestCompare_DroppedIndex(t *testing.T) {
 	source := &types.Schema{
 		Tables: []types.Table{
 			{
-				Name: "users",
+				Name:    "users",
 				Indexes: []types.Index{},
 			},
 		},
@@ -294,7 +294,7 @@ func TestCompare_NewForeignKey(t *testing.T) {
 	source := &types.Schema{
 		Tables: []types.Table{
 			{
-				Name: "posts",
+				Name:    "posts",
 				Columns: []types.Column{{Name: "id", DataType: "integer"}},
 				ForeignKeys: []types.ForeignKey{
 					{
@@ -341,7 +341,7 @@ func TestCompare_DroppedForeignKey(t *testing.T) {
 	target := &types.Schema{
 		Tables: []types.Table{
 			{
-				Name: "posts",
+				Name:    "posts",
 				Columns: []types.Column{{Name: "id", DataType: "integer"}},
 				ForeignKeys: []types.ForeignKey{
 					{

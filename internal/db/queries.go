@@ -192,9 +192,9 @@ func getForeignKeys(ctx context.Context, db *DB, schemaName, tableName string) (
 	for rows.Next() {
 		var fk types.ForeignKey
 		if err := rows.Scan(
-			&fk.Name, 
-			&fk.Columns, 
-			&fk.RefTable, 
+			&fk.Name,
+			&fk.Columns,
+			&fk.RefTable,
 			&fk.RefColumns,
 			&fk.UniqueConstraintName,
 			&fk.OnDelete,
@@ -314,13 +314,13 @@ func matchPattern(name, pattern string) bool {
 	if name == pattern {
 		return true
 	}
-	
+
 	// Use filepath.Match for glob patterns
 	matched, _ := filepath.Match(pattern, name)
 	if matched {
 		return true
 	}
-	
+
 	// Handle * in pattern (filepath.Match should handle this, but just in case)
 	if strings.Contains(pattern, "*") {
 		parts := strings.Split(pattern, "*")
@@ -329,7 +329,7 @@ func matchPattern(name, pattern string) bool {
 			return strings.HasPrefix(name, parts[0]) && strings.HasSuffix(name, parts[1])
 		}
 	}
-	
+
 	return false
 }
 
@@ -338,10 +338,10 @@ func filterColumns(columns []types.Column, ignorePatterns []string) []types.Colu
 	if len(ignorePatterns) == 0 {
 		return columns
 	}
-	
+
 	// Add default patterns if not specified
 	allPatterns := append(DefaultIgnorePatterns, ignorePatterns...)
-	
+
 	var filtered []types.Column
 	for _, col := range columns {
 		if !matchesIgnorePatterns(col.Name, allPatterns) {
@@ -349,4 +349,23 @@ func filterColumns(columns []types.Column, ignorePatterns []string) []types.Colu
 		}
 	}
 	return filtered
+}
+
+func getViews(ctx context.Context, db *DB, schemaName string) ([]types.View, error) {
+	query := `SELECT table_name, view_definition FROM information_schema.views WHERE table_schema = $1`
+	rows, err := db.Query(ctx, query, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var views []types.View
+	for rows.Next() {
+		var v types.View
+		if err := rows.Scan(&v.Name, &v.Definition); err != nil {
+			return nil, err
+		}
+		views = append(views, v)
+	}
+	return views, rows.Err()
 }

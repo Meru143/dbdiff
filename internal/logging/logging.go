@@ -15,7 +15,7 @@ var (
 func Init(debug, verbose bool) {
 	once.Do(func() {
 		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-		
+
 		if debug {
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		} else if verbose {

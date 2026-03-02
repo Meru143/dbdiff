@@ -8,10 +8,10 @@ import (
 // Error codes
 const (
 	EConnectionFailed  = "E001"
-	EAuthFailed       = "E002"
-	EPermissionDenied = "E003"
-	ESchemaTooLarge   = "E004"
-	ETimeout          = "E005"
+	EAuthFailed        = "E002"
+	EPermissionDenied  = "E003"
+	ESchemaTooLarge    = "E004"
+	ETimeout           = "E005"
 	EOutputWriteFailed = "E006"
 )
 

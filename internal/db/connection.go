@@ -86,8 +86,6 @@ func connect(ctx context.Context, connStr, sslMode string, timeout time.Duration
 	return &DB{Pool: pool}, nil
 }
 
-
-
 // applySSLConfig applies SSL configuration based on mode
 func applySSLConfig(config *pgxpool.Config, sslMode string) error {
 	switch sslMode {

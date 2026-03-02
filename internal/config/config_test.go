@@ -43,17 +43,17 @@ func TestLoad_Defaults(t *testing.T) {
 
 func TestLoad_FlagBinding(t *testing.T) {
 	flags := map[string]interface{}{
-		"source":   "postgres://user:pass@localhost/db",
-		"target":   "postgres://user:pass@localhost/db2",
-		"output":   "migration.sql",
-		"format":   "json",
-		"dry-run":  "false",
-		"schema":   "myschema",
-		"timeout":  "60s",
+		"source":      "postgres://user:pass@localhost/db",
+		"target":      "postgres://user:pass@localhost/db2",
+		"output":      "migration.sql",
+		"format":      "json",
+		"dry-run":     "false",
+		"schema":      "myschema",
+		"timeout":     "60s",
 		"transaction": "false",
-		"verbose":  "true",
-		"debug":    "true",
-		"ssl-mode": "require",
+		"verbose":     "true",
+		"debug":       "true",
+		"ssl-mode":    "require",
 	}
 
 	cfg, err := Load(flags)
@@ -148,8 +148,8 @@ func TestLoad_IgnorePatterns(t *testing.T) {
 
 func TestLoad_BackupConfig(t *testing.T) {
 	flags := map[string]interface{}{
-		"backup-dir":       "/tmp/backups",
-		"max-backups":      "10",
+		"backup-dir":        "/tmp/backups",
+		"max-backups":       "10",
 		"protected-objects": []string{"users", "accounts"},
 	}
 
@@ -211,18 +211,18 @@ func TestLoad_AllFlags(t *testing.T) {
 	flags := map[string]interface{}{
 		"source":            "postgres://a:b@localhost:5432/db",
 		"target":            "postgres://c:d@localhost:5432/db2",
-		"output":           "/tmp/out.sql",
-		"format":           "table",
-		"dry-run":          "false",
-		"force":            "true",
-		"schema":           "custom",
-		"timeout":          "120s",
-		"transaction":      "false",
-		"verbose":          "true",
-		"debug":            "true",
-		"ssl-mode":         "require",
-		"backup-dir":       "/backups",
-		"max-backups":      "20",
+		"output":            "/tmp/out.sql",
+		"format":            "table",
+		"dry-run":           "false",
+		"force":             "true",
+		"schema":            "custom",
+		"timeout":           "120s",
+		"transaction":       "false",
+		"verbose":           "true",
+		"debug":             "true",
+		"ssl-mode":          "require",
+		"backup-dir":        "/backups",
+		"max-backups":       "20",
 		"protected-objects": []string{"critical_table"},
 	}
 
@@ -234,7 +234,7 @@ func TestLoad_AllFlags(t *testing.T) {
 	// Verify all values
 	tests := []struct {
 		got, want interface{}
-		name     string
+		name      string
 	}{
 		{cfg.Source, "postgres://a:b@localhost:5432/db", "source"},
 		{cfg.Target, "postgres://c:d@localhost:5432/db2", "target"},

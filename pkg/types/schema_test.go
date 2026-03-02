@@ -118,12 +118,12 @@ func TestColumn_JSON(t *testing.T) {
 
 func TestForeignKey_JSON(t *testing.T) {
 	fk := ForeignKey{
-		Name:          "fk_users_posts",
-		Columns:       []string{"user_id"},
-		RefTable:     "users",
-		RefColumns:   []string{"id"},
-		OnDelete:     "CASCADE",
-		OnUpdate:     "NO ACTION",
+		Name:       "fk_users_posts",
+		Columns:    []string{"user_id"},
+		RefTable:   "users",
+		RefColumns: []string{"id"},
+		OnDelete:   "CASCADE",
+		OnUpdate:   "NO ACTION",
 	}
 
 	data, err := json.Marshal(fk)
@@ -185,7 +185,7 @@ func TestIndex_JSON(t *testing.T) {
 		Name:       "users_email_idx",
 		Columns:    []string{"email"},
 		IsUnique:   true,
-		IsPrimary: false,
+		IsPrimary:  false,
 		Definition: "CREATE UNIQUE INDEX users_email_idx ON users(email)",
 	}
 

@@ -32,6 +32,7 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 		Tables:    make([]types.Table, 0),
 		Sequences: make([]types.Sequence, 0),
 		Types:     make([]types.Type, 0),
+		Views:     make([]types.View, 0),
 	}
 
 	// Get tables
@@ -105,9 +106,19 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	}
 	schema.Types = customTypes
 
+	// Get views
 	if i.verbose {
-		log.Printf("Introspection complete: %d tables, %d sequences, %d types",
-			len(schema.Tables), len(schema.Sequences), len(schema.Types))
+		log.Println("Introspecting views...")
+	}
+	views, err := getViews(ctx, i.db, i.schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get views: %w", err)
+	}
+	schema.Views = views
+
+	if i.verbose {
+		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views",
+			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views))
 	}
 
 	return schema, nil

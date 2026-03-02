@@ -23,7 +23,7 @@ type FormatOptions struct {
 
 // Formatter handles output formatting
 type Formatter struct {
-	options FormatOptions
+	options      FormatOptions
 	sourceSchema *types.Schema
 }
 

@@ -34,6 +34,9 @@ func (e *DiffEngine) Compare() types.DiffList {
 	// Type comparison
 	differences = append(differences, e.compareTypes()...)
 
+	// View comparison
+	differences = append(differences, e.compareViews()...)
+
 	return differences
 }
 
@@ -293,8 +296,8 @@ func compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
 	targetColOrder := getExistingColumnOrder(targetTable.Columns, sourceCols)
 
 	// Check for column order changes only if both have same columns
-	if len(sourceColOrder) > 1 && len(sourceColOrder) == len(targetColOrder) && 
-	   !columnOrdersEqual(sourceColOrder, targetColOrder) {
+	if len(sourceColOrder) > 1 && len(sourceColOrder) == len(targetColOrder) &&
+		!columnOrdersEqual(sourceColOrder, targetColOrder) {
 		differences = append(differences, types.Diff{
 			Type:        types.DiffAlter,
 			Object:      types.ObjectColumn,
@@ -492,12 +495,12 @@ func compareConstraints(sourceTable, targetTable *types.Table) types.DiffList {
 			if srcCons.Type == "PRIMARY KEY" && tgtCons.Type == "PRIMARY KEY" {
 				if !stringSlicesEqual(srcCons.Columns, tgtCons.Columns) {
 					differences = append(differences, types.Diff{
-						Type:      types.DiffAlter,
-						Object:    types.ObjectConstraint,
-						Name:      name,
-						TableName: sourceTable.Name,
-						OldValue:  strings.Join(tgtCons.Columns, ", "),
-						NewValue:  strings.Join(srcCons.Columns, ", "),
+						Type:        types.DiffAlter,
+						Object:      types.ObjectConstraint,
+						Name:        name,
+						TableName:   sourceTable.Name,
+						OldValue:    strings.Join(tgtCons.Columns, ", "),
+						NewValue:    strings.Join(srcCons.Columns, ", "),
 						Description: "Primary key columns changed",
 					})
 				}
@@ -544,55 +547,55 @@ func compareForeignKeys(sourceTable, targetTable *types.Table) types.DiffList {
 			})
 		} else {
 			targetFK := targetFKs[name]
-			
+
 			// Reference table change
 			if fk.RefTable != targetFK.RefTable {
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectForeignKey,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  targetFK.RefTable,
-					NewValue:  fk.RefTable,
+					Type:        types.DiffAlter,
+					Object:      types.ObjectForeignKey,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    targetFK.RefTable,
+					NewValue:    fk.RefTable,
 					Description: "Referenced table changed",
 				})
 			}
-			
+
 			// FK columns change
 			if !stringSlicesEqual(fk.Columns, targetFK.Columns) {
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectForeignKey,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  strings.Join(targetFK.Columns, ", "),
-					NewValue:  strings.Join(fk.Columns, ", "),
+					Type:        types.DiffAlter,
+					Object:      types.ObjectForeignKey,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    strings.Join(targetFK.Columns, ", "),
+					NewValue:    strings.Join(fk.Columns, ", "),
 					Description: "Foreign key columns changed",
 				})
 			}
-			
+
 			// ON DELETE change
 			if fk.OnDelete != targetFK.OnDelete {
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectForeignKey,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  "ON DELETE " + targetFK.OnDelete,
-					NewValue:  "ON DELETE " + fk.OnDelete,
+					Type:        types.DiffAlter,
+					Object:      types.ObjectForeignKey,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    "ON DELETE " + targetFK.OnDelete,
+					NewValue:    "ON DELETE " + fk.OnDelete,
 					Description: "ON DELETE action changed",
 				})
 			}
-			
+
 			// ON UPDATE change
 			if fk.OnUpdate != targetFK.OnUpdate {
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectForeignKey,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  "ON UPDATE " + targetFK.OnUpdate,
-					NewValue:  "ON UPDATE " + fk.OnUpdate,
+					Type:        types.DiffAlter,
+					Object:      types.ObjectForeignKey,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    "ON UPDATE " + targetFK.OnUpdate,
+					NewValue:    "ON UPDATE " + fk.OnUpdate,
 					Description: "ON UPDATE action changed",
 				})
 			}
@@ -618,4 +621,54 @@ func nullableToString(b bool) string {
 		return "NULL"
 	}
 	return "NOT NULL"
+}
+
+func (e *DiffEngine) compareViews() types.DiffList {
+	var differences types.DiffList
+
+	sourceViews := make(map[string]*types.View)
+	targetViews := make(map[string]*types.View)
+
+	for i := range e.source.Views {
+		v := &e.source.Views[i]
+		sourceViews[v.Name] = v
+	}
+	for i := range e.target.Views {
+		v := &e.target.Views[i]
+		targetViews[v.Name] = v
+	}
+
+	// New and altered views
+	for name, sourceView := range sourceViews {
+		if targetView, exists := targetViews[name]; !exists {
+			differences = append(differences, types.Diff{
+				Type:     types.DiffAdd,
+				Object:   types.ObjectView,
+				Name:     name,
+				NewValue: sourceView.Definition,
+			})
+		} else if sourceView.Definition != targetView.Definition {
+			// Definition changed
+			differences = append(differences, types.Diff{
+				Type:     types.DiffAlter,
+				Object:   types.ObjectView,
+				Name:     name,
+				OldValue: targetView.Definition,
+				NewValue: sourceView.Definition,
+			})
+		}
+	}
+
+	// Dropped views
+	for name := range targetViews {
+		if _, exists := sourceViews[name]; !exists {
+			differences = append(differences, types.Diff{
+				Type:   types.DiffDrop,
+				Object: types.ObjectView,
+				Name:   name,
+			})
+		}
+	}
+
+	return differences
 }

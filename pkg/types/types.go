@@ -8,6 +8,7 @@ type Schema struct {
 	Tables    []Table    `json:"tables"`
 	Sequences []Sequence `json:"sequences,omitempty"`
 	Types     []Type     `json:"types,omitempty"`
+	Views     []View     `json:"views,omitempty"`
 }
 
 type Table struct {
@@ -41,30 +42,36 @@ type Constraint struct {
 }
 
 type ForeignKey struct {
-	Name                string   `json:"name"`
-	Columns             []string `json:"columns"`
-	RefTable           string   `json:"reference_table"`
-	RefColumns         []string `json:"reference_columns"`
-	UniqueConstraintName string  `json:"unique_constraint_name,omitempty"`
-	OnDelete           string   `json:"on_delete,omitempty"`
-	OnUpdate           string   `json:"on_update,omitempty"`
+	Name                 string   `json:"name"`
+	Columns              []string `json:"columns"`
+	RefTable             string   `json:"reference_table"`
+	RefColumns           []string `json:"reference_columns"`
+	UniqueConstraintName string   `json:"unique_constraint_name,omitempty"`
+	OnDelete             string   `json:"on_delete,omitempty"`
+	OnUpdate             string   `json:"on_update,omitempty"`
 }
 
 type Sequence struct {
-	Name     string  `json:"name"`
-	Start    int64   `json:"start,omitempty"`
-	MinValue int64   `json:"min_value,omitempty"`
-	MaxValue int64   `json:"max_value,omitempty"`
+	Name      string `json:"name"`
+	Start     int64  `json:"start,omitempty"`
+	MinValue  int64  `json:"min_value,omitempty"`
+	MaxValue  int64  `json:"max_value,omitempty"`
 	Increment int64  `json:"increment,omitempty"`
-	Cache    int64   `json:"cache,omitempty"`
-	Cycle    bool    `json:"cycle,omitempty"`
+	Cache     int64  `json:"cache,omitempty"`
+	Cycle     bool   `json:"cycle,omitempty"`
 }
 
 // Type represents a custom PostgreSQL type
 type Type struct {
-	Name    string `json:"name"`
-	Kind    string `json:"kind"` // enum, composite, domain
-	Values  []string `json:"values,omitempty"` // for enum
+	Name   string   `json:"name"`
+	Kind   string   `json:"kind"`             // enum, composite, domain
+	Values []string `json:"values,omitempty"` // for enum
+}
+
+// View represents a database view
+type View struct {
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
 }
 
 type DiffType string
@@ -86,17 +93,18 @@ const (
 	ObjectForeignKey DiffObject = "FOREIGN_KEY"
 	ObjectSequence   DiffObject = "SEQUENCE"
 	ObjectType       DiffObject = "TYPE"
+	ObjectView       DiffObject = "VIEW"
 )
 
 type Diff struct {
-	Type       DiffType   `json:"type"`
-	Object     DiffObject `json:"object"`
-	Name       string     `json:"name"`
-	TableName  string     `json:"table_name,omitempty"`
-	OldValue   string     `json:"old_value,omitempty"`
-	NewValue   string     `json:"new_value,omitempty"`
-	SQL        string     `json:"sql,omitempty"`
-	Description string    `json:"description,omitempty"`
+	Type        DiffType   `json:"type"`
+	Object      DiffObject `json:"object"`
+	Name        string     `json:"name"`
+	TableName   string     `json:"table_name,omitempty"`
+	OldValue    string     `json:"old_value,omitempty"`
+	NewValue    string     `json:"new_value,omitempty"`
+	SQL         string     `json:"sql,omitempty"`
+	Description string     `json:"description,omitempty"`
 }
 
 type DiffList []Diff

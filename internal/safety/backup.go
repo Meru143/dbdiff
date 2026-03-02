@@ -9,7 +9,7 @@ import (
 
 // BackupManager handles creating and managing backups
 type BackupManager struct {
-	backupDir string
+	backupDir  string
 	maxBackups int
 }
 

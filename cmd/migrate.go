@@ -22,7 +22,7 @@ func confirmPrompt() bool {
 	fmt.Print("Do you want to proceed? (yes/no/abort): ")
 	response, _ := reader.ReadString('\n')
 	response = strings.ToLower(strings.TrimSpace(response))
-	
+
 	switch response {
 	case "yes", "y":
 		return true
@@ -97,14 +97,14 @@ var MigrateCmd = &cobra.Command{
 		if len(cfg.ProtectedObjects) > 0 {
 			validator := safety.NewValidator(cfg.ProtectedObjects, cfg.DryRun)
 			validation := validator.ValidateDiffs(differences)
-			
+
 			if len(validation.Errors) > 0 {
 				for _, err := range validation.Errors {
 					logging.Error(err)
 				}
 				return fmt.Errorf("migration contains protected objects")
 			}
-			
+
 			// Filter out protected diffs
 			var filteredDiffs []types.Diff
 			for _, d := range differences {
@@ -113,7 +113,7 @@ var MigrateCmd = &cobra.Command{
 				}
 			}
 			differences = filteredDiffs
-			
+
 			if len(validation.Warnings) > 0 {
 				for _, warn := range validation.Warnings {
 					logging.Warn(warn)
@@ -142,7 +142,7 @@ var MigrateCmd = &cobra.Command{
 		// Create backup before writing
 		if cfg.BackupDir != "" && cfg.Output != "stdout" && !cfg.DryRun {
 			backupMgr := safety.NewBackupManager(cfg.BackupDir, cfg.MaxBackups)
-			
+
 			// Check if target file exists
 			if _, err := os.Stat(cfg.Output); err == nil {
 				existingContent, _ := os.ReadFile(cfg.Output)
