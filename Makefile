@@ -45,7 +45,7 @@ test-integration:
 
 test-e2e:
 	@echo "Running E2E tests..."
-	go test -tags=e2e -v ./...
+	go run -tags=e2e test/e2e_test.go
 
 test-coverage:
 	go test -race -coverprofile=coverage.out ./...

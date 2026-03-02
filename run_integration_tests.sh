@@ -26,7 +26,7 @@ sleep 10
 # Run integration tests
 echo "Running integration tests..."
 cd /home/meru/workspace/dbdiff
-go run -tags=integration integration_test.go
+go run -tags=integration test/integration_test.go
 
 # Stop containers
 echo "Stopping test databases..."
