@@ -12,6 +12,7 @@ type Schema struct {
 	MaterializedViews []MaterializedView `json:"materialized_views,omitempty"`
 	Functions         []Function         `json:"functions,omitempty"`
 	Triggers          []Trigger          `json:"triggers,omitempty"`
+	Grants            []Grant            `json:"grants,omitempty"`
 }
 
 type Table struct {
@@ -97,6 +98,14 @@ type Trigger struct {
 	Definition string `json:"definition"`
 }
 
+// Grant represents a user privilege on a database object like a table
+type Grant struct {
+	Table       string `json:"table"`
+	Grantee     string `json:"grantee"`
+	Privilege   string `json:"privilege_type"`
+	IsGrantable bool   `json:"is_grantable"`
+}
+
 type DiffType string
 
 const (
@@ -120,6 +129,7 @@ const (
 	ObjectMaterializedView DiffObject = "MATERIALIZED_VIEW"
 	ObjectFunction         DiffObject = "FUNCTION"
 	ObjectTrigger          DiffObject = "TRIGGER"
+	ObjectGrant            DiffObject = "GRANT"
 )
 
 type Diff struct {

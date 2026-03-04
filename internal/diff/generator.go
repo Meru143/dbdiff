@@ -137,6 +137,7 @@ func (g *SQLGenerator) topologicalSort() types.DiffList {
 			types.ObjectMaterializedView: 8,
 			types.ObjectFunction:         9,
 			types.ObjectTrigger:          10,
+			types.ObjectGrant:            11,
 		}
 		return order[alters[i].Object] < order[alters[j].Object]
 	})
@@ -183,6 +184,8 @@ func (g *SQLGenerator) generateStatement(diff *types.Diff) string {
 		return g.generateFunctionDiff(diff)
 	case types.ObjectTrigger:
 		return g.generateTriggerDiff(diff)
+	case types.ObjectGrant:
+		return g.generateGrantDiff(diff)
 	default:
 		return ""
 	}
@@ -511,6 +514,24 @@ func (g *SQLGenerator) generateTriggerDiff(diff *types.Diff) string {
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop trigger: %s on %s\nDROP TRIGGER IF EXISTS %s ON %s%s CASCADE;",
 			diff.Name, diff.TableName, diff.Name, schema, diff.TableName)
+	default:
+		return ""
+	}
+}
+
+func (g *SQLGenerator) generateGrantDiff(diff *types.Diff) string {
+	schema := schemaPrefix(g.schemaName)
+	switch diff.Type {
+	case types.DiffAdd:
+		grantable := ""
+		if diff.OldValue == "true" {
+			grantable = " WITH GRANT OPTION"
+		}
+		return fmt.Sprintf("-- Grant %s on table %s to %s\nGRANT %s ON TABLE %s%s TO %s%s;",
+			diff.Name, diff.TableName, diff.NewValue, diff.Name, schema, diff.TableName, diff.NewValue, grantable)
+	case types.DiffDrop:
+		return fmt.Sprintf("-- Revoke %s on table %s from %s\nREVOKE %s ON TABLE %s%s FROM %s CASCADE;",
+			diff.Name, diff.TableName, diff.OldValue, diff.Name, schema, diff.TableName, diff.OldValue)
 	default:
 		return ""
 	}

@@ -47,6 +47,9 @@ func (e *DiffEngine) Compare() types.DiffList {
 	// Trigger comparison
 	differences = append(differences, e.compareTriggers()...)
 
+	// Grant comparison
+	differences = append(differences, e.compareGrants()...)
+
 	return differences
 }
 
@@ -834,6 +837,54 @@ func (e *DiffEngine) compareTriggers() types.DiffList {
 				Object:    types.ObjectTrigger,
 				Name:      targetTrigger.Name,
 				TableName: targetTrigger.Table,
+			})
+		}
+	}
+
+	return differences
+}
+
+func (e *DiffEngine) compareGrants() types.DiffList {
+	var differences types.DiffList
+
+	sourceGrants := make(map[string]*types.Grant)
+	targetGrants := make(map[string]*types.Grant)
+
+	for i := range e.source.Grants {
+		g := &e.source.Grants[i]
+		// Use table.grantee.privilege as the unique identifier
+		key := fmt.Sprintf("%s.%s.%s", g.Table, g.Grantee, g.Privilege)
+		sourceGrants[key] = g
+	}
+	for i := range e.target.Grants {
+		g := &e.target.Grants[i]
+		key := fmt.Sprintf("%s.%s.%s", g.Table, g.Grantee, g.Privilege)
+		targetGrants[key] = g
+	}
+
+	// New grants
+	for key, sourceGrant := range sourceGrants {
+		if _, exists := targetGrants[key]; !exists {
+			differences = append(differences, types.Diff{
+				Type:      types.DiffAdd,
+				Object:    types.ObjectGrant,
+				Name:      sourceGrant.Privilege,                      // Stash privilege
+				TableName: sourceGrant.Table,                          // Stash table
+				NewValue:  sourceGrant.Grantee,                        // Stash grantee
+				OldValue:  fmt.Sprintf("%t", sourceGrant.IsGrantable), // Stash grantable flag
+			})
+		}
+	}
+
+	// Dropped grants
+	for key, targetGrant := range targetGrants {
+		if _, exists := sourceGrants[key]; !exists {
+			differences = append(differences, types.Diff{
+				Type:      types.DiffDrop,
+				Object:    types.ObjectGrant,
+				Name:      targetGrant.Privilege,
+				TableName: targetGrant.Table,
+				OldValue:  targetGrant.Grantee,
 			})
 		}
 	}

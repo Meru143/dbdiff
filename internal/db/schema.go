@@ -36,6 +36,7 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 		MaterializedViews: make([]types.MaterializedView, 0),
 		Functions:         make([]types.Function, 0),
 		Triggers:          make([]types.Trigger, 0),
+		Grants:            make([]types.Grant, 0),
 	}
 
 	// Get tables
@@ -149,9 +150,19 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	}
 	schema.Triggers = triggers
 
+	// Get grants
 	if i.verbose {
-		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views, %d functions, %d triggers",
-			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews), len(schema.Functions), len(schema.Triggers))
+		log.Println("Introspecting grants...")
+	}
+	grants, err := getGrants(ctx, i.db, i.schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get grants: %w", err)
+	}
+	schema.Grants = grants
+
+	if i.verbose {
+		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views, %d functions, %d triggers, %d grants",
+			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews), len(schema.Functions), len(schema.Triggers), len(schema.Grants))
 	}
 
 	return schema, nil

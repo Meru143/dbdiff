@@ -445,3 +445,31 @@ func getTriggers(ctx context.Context, db *DB, schemaName string) ([]types.Trigge
 	}
 	return triggers, rows.Err()
 }
+
+func getGrants(ctx context.Context, db *DB, schemaName string) ([]types.Grant, error) {
+	// Query to extract table privileges excluding root owners automatically generated grants
+	query := `
+		SELECT 
+			table_name as table,
+			grantee,
+			privilege_type,
+			is_grantable = 'YES' as is_grantable
+		FROM information_schema.role_table_grants
+		WHERE table_schema = $1 AND grantee != grantor
+	`
+	rows, err := db.Query(ctx, query, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var grants []types.Grant
+	for rows.Next() {
+		var g types.Grant
+		if err := rows.Scan(&g.Table, &g.Grantee, &g.Privilege, &g.IsGrantable); err != nil {
+			return nil, err
+		}
+		grants = append(grants, g)
+	}
+	return grants, rows.Err()
+}
