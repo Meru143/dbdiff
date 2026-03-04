@@ -177,9 +177,10 @@ func TestIntrospectMocked(t *testing.T) {
 	ctx := context.Background()
 	schemaName := "test_schema"
 
-	// Mock getTables
+	// Mock getTables (ListTables now takes schema as param)
 	tableRows := sqlmock.NewRows([]string{"TABLE_NAME"}).AddRow("users")
 	mock.ExpectQuery(`SELECT table_name FROM information_schema\.tables`).
+		WithArgs(schemaName).
 		WillReturnRows(tableRows)
 
 	// Mock getColumns
@@ -189,37 +190,38 @@ func TestIntrospectMocked(t *testing.T) {
 		AddRow("email", "varchar", nil, "YES", 0)
 
 	mock.ExpectQuery(`SELECT c\.COLUMN_NAME, c\.DATA_TYPE`).
-		WithArgs("users").
+		WithArgs(schemaName, "users").
 		WillReturnRows(colRows)
 
 	// Mock getIndexes
 	idxRows := sqlmock.NewRows([]string{"INDEX_NAME", "is_unique", "is_primary", "COLUMN_NAME"}).
 		AddRow("idx_email", false, false, "email")
 	mock.ExpectQuery(`SELECT INDEX_NAME, NON_UNIQUE \= 0 AS is_unique, INDEX_NAME \= 'PRIMARY' AS is_primary, COLUMN_NAME`).
-		WithArgs("users").
+		WithArgs(schemaName, "users").
 		WillReturnRows(idxRows)
 
 	// Mock getConstraints
 	cstRows := sqlmock.NewRows([]string{"CONSTRAINT_NAME", "CONSTRAINT_TYPE", "COLUMN_NAME"}).
 		AddRow("chk_age", "CHECK", "age")
 	mock.ExpectQuery(`SELECT tc\.CONSTRAINT_NAME, tc\.CONSTRAINT_TYPE, kcu\.COLUMN_NAME`).
-		WithArgs("users").
+		WithArgs(schemaName, "users").
 		WillReturnRows(cstRows)
 
 	// Mock getForeignKeys
 	fkRows := sqlmock.NewRows([]string{"CONSTRAINT_NAME", "COLUMN_NAME", "REFERENCED_TABLE_NAME", "REFERENCED_COLUMN_NAME"}).
 		AddRow("fk_user", "user_id", "users", "id")
 	mock.ExpectQuery(`SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME`).
-		WithArgs("users").
+		WithArgs(schemaName, "users").
 		WillReturnRows(fkRows)
 
 	mock.ExpectQuery(`SELECT UPDATE_RULE, DELETE_RULE`).
-		WithArgs("fk_user").
+		WithArgs(schemaName, "fk_user").
 		WillReturnRows(sqlmock.NewRows([]string{"UPDATE_RULE", "DELETE_RULE"}).AddRow("RESTRICT", "CASCADE"))
 
 	// Mock getViews
 	viewRows := sqlmock.NewRows([]string{"TABLE_NAME", "VIEW_DEFINITION"}).AddRow("v_users", "SELECT * FROM users")
 	mock.ExpectQuery(`SELECT TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS`).
+		WithArgs(schemaName).
 		WillReturnRows(viewRows)
 
 	schema, err := d.Introspect(ctx, schemaName, nil)

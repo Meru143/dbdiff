@@ -78,11 +78,12 @@ func TestListTables(t *testing.T) {
 		AddRow("posts").
 		AddRow("_created_at") // This should be ignored by DefaultIgnorePatterns
 
-	// The query uses DATABASE() and 'BASE TABLE'
-	mock.ExpectQuery(`SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE\(\) AND table_type = 'BASE TABLE'`).
+	// The query now uses parameterized schema
+	mock.ExpectQuery(`SELECT table_name FROM information_schema.tables WHERE table_schema = \? AND table_type = 'BASE TABLE'`).
+		WithArgs("testdb").
 		WillReturnRows(rows)
 
-	tables, err := d.ListTables(ctx, "testdb", DefaultIgnorePatterns) // schema arg is ignored in query string anyway
+	tables, err := d.ListTables(ctx, "testdb", DefaultIgnorePatterns)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}

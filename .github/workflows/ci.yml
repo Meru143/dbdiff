@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: go build -v ./...
 
-      - name: Test
+      - name: Unit Tests
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Check coverage
@@ -46,3 +46,87 @@ jobs:
         with:
           files: ./coverage.out
           flags: unittests
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    services:
+      postgres-source:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: sourcedb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres-target:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: targetdb
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mysql-source:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: sourcedb
+          MYSQL_USER: testuser
+          MYSQL_PASSWORD: testpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      mysql-target:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: targetdb
+          MYSQL_USER: testuser
+          MYSQL_PASSWORD: testpass
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Wait for services
+        run: sleep 15
+
+      - name: Run Integration Tests
+        run: go run -tags=integration test/integration_main.go
+        env:
+          PG_SOURCE_DSN: "postgres://testuser:testpass@localhost:5432/sourcedb?sslmode=disable"
+          PG_TARGET_DSN: "postgres://testuser:testpass@localhost:5433/targetdb?sslmode=disable"
+          MYSQL_SOURCE_DSN: "testuser:testpass@tcp(localhost:3306)/sourcedb?multiStatements=true"
+          MYSQL_TARGET_DSN: "testuser:testpass@tcp(localhost:3307)/targetdb?multiStatements=true"

@@ -5,18 +5,21 @@
 [![Coverage](https://codecov.io/gh/meru143/dbdiff/branch/main/graph/badge.svg)](https://codecov.io/gh/meru143/dbdiff)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/meru143/dbdiff)](https://github.com/meru143/dbdiff)
 
-PostgreSQL schema comparison and migration CLI tool.
+Multi-database schema comparison and migration CLI tool. Supports **PostgreSQL** and **MySQL**.
 
 ## Features
 
-- Compare PostgreSQL schemas between two databases
+- Compare database schemas between two instances
 - Generate migration SQL scripts
+- **Multi-database support**: PostgreSQL and MySQL
+- Dialect-aware SQL generation (e.g., `MODIFY COLUMN` for MySQL, `ALTER COLUMN TYPE` for PostgreSQL)
 - Multiple output formats: SQL, Table, JSON
 - Dry-run mode (default)
 - Schema filtering
 - Ignore patterns for columns
 - Transaction wrapper support
 - SSL/TLS connection support
+- Migration tracking
 
 ## Installation
 
@@ -34,8 +37,10 @@ chmod +x dbdiff
 
 ## Usage
 
+### PostgreSQL
+
 ```bash
-# Compare two databases
+# Compare two PostgreSQL databases
 dbdiff compare postgres://user:pass@localhost:5432/db1 postgres://user:pass@localhost:5432/db2
 
 # Generate migration
@@ -43,7 +48,21 @@ dbdiff migrate -s postgres://localhost:5432/db1 -t postgres://localhost:5432/db2
 
 # Show table diff
 dbdiff diff postgres://localhost:5432/db1 postgres://localhost:5432/db2 --format table
+```
 
+### MySQL
+
+```bash
+# Compare two MySQL databases
+dbdiff compare mysql://user:pass@tcp(localhost:3306)/db1 mysql://user:pass@tcp(localhost:3306)/db2
+
+# Generate migration
+dbdiff migrate -s mysql://user:pass@tcp(localhost:3306)/db1 -t mysql://user:pass@tcp(localhost:3306)/db2 -o migration.sql
+```
+
+### General Commands
+
+```bash
 # List tables
 dbdiff tables postgres://localhost:5432/db
 
@@ -66,6 +85,13 @@ ignore_patterns:
   - "_updated_at"
 ```
 
+## Supported Databases
+
+| Database   | Introspection | Migration SQL | Dialect-Aware DDL |
+|------------|:---:|:---:|:---:|
+| PostgreSQL | ✅ | ✅ | ✅ |
+| MySQL 8.0+ | ✅ | ✅ | ✅ |
+
 ## Flags
 
 | Flag | Short | Description | Default |
@@ -74,7 +100,7 @@ ignore_patterns:
 | --target | -t | Target database URL | |
 | --output | -o | Output file path | stdout |
 | --format | | Output format: sql, table, json | sql |
-| --schema | | PostgreSQL schema | public |
+| --schema | | Database schema | public |
 | --dry-run | | Dry-run mode (don't write) | true |
 | --force | -f | Skip confirmation prompt | false |
 | --timeout | | Query timeout | 30s |
@@ -96,6 +122,20 @@ ignore_patterns:
 | DBDIFF_TARGET | Target database URL |
 | DBDIFF_LOG_LEVEL | Log level: debug, info, warn, error |
 | DBDIFF_CONFIG | Config file path |
+
+## Development
+
+### Running Tests
+
+```bash
+# Unit tests
+go test ./...
+
+# Integration tests (requires Docker)
+docker compose -f docker-compose.test.yml up -d
+go run -tags=integration test/integration_main.go
+docker compose -f docker-compose.test.yml down
+```
 
 ## License
 

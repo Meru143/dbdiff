@@ -15,8 +15,8 @@ var DefaultIgnorePatterns = []string{"_created_at", "_updated_at", "_modified_at
 // ListTables returns table names in the given schema
 func (d *Driver) ListTables(ctx context.Context, schema string, ignorePatterns []string) ([]string, error) {
 	// In MySQL, the schema is often just the currently selected DB
-	query := "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
-	rows, err := d.db.QueryContext(ctx, query)
+	query := "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'"
+	rows, err := d.db.QueryContext(ctx, query, schema)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +104,9 @@ func getColumns(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 			AND c.TABLE_NAME = k.TABLE_NAME 
 			AND c.COLUMN_NAME = k.COLUMN_NAME 
 			AND k.CONSTRAINT_NAME = 'PRIMARY'
-		WHERE c.TABLE_SCHEMA = DATABASE() AND c.TABLE_NAME = ?
+		WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ?
 		ORDER BY c.ORDINAL_POSITION`
-	rows, err := dbConn.QueryContext(ctx, query, tableName)
+	rows, err := dbConn.QueryContext(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -140,10 +140,10 @@ func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 			INDEX_NAME = 'PRIMARY' AS is_primary,
 			COLUMN_NAME
 		FROM information_schema.STATISTICS 
-		WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+		WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
 		ORDER BY INDEX_NAME, SEQ_IN_INDEX`
 
-	rows, err := dbConn.QueryContext(ctx, query, tableName)
+	rows, err := dbConn.QueryContext(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -193,10 +193,10 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 		FROM information_schema.TABLE_CONSTRAINTS tc
 		JOIN information_schema.KEY_COLUMN_USAGE kcu
 			ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
-		WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE', 'CHECK')
+		WHERE tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE', 'CHECK')
 		ORDER BY tc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`
 
-	rows, err := dbConn.QueryContext(ctx, query, tableName)
+	rows, err := dbConn.QueryContext(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -239,10 +239,10 @@ func getForeignKeys(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 			REFERENCED_TABLE_NAME,
 			REFERENCED_COLUMN_NAME
 		FROM information_schema.KEY_COLUMN_USAGE 
-		WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
+		WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
 		ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION`
 
-	rows, err := dbConn.QueryContext(ctx, query, tableName)
+	rows, err := dbConn.QueryContext(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -274,9 +274,9 @@ func getForeignKeys(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 	var fks []types.ForeignKey
 	for _, name := range orderedNames {
 		// fetch on update / delete
-		rcQuery := `SELECT UPDATE_RULE, DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?`
+		rcQuery := `SELECT UPDATE_RULE, DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = ? AND CONSTRAINT_NAME = ?`
 		var onUpd, onDel string
-		if err := dbConn.QueryRowContext(ctx, rcQuery, name).Scan(&onUpd, &onDel); err == nil {
+		if err := dbConn.QueryRowContext(ctx, rcQuery, schemaName, name).Scan(&onUpd, &onDel); err == nil {
 			fkMap[name].OnUpdate = onUpd
 			fkMap[name].OnDelete = onDel
 		}
@@ -287,8 +287,8 @@ func getForeignKeys(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 }
 
 func getViews(ctx context.Context, dbConn *sql.DB, schemaName string) ([]types.View, error) {
-	query := `SELECT TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE()`
-	rows, err := dbConn.QueryContext(ctx, query)
+	query := `SELECT TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS WHERE TABLE_SCHEMA = ?`
+	rows, err := dbConn.QueryContext(ctx, query, schemaName)
 	if err != nil {
 		return nil, err
 	}

@@ -85,8 +85,12 @@ func (d *Driver) Dialect() string {
 // Introspect performs full schema introspection for MySQL
 func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
 	if schema == "" {
-		// In MySQL, schema is database
-		schema = "DATABASE()" // Or get current DB
+		// Query the current database name
+		var dbName string
+		if err := d.db.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&dbName); err != nil {
+			return nil, fmt.Errorf("failed to determine current database: %w", err)
+		}
+		schema = dbName
 	}
 
 	result := &types.Schema{}
