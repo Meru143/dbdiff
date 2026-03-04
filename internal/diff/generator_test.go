@@ -11,7 +11,7 @@ func TestSQLGenerator_CreateTable(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -24,7 +24,7 @@ func TestSQLGenerator_DropTable(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectTable, Name: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -37,7 +37,7 @@ func TestSQLGenerator_AddColumn(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectColumn, Name: "email", TableName: "users", NewValue: "varchar"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -50,7 +50,7 @@ func TestSQLGenerator_DropColumn(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectColumn, Name: "email", TableName: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -63,7 +63,7 @@ func TestSQLGenerator_AlterColumn(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAlter, Object: types.ObjectColumn, Name: "email", TableName: "users", OldValue: "varchar", NewValue: "text"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -76,7 +76,7 @@ func TestSQLGenerator_CreateIndex(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectIndex, Name: "users_email_idx", TableName: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -89,7 +89,7 @@ func TestSQLGenerator_DropIndex(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectIndex, Name: "users_email_idx"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -102,7 +102,7 @@ func TestSQLGenerator_AddConstraint(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectConstraint, Name: "users_pkey", TableName: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -115,7 +115,7 @@ func TestSQLGenerator_DropConstraint(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectConstraint, Name: "users_pkey", TableName: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -128,7 +128,7 @@ func TestSQLGenerator_CreateSequence(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectSequence, Name: "users_id_seq"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -141,7 +141,7 @@ func TestSQLGenerator_TransactionWrapper(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(true)
 	sql := gen.Generate()
 
@@ -152,7 +152,7 @@ func TestSQLGenerator_TransactionWrapper(t *testing.T) {
 
 func TestSQLGenerator_EmptyDiffs(t *testing.T) {
 	diffs := types.DiffList{}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -167,7 +167,7 @@ func TestSQLGenerator_MultipleDiffs(t *testing.T) {
 		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "posts"},
 		{Type: types.DiffDrop, Object: types.ObjectTable, Name: "old_table"},
 	}
-	gen := NewSQLGenerator(diffs, "public")
+	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -180,7 +180,7 @@ func TestSQLGenerator_View(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectView, Name: "active_users", NewValue: "SELECT * FROM users;"},
 	}
-	gen := NewSQLGenerator(diffs, "")
+	gen := NewSQLGenerator(diffs, "", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -193,7 +193,7 @@ func TestSQLGenerator_MaterializedView(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectMaterializedView, Name: "daily_stats"},
 	}
-	gen := NewSQLGenerator(diffs, "")
+	gen := NewSQLGenerator(diffs, "", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -206,7 +206,7 @@ func TestSQLGenerator_Function(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectFunction, Name: "get_user(integer)", NewValue: "CREATE OR REPLACE FUNCTION get_user(integer) RETURNS void;"},
 	}
-	gen := NewSQLGenerator(diffs, "")
+	gen := NewSQLGenerator(diffs, "", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -219,7 +219,7 @@ func TestSQLGenerator_Trigger(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAlter, Object: types.ObjectTrigger, Name: "update_timestamp", TableName: "users", NewValue: "CREATE TRIGGER update_timestamp BEFORE UPDATE..."},
 	}
-	gen := NewSQLGenerator(diffs, "")
+	gen := NewSQLGenerator(diffs, "", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 
@@ -235,7 +235,7 @@ func TestSQLGenerator_Grant(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffAdd, Object: types.ObjectGrant, Name: "SELECT", TableName: "users", NewValue: "api_role", OldValue: "true"},
 	}
-	gen := NewSQLGenerator(diffs, "")
+	gen := NewSQLGenerator(diffs, "", "postgresql")
 	gen.SetTransaction(false)
 	sql := gen.Generate()
 

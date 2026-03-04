@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/meru143/dbdiff/internal/db"
 	dbdiff "github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/pkg/types"
 )
@@ -245,11 +246,12 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 func (f *Formatter) formatDiffSQL(diff *types.Diff) string {
 	// Use SQLGenerator for proper SQL generation
 	// Disable transaction wrapper since FormatMigration handles that
+	dialect := db.DetectDialect(f.options.SourceDB)
 	var generator *dbdiff.SQLGenerator
 	if f.sourceSchema != nil {
-		generator = dbdiff.NewSQLGeneratorWithSchema(types.DiffList{*diff}, f.options.SourceDB, f.sourceSchema)
+		generator = dbdiff.NewSQLGeneratorWithSchema(types.DiffList{*diff}, f.options.SourceDB, f.sourceSchema, dialect)
 	} else {
-		generator = dbdiff.NewSQLGenerator(types.DiffList{*diff}, f.options.SourceDB)
+		generator = dbdiff.NewSQLGenerator(types.DiffList{*diff}, f.options.SourceDB, dialect)
 	}
 	generator.SetTransaction(false)
 	return generator.Generate()

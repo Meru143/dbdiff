@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/meru143/dbdiff/internal/db/mysql"
 	"github.com/meru143/dbdiff/internal/db/postgres"
 )
 
@@ -22,7 +23,7 @@ func NewDriver(connStr string) (Driver, error) {
 
 	case strings.HasPrefix(lower, "mysql://"),
 		strings.HasPrefix(lower, "mysql+tcp://"):
-		return nil, fmt.Errorf("mysql support is not yet implemented — coming soon")
+		return mysql.New(), nil
 
 	case strings.HasPrefix(lower, "sqlserver://"):
 		return nil, fmt.Errorf("sql server support is not yet implemented — coming soon")

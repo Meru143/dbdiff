@@ -13,17 +13,22 @@ type SQLGenerator struct {
 	diffs        types.DiffList
 	sourceSchema *types.Schema
 	schemaName   string
+	dialect      string
 	lockTimeout  string
 	concurrently bool
 	transaction  bool
 }
 
 // NewSQLGenerator creates a new SQL generator
-func NewSQLGenerator(diffs types.DiffList, schemaName string) *SQLGenerator {
+func NewSQLGenerator(diffs types.DiffList, schemaName string, dialect string) *SQLGenerator {
+	if dialect == "" {
+		dialect = "postgresql" // default
+	}
 	return &SQLGenerator{
 		diffs:        diffs,
 		sourceSchema: nil,
 		schemaName:   schemaName,
+		dialect:      dialect,
 		lockTimeout:  "10s",
 		concurrently: true,
 		transaction:  true,
@@ -31,11 +36,15 @@ func NewSQLGenerator(diffs types.DiffList, schemaName string) *SQLGenerator {
 }
 
 // NewSQLGeneratorWithSchema creates a new SQL generator with source schema for full SQL generation
-func NewSQLGeneratorWithSchema(diffs types.DiffList, schemaName string, sourceSchema *types.Schema) *SQLGenerator {
+func NewSQLGeneratorWithSchema(diffs types.DiffList, schemaName string, sourceSchema *types.Schema, dialect string) *SQLGenerator {
+	if dialect == "" {
+		dialect = "postgresql" // default
+	}
 	return &SQLGenerator{
 		diffs:        diffs,
 		sourceSchema: sourceSchema,
 		schemaName:   schemaName,
+		dialect:      dialect,
 		lockTimeout:  "10s",
 		concurrently: true,
 		transaction:  true,
@@ -67,17 +76,25 @@ func (g *SQLGenerator) Generate() string {
 		}
 	}
 
-	// Wrap in transaction if requested
+	// Wrap in transaction if requested (PostgreSQL uses DO logic, MySQL has limited transaction DDL support)
 	if g.transaction && len(sql) > 0 {
-		transactionalSQL := []string{"DO $$"}
-		transactionalSQL = append(transactionalSQL, "BEGIN")
-		transactionalSQL = append(transactionalSQL, sql...)
-		transactionalSQL = append(transactionalSQL, "EXCEPTION WHEN OTHERS THEN")
-		transactionalSQL = append(transactionalSQL, "  RAISE NOTICE 'Migration failed: %', SQLERRM;")
-		transactionalSQL = append(transactionalSQL, "  ROLLBACK;")
-		transactionalSQL = append(transactionalSQL, "  RAISE;")
-		transactionalSQL = append(transactionalSQL, "END $$;")
-		return strings.Join(transactionalSQL, "\n")
+		if g.dialect == "mysql" {
+			// Basic transaction for MySQL, though DDL implicitly commits in MySQL
+			transactionalSQL := []string{"START TRANSACTION;"}
+			transactionalSQL = append(transactionalSQL, sql...)
+			transactionalSQL = append(transactionalSQL, "COMMIT;")
+			return strings.Join(transactionalSQL, "\n")
+		} else {
+			transactionalSQL := []string{"DO $$"}
+			transactionalSQL = append(transactionalSQL, "BEGIN")
+			transactionalSQL = append(transactionalSQL, sql...)
+			transactionalSQL = append(transactionalSQL, "EXCEPTION WHEN OTHERS THEN")
+			transactionalSQL = append(transactionalSQL, "  RAISE NOTICE 'Migration failed: %', SQLERRM;")
+			transactionalSQL = append(transactionalSQL, "  ROLLBACK;")
+			transactionalSQL = append(transactionalSQL, "  RAISE;")
+			transactionalSQL = append(transactionalSQL, "END $$;")
+			return strings.Join(transactionalSQL, "\n")
+		}
 	}
 
 	return strings.Join(sql, "\n")
@@ -206,8 +223,15 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 		// Fallback if no source schema
 		return fmt.Sprintf("-- Create table: %s\nCREATE TABLE IF NOT EXISTS %s%s ();", diff.Name, schema, diff.Name)
 	case types.DiffDrop:
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
+		}
 		return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
 	case types.DiffRename:
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Rename table: %s -> %s\nRENAME TABLE %s%s TO %s%s;",
+				diff.OldValue, diff.NewValue, schema, diff.OldValue, schema, diff.NewValue)
+		}
 		return fmt.Sprintf("-- Rename table: %s -> %s\nALTER TABLE %s%s RENAME TO %s;",
 			diff.OldValue, diff.NewValue, schema, diff.OldValue, diff.NewValue)
 	default:
@@ -319,6 +343,10 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 		return fmt.Sprintf("-- Add column: %s to %s\nALTER TABLE %s%s ADD COLUMN %s %s;",
 			diff.Name, diff.TableName, schema, diff.TableName, diff.Name, dataType)
 	case types.DiffDrop:
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Drop column: %s from %s\nALTER TABLE %s%s DROP COLUMN %s;",
+				diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
+		}
 		return fmt.Sprintf("-- Drop column: %s from %s\nALTER TABLE %s%s DROP COLUMN IF EXISTS %s CASCADE;",
 			diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
 	case types.DiffAlter:
@@ -326,6 +354,12 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 			// Check if it's a type change or nullable change
 			if diff.OldValue == "NULL" || diff.OldValue == "NOT NULL" {
 				// Nullable change
+				if g.dialect == "mysql" {
+					// In MySQL, you alter column by modifying it with its full type.
+					// We don't have the full type here, so we emit a warning/stub.
+					return fmt.Sprintf("-- Alter column: %s.%s (Modifying NULL in MySQL requires full definition)\nALTER TABLE %s%s MODIFY COLUMN %s /* type */ %s;",
+						diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
+				}
 				nullable := "DROP NOT NULL"
 				if diff.NewValue == "NOT NULL" {
 					nullable = "SET NOT NULL"
@@ -333,7 +367,11 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s %s;",
 					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, nullable)
 			}
-			// Type change with USING clause
+			// Type change
+			if g.dialect == "mysql" {
+				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s MODIFY COLUMN %s %s;",
+					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
+			}
 			return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s TYPE %s USING (%s::%s);",
 				diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue, diff.Name, diff.NewValue)
 		}
@@ -359,6 +397,10 @@ func (g *SQLGenerator) generateIndexDiff(diff *types.Diff) string {
 			concurrently, diff.Name)
 	case types.DiffAlter:
 		// Recreate index for definition changes
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Recreate index: %s\nDROP INDEX %s ON %s%s;\nCREATE INDEX %s ON %s%s ();",
+				diff.Name, diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName)
+		}
 		return fmt.Sprintf("-- Recreate index: %s\nDROP INDEX IF EXISTS %s;\nCREATE INDEX %sON %s%s ();",
 			diff.Name, diff.Name, concurrently, schema, diff.TableName)
 	default:
@@ -374,10 +416,18 @@ func (g *SQLGenerator) generateConstraintDiff(diff *types.Diff) string {
 		return fmt.Sprintf("-- Add constraint: %s\nALTER TABLE %s%s ADD CONSTRAINT %s;",
 			diff.Name, schema, diff.TableName, diff.Name)
 	case types.DiffDrop:
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Drop constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;",
+				diff.Name, schema, diff.TableName, diff.Name)
+		}
 		return fmt.Sprintf("-- Drop constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;",
 			diff.Name, schema, diff.TableName, diff.Name)
 	case types.DiffAlter:
 		// Drop and recreate
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Alter constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
+				diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
+		}
 		return fmt.Sprintf("-- Alter constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
 			diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
 	default:
@@ -392,11 +442,18 @@ func (g *SQLGenerator) generateForeignKeyDiff(diff *types.Diff) string {
 		return fmt.Sprintf("-- Add foreign key: %s\nALTER TABLE %s%s ADD CONSTRAINT %s;",
 			diff.Name, schema, diff.TableName, diff.Name)
 	case types.DiffDrop:
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP FOREIGN KEY %s;",
+				diff.Name, schema, diff.TableName, diff.Name)
+		}
 		return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;",
 			diff.Name, schema, diff.TableName, diff.Name)
 	case types.DiffAlter:
 		// For FK changes, drop and recreate
-		// Extract action from Description if available
+		if g.dialect == "mysql" {
+			return fmt.Sprintf("-- Alter foreign key: %s\nALTER TABLE %s%s DROP FOREIGN KEY %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
+				diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
+		}
 		return fmt.Sprintf("-- Alter foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
 			diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
 	default:
@@ -537,8 +594,7 @@ func (g *SQLGenerator) generateGrantDiff(diff *types.Diff) string {
 	}
 }
 
-// GenerateSQL is a legacy function
-func GenerateSQL(diffs types.DiffList, schemaName string) string {
-	gen := NewSQLGenerator(diffs, schemaName)
+func GenerateSQL(diffs types.DiffList, schemaName string, dialect string) string {
+	gen := NewSQLGenerator(diffs, schemaName, dialect)
 	return gen.Generate()
 }
