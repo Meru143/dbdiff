@@ -16,6 +16,21 @@ func TestSchema_JSON(t *testing.T) {
 		Types: []Type{
 			{Name: "user_status", Kind: "enum", Values: []string{"active", "inactive"}},
 		},
+		Views: []View{
+			{Name: "active_users", Definition: "SELECT * FROM users"},
+		},
+		MaterializedViews: []MaterializedView{
+			{Name: "daily_stats"},
+		},
+		Functions: []Function{
+			{Name: "get_user"},
+		},
+		Triggers: []Trigger{
+			{Name: "update_log"},
+		},
+		Grants: []Grant{
+			{Privilege: "SELECT"},
+		},
 	}
 
 	// Marshal
@@ -41,6 +56,21 @@ func TestSchema_JSON(t *testing.T) {
 	}
 	if len(decoded.Types) != 1 {
 		t.Errorf("Expected 1 type, got %d", len(decoded.Types))
+	}
+	if len(decoded.Views) != 1 {
+		t.Errorf("Expected 1 view, got %d", len(decoded.Views))
+	}
+	if len(decoded.MaterializedViews) != 1 {
+		t.Errorf("Expected 1 materialized view, got %d", len(decoded.MaterializedViews))
+	}
+	if len(decoded.Functions) != 1 {
+		t.Errorf("Expected 1 function, got %d", len(decoded.Functions))
+	}
+	if len(decoded.Triggers) != 1 {
+		t.Errorf("Expected 1 trigger, got %d", len(decoded.Triggers))
+	}
+	if len(decoded.Grants) != 1 {
+		t.Errorf("Expected 1 grant, got %d", len(decoded.Grants))
 	}
 }
 
@@ -232,5 +262,55 @@ func TestConstraint_JSON(t *testing.T) {
 	}
 	if decoded.Type != "UNIQUE" {
 		t.Errorf("Expected type UNIQUE, got %s", decoded.Type)
+	}
+}
+
+func TestView_JSON(t *testing.T) {
+	view := View{Name: "active_users", Definition: "SELECT * FROM users"}
+	data, _ := json.Marshal(view)
+	var decoded View
+	json.Unmarshal(data, &decoded)
+	if decoded.Name != "active_users" {
+		t.Errorf("Expected 'active_users', got %s", decoded.Name)
+	}
+}
+
+func TestMaterializedView_JSON(t *testing.T) {
+	mview := MaterializedView{Name: "daily_stats", Definition: "SELECT * FROM logs"}
+	data, _ := json.Marshal(mview)
+	var decoded MaterializedView
+	json.Unmarshal(data, &decoded)
+	if decoded.Name != "daily_stats" {
+		t.Errorf("Expected 'daily_stats', got %s", decoded.Name)
+	}
+}
+
+func TestFunction_JSON(t *testing.T) {
+	fn := Function{Name: "get_user", Arguments: "integer", Definition: "SELECT 1"}
+	data, _ := json.Marshal(fn)
+	var decoded Function
+	json.Unmarshal(data, &decoded)
+	if decoded.Name != "get_user" {
+		t.Errorf("Expected 'get_user', got %s", decoded.Name)
+	}
+}
+
+func TestTrigger_JSON(t *testing.T) {
+	trig := Trigger{Name: "update_log", Table: "users", Definition: "EXECUTE fn()"}
+	data, _ := json.Marshal(trig)
+	var decoded Trigger
+	json.Unmarshal(data, &decoded)
+	if decoded.Name != "update_log" {
+		t.Errorf("Expected 'update_log', got %s", decoded.Name)
+	}
+}
+
+func TestGrant_JSON(t *testing.T) {
+	grant := Grant{Table: "users", Grantee: "web", Privilege: "SELECT", IsGrantable: true}
+	data, _ := json.Marshal(grant)
+	var decoded Grant
+	json.Unmarshal(data, &decoded)
+	if decoded.Privilege != "SELECT" {
+		t.Errorf("Expected 'SELECT', got %s", decoded.Privilege)
 	}
 }
