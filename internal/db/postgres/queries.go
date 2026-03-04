@@ -163,20 +163,13 @@ func getForeignKeys(ctx context.Context, pool *pgxpool.Pool, schemaName, tableNa
 			AND tc.table_schema = kcu.table_schema
 		JOIN information_schema.constraint_column_usage ccu 
 			ON tc.constraint_name = ccu.constraint_name
-		JOIN (
-			SELECT 
-				r.conname as constraint_name,
-				r.confrelid,
-				r.delete_rule,
-				r.update_rule,
-				r.conname as unique_constraint_name
-			FROM pg_catalog.pg_constraint r
-			WHERE r.contype = 'f'
-		) rc ON tc.constraint_name = rc.constraint_name
+		JOIN information_schema.referential_constraints rc 
+			ON tc.constraint_name = rc.constraint_name 
+			AND tc.constraint_schema = rc.constraint_schema
 		WHERE tc.table_schema = $1 
 			AND tc.table_name = $2 
 			AND tc.constraint_type = 'FOREIGN KEY'
-		GROUP BY tc.constraint_name, ccu.table_name, rc.unique_constraint_name, rc.delete_rule, rc.update_rule`
+		GROUP BY tc.constraint_name, ccu.table_name, rc.unique_constraint_name, rc.update_rule, rc.delete_rule`
 	rows, err := pool.Query(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
@@ -198,7 +191,7 @@ func getForeignKeys(ctx context.Context, pool *pgxpool.Pool, schemaName, tableNa
 }
 
 func getSequences(ctx context.Context, pool *pgxpool.Pool, schemaName string) ([]types.Sequence, error) {
-	query := `SELECT sequence_name, start_value, minimum_value, maximum_value, increment, cache_size, cycle FROM information_schema.sequences WHERE sequence_schema = $1`
+	query := `SELECT sequencename, start_value, min_value, max_value, increment_by, cache_size, cycle FROM pg_sequences WHERE schemaname = $1`
 	rows, err := pool.Query(ctx, query, schemaName)
 	if err != nil {
 		return nil, err

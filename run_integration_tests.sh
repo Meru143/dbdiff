@@ -17,19 +17,18 @@ fi
 
 # Start containers
 echo "Starting test databases..."
-docker-compose up -d
+docker-compose -f docker-compose.test.yml up -d
 
 # Wait for databases to be ready
-echo "Waiting for databases to be ready..."
-sleep 10
+echo "Waiting for PostgreSQL and MySQL to be ready..."
+sleep 20 # MySQL takes longer to boot up
 
-# Run integration tests
+# Run integration tests locally (assuming go is installed properly)
 echo "Running integration tests..."
-cd /home/meru/workspace/dbdiff
-go run -tags=integration test/integration_test.go
+go test -tags=integration ./test/... -v
 
 # Stop containers
 echo "Stopping test databases..."
-docker-compose down
+docker-compose -f docker-compose.test.yml down
 
 echo "=== Integration tests complete ==="
