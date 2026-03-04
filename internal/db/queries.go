@@ -340,7 +340,9 @@ func filterColumns(columns []types.Column, ignorePatterns []string) []types.Colu
 	}
 
 	// Add default patterns if not specified
-	allPatterns := append(DefaultIgnorePatterns, ignorePatterns...)
+	allPatterns := make([]string, 0, len(DefaultIgnorePatterns)+len(ignorePatterns))
+	allPatterns = append(allPatterns, DefaultIgnorePatterns...)
+	allPatterns = append(allPatterns, ignorePatterns...)
 
 	var filtered []types.Column
 	for _, col := range columns {
