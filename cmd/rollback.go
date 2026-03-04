@@ -39,17 +39,22 @@ var RollbackCmd = &cobra.Command{
 
 		ctx := context.Background()
 
-		targetDB, err := db.Connect(ctx, target, cfg.SSLMode, cfg.Timeout)
+		driver, err := db.NewDriver(target)
+		if err != nil {
+			return fmt.Errorf("failed to initialize driver: %w", err)
+		}
+
+		err = driver.Connect(ctx, target, cfg.SSLMode, cfg.Timeout)
 		if err != nil {
 			return fmt.Errorf("failed to connect to target: %w", err)
 		}
-		defer targetDB.Close()
+		defer driver.Close()
 
-		if err := db.EnsureMigrationsTable(ctx, targetDB); err != nil {
+		if err := driver.EnsureMigrationsTable(ctx); err != nil {
 			return fmt.Errorf("failed to ensure migrations tracking table: %w", err)
 		}
 
-		applied, err := db.GetAppliedMigrations(ctx, targetDB)
+		applied, err := driver.GetAppliedMigrations(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve applied migrations: %w", err)
 		}
@@ -77,11 +82,11 @@ var RollbackCmd = &cobra.Command{
 			sqlCmd = "BEGIN;\n" + sqlCmd + "\nCOMMIT;"
 		}
 
-		if _, err := targetDB.Exec(ctx, sqlCmd); err != nil {
+		if err := driver.Exec(ctx, sqlCmd); err != nil {
 			return fmt.Errorf("failed to execute rollback script: %w", err)
 		}
 
-		if err := db.RemoveMigration(ctx, targetDB, version); err != nil {
+		if err := driver.RemoveMigration(ctx, version); err != nil {
 			return fmt.Errorf("rollback script succeeded but failed to purge history record: %w", err)
 		}
 

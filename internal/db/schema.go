@@ -167,27 +167,3 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 
 	return schema, nil
 }
-
-// Introspect performs full schema introspection (legacy function)
-func Introspect(ctx context.Context, db *DB, schemaName string, ignorePatterns []string) (*types.Schema, error) {
-	introspector := NewIntrospector(db, schemaName, ignorePatterns, false)
-	return introspector.Introspect(ctx)
-}
-
-func ListTables(ctx context.Context, db *DB, schemaName string, ignorePatterns []string) ([]string, error) {
-	return getTables(ctx, db, schemaName, ignorePatterns)
-}
-
-type ServerInfo struct {
-	Version  string
-	Database string
-	User     string
-}
-
-func GetServerInfo(ctx context.Context, db *DB) (*ServerInfo, error) {
-	var info ServerInfo
-	err := db.QueryRow(ctx, "SELECT current_database(), current_user, version()").Scan(
-		&info.Database, &info.User, &info.Version,
-	)
-	return &info, err
-}

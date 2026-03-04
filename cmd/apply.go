@@ -38,19 +38,24 @@ var ApplyCmd = &cobra.Command{
 		ctx := context.Background()
 
 		// Connect to DB
-		targetDB, err := db.Connect(ctx, target, cfg.SSLMode, cfg.Timeout)
+		driver, err := db.NewDriver(target)
+		if err != nil {
+			return fmt.Errorf("failed to initialize driver: %w", err)
+		}
+
+		err = driver.Connect(ctx, target, cfg.SSLMode, cfg.Timeout)
 		if err != nil {
 			return fmt.Errorf("failed to connect to target: %w", err)
 		}
-		defer targetDB.Close()
+		defer driver.Close()
 
 		// Ensure tracking table exists
-		if err := db.EnsureMigrationsTable(ctx, targetDB); err != nil {
+		if err := driver.EnsureMigrationsTable(ctx); err != nil {
 			return fmt.Errorf("failed to ensure migrations tracking table: %w", err)
 		}
 
 		// Check if it already ran
-		applied, err := db.GetAppliedMigrations(ctx, targetDB)
+		applied, err := driver.GetAppliedMigrations(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve applied migrations: %w", err)
 		}
@@ -71,12 +76,12 @@ var ApplyCmd = &cobra.Command{
 			sqlCmd = "BEGIN;\n" + sqlCmd + "\nCOMMIT;"
 		}
 
-		if _, err := targetDB.Exec(ctx, sqlCmd); err != nil {
+		if err := driver.Exec(ctx, sqlCmd); err != nil {
 			return fmt.Errorf("failed to apply migration '%s': %w", version, err)
 		}
 
 		// Mark as applied
-		if err := db.RecordMigration(ctx, targetDB, version); err != nil {
+		if err := driver.RecordMigration(ctx, version); err != nil {
 			return fmt.Errorf("migration applied but failed to record into tracking table: %w", err)
 		}
 

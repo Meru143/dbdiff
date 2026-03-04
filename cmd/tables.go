@@ -29,13 +29,18 @@ var TablesCmd = &cobra.Command{
 		logging.Info(fmt.Sprintf("Connecting to: %s", database))
 
 		ctx := context.Background()
-		conn, err := db.Connect(ctx, database, cfg.SSLMode, cfg.Timeout)
+		driver, err := db.NewDriver(database)
+		if err != nil {
+			return fmt.Errorf("failed to initialize driver: %w", err)
+		}
+
+		err = driver.Connect(ctx, database, cfg.SSLMode, cfg.Timeout)
 		if err != nil {
 			return fmt.Errorf("failed to connect: %w", err)
 		}
-		defer conn.Close()
+		defer driver.Close()
 
-		tables, err := db.ListTables(ctx, conn, cfg.Schema, cfg.IgnorePatterns)
+		tables, err := driver.ListTables(ctx, cfg.Schema, cfg.IgnorePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to list tables: %w", err)
 		}

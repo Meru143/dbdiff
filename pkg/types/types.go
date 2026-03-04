@@ -106,6 +106,13 @@ type Grant struct {
 	IsGrantable bool   `json:"is_grantable"`
 }
 
+// ServerInfo holds database server metadata
+type ServerInfo struct {
+	Version  string
+	Database string
+	User     string
+}
+
 type DiffType string
 
 const (

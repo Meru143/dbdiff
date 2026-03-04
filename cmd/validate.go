@@ -29,14 +29,19 @@ var ValidateCmd = &cobra.Command{
 		fmt.Printf("Validating connection to: %s\n", database)
 
 		ctx := context.Background()
-		conn, err := db.Connect(ctx, database, cfg.SSLMode, cfg.Timeout)
+		driver, err := db.NewDriver(database)
+		if err != nil {
+			return fmt.Errorf("failed to initialize driver: %w", err)
+		}
+
+		err = driver.Connect(ctx, database, cfg.SSLMode, cfg.Timeout)
 		if err != nil {
 			fmt.Printf("❌ Connection failed: %v\n", err)
 			return err
 		}
-		defer conn.Close()
+		defer driver.Close()
 
-		info, err := db.GetServerInfo(ctx, conn)
+		info, err := driver.GetServerInfo(ctx)
 		if err != nil {
 			fmt.Printf("⚠️  Connected but failed to get server info: %v\n", err)
 		} else {

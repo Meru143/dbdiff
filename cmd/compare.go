@@ -36,24 +36,32 @@ var CompareCmd = &cobra.Command{
 
 		ctx := context.Background()
 
-		sourceDB, err := db.Connect(ctx, source, cfg.SSLMode, cfg.Timeout)
+		sourceDriver, err := db.NewDriver(source)
+		if err != nil {
+			return fmt.Errorf("failed to initialize source driver: %w", err)
+		}
+		err = sourceDriver.Connect(ctx, source, cfg.SSLMode, cfg.Timeout)
 		if err != nil {
 			return fmt.Errorf("failed to connect to source: %w", err)
 		}
-		defer sourceDB.Close()
+		defer sourceDriver.Close()
 
-		targetDB, err := db.Connect(ctx, target, cfg.SSLMode, cfg.Timeout)
+		targetDriver, err := db.NewDriver(target)
+		if err != nil {
+			return fmt.Errorf("failed to initialize target driver: %w", err)
+		}
+		err = targetDriver.Connect(ctx, target, cfg.SSLMode, cfg.Timeout)
 		if err != nil {
 			return fmt.Errorf("failed to connect to target: %w", err)
 		}
-		defer targetDB.Close()
+		defer targetDriver.Close()
 
-		sourceSchema, err := db.Introspect(ctx, sourceDB, cfg.Schema, cfg.IgnorePatterns)
+		sourceSchema, err := sourceDriver.Introspect(ctx, cfg.Schema, cfg.IgnorePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to introspect source: %w", err)
 		}
 
-		targetSchema, err := db.Introspect(ctx, targetDB, cfg.Schema, cfg.IgnorePatterns)
+		targetSchema, err := targetDriver.Introspect(ctx, cfg.Schema, cfg.IgnorePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to introspect target: %w", err)
 		}
