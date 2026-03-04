@@ -121,14 +121,25 @@ var MigrateCmd = &cobra.Command{
 			}
 		}
 
-		formatter := output.NewFormatter("sql")
+		formatterOpts := output.FormatOptions{
+			Format:       "sql",
+			IsExecutable: cfg.Executable,
+		}
+		formatter := output.NewFormatterWithOptions(formatterOpts)
 		migrationSQL, err := formatter.FormatMigration(differences, cfg.Transaction)
 		if err != nil {
 			return fmt.Errorf("failed to generate migration: %w", err)
 		}
 
 		header := fmt.Sprintf("-- DBDiff Migration\n-- Source: %s\n-- Target: %s\n-- Schema: %s\n\n", source, target, cfg.Schema)
-		fullSQL := header + migrationSQL
+
+		var fullSQL string
+		if cfg.Executable {
+			// If executing a bash script, omit the header as shebang is inside formatExecutable natively.
+			fullSQL = migrationSQL
+		} else {
+			fullSQL = header + migrationSQL
+		}
 
 		// Confirmation prompt (only for non-dry-run, non-force)
 		if !cfg.DryRun && !cfg.Force && cfg.Output != "stdout" {
@@ -170,4 +181,8 @@ var MigrateCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	MigrateCmd.Flags().BoolP("executable", "x", false, "Generate an executable bash migration script")
 }

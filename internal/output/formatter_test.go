@@ -69,6 +69,40 @@ func TestFormatMigration(t *testing.T) {
 	}
 }
 
+func TestFormatExecutable(t *testing.T) {
+	opts := FormatOptions{
+		Format:       "sql",
+		IsExecutable: true,
+	}
+	formatter := NewFormatterWithOptions(opts)
+	diffs := types.DiffList{
+		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
+	}
+
+	result, err := formatter.FormatMigration(diffs, false)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Verify Bash script wrapper components
+	expectedStrings := []string{
+		"#!/bin/bash",
+		"DB_URL=${1:-$DATABASE_URL}",
+		"psql \"$DB_URL\" -c",
+		"psql -v ON_ERROR_STOP=1 \"$DB_URL\" << 'EOF'",
+		"BEGIN;",
+		"-- Create table: users",
+		"COMMIT;",
+		"EOF",
+	}
+
+	for _, exp := range expectedStrings {
+		if !contains(result, exp) {
+			t.Errorf("Expected executable script to contain %q", exp)
+		}
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && (s[:len(substr)] == substr || contains(s[1:], substr)))
 }

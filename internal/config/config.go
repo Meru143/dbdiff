@@ -21,6 +21,7 @@ type Config struct {
 	Transaction      bool
 	Verbose          bool
 	Debug            bool
+	Executable       bool
 	SSLMode          string
 	BackupDir        string
 	MaxBackups       int
@@ -85,6 +86,7 @@ func Load(flags map[string]interface{}) (*Config, error) {
 		Transaction:      v.GetBool("transaction"),
 		Verbose:          v.GetBool("verbose"),
 		Debug:            v.GetBool("debug"),
+		Executable:       v.GetBool("executable"),
 		SSLMode:          v.GetString("ssl-mode"),
 		BackupDir:        v.GetString("backup-dir"),
 		LogLevel:         v.GetString("log-level"),
