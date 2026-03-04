@@ -160,6 +160,7 @@ func main() {
 	rootCmd.AddCommand(cmd.ApplyCmd)
 	rootCmd.AddCommand(cmd.HistoryCmd)
 	rootCmd.AddCommand(cmd.RollbackCmd)
+	rootCmd.AddCommand(cmd.InteractiveCmd)
 
 	// Add completion command
 	rootCmd.AddCommand(&cobra.Command{
