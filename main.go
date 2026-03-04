@@ -157,6 +157,9 @@ func main() {
 	rootCmd.AddCommand(cmd.DiffCmd)
 	rootCmd.AddCommand(cmd.TablesCmd)
 	rootCmd.AddCommand(cmd.ValidateCmd)
+	rootCmd.AddCommand(cmd.ApplyCmd)
+	rootCmd.AddCommand(cmd.HistoryCmd)
+	rootCmd.AddCommand(cmd.RollbackCmd)
 
 	// Add completion command
 	rootCmd.AddCommand(&cobra.Command{

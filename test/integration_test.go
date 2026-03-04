@@ -22,7 +22,7 @@ const (
 
 func main() {
 	fmt.Println("=== dbdiff Integration Tests ===")
-	
+
 	ctx := context.Background()
 	timeout := 30 * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -132,6 +132,43 @@ func main() {
 		fmt.Println("✅ JSON output generated")
 	}
 
+	// Test 9: Migration Tracking
+	fmt.Println("\n--- Test 9: Migration Tracking ---")
+	err = db.EnsureMigrationsTable(ctx, targetConn)
+	if err != nil {
+		fmt.Printf("❌ Failed to ensure migrations table: %v\n", err)
+		os.Exit(1)
+	}
+
+	applied, err := db.GetAppliedMigrations(ctx, targetConn)
+	if err != nil {
+		fmt.Printf("❌ Failed to get applied migrations: %v\n", err)
+		os.Exit(1)
+	}
+	if len(applied) != 0 {
+		fmt.Printf("❌ Expected 0 applied migrations, got %d\n", len(applied))
+		os.Exit(1)
+	}
+
+	err = db.RecordMigration(ctx, targetConn, "001_init.sql")
+	if err != nil {
+		fmt.Printf("❌ Failed to record migration: %v\n", err)
+		os.Exit(1)
+	}
+
+	applied, err = db.GetAppliedMigrations(ctx, targetConn)
+	if err != nil || len(applied) != 1 || applied[0] != "001_init.sql" {
+		fmt.Printf("❌ Failed to verify recorded migration\n")
+		os.Exit(1)
+	}
+
+	err = db.RemoveMigration(ctx, targetConn, "001_init.sql")
+	if err != nil {
+		fmt.Printf("❌ Failed to remove migration: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✅ Migration tracking validated")
+
 	fmt.Println("\n=== All Integration Tests Passed ✅ ===")
 }
 
@@ -139,7 +176,7 @@ func waitForDB(url string, maxAttempts int) bool {
 	for i := 0; i < maxAttempts; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		conn, err := db.Connect(ctx, url, "disable", 5*time.Second)
 		if err == nil {
 			conn.Close()

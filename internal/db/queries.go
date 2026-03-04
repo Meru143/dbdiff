@@ -473,3 +473,53 @@ func getGrants(ctx context.Context, db *DB, schemaName string) ([]types.Grant, e
 	}
 	return grants, rows.Err()
 }
+
+// EnsureMigrationsTable creates the migration tracking table if it doesn't exist
+func EnsureMigrationsTable(ctx context.Context, db *DB) error {
+	query := `
+		CREATE TABLE IF NOT EXISTS _dbdiff_migrations (
+			version VARCHAR(255) PRIMARY KEY,
+			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`
+	_, err := db.Exec(ctx, query)
+	return err
+}
+
+// GetAppliedMigrations returns a list of applied migration versions
+func GetAppliedMigrations(ctx context.Context, db *DB) ([]string, error) {
+	query := `SELECT version FROM _dbdiff_migrations ORDER BY applied_at ASC`
+	rows, err := db.Query(ctx, query)
+	if err != nil {
+		// If table doesn't exist, return empty list instead of error
+		if strings.Contains(err.Error(), "does not exist") {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	var versions []string
+	for rows.Next() {
+		var version string
+		if err := rows.Scan(&version); err != nil {
+			return nil, err
+		}
+		versions = append(versions, version)
+	}
+	return versions, rows.Err()
+}
+
+// RecordMigration records a successful migration execution
+func RecordMigration(ctx context.Context, db *DB, version string) error {
+	query := `INSERT INTO _dbdiff_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING`
+	_, err := db.Exec(ctx, query, version)
+	return err
+}
+
+// RemoveMigration deletes a recorded migration (used during rollback)
+func RemoveMigration(ctx context.Context, db *DB, version string) error {
+	query := `DELETE FROM _dbdiff_migrations WHERE version = $1`
+	_, err := db.Exec(ctx, query, version)
+	return err
+}
