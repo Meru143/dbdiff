@@ -390,3 +390,96 @@ func TestCompare_Sequence(t *testing.T) {
 func strPtr(s string) *string {
 	return &s
 }
+
+func TestCompare_View(t *testing.T) {
+	source := &types.Schema{
+		Views: []types.View{
+			{Name: "active_users", Definition: "SELECT * FROM users WHERE active = true"},
+		},
+	}
+	target := &types.Schema{
+		Views: []types.View{
+			{Name: "active_users", Definition: "SELECT id, name FROM users WHERE active = true"},
+		},
+	}
+
+	result := Compare(source, target)
+
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 difference, got %d", len(result))
+	}
+	if result[0].Object != types.ObjectView || result[0].Type != types.DiffAlter {
+		t.Errorf("Expected ALTER VIEW, got %s %s", result[0].Type, result[0].Object)
+	}
+}
+
+func TestCompare_MaterializedView(t *testing.T) {
+	source := &types.Schema{
+		MaterializedViews: []types.MaterializedView{
+			{Name: "daily_stats", Definition: "SELECT date_trunc('day', created_at) FROM logs"},
+		},
+	}
+	target := &types.Schema{} // Target has no materialized views initially
+
+	result := Compare(source, target)
+
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 difference, got %d", len(result))
+	}
+	if result[0].Object != types.ObjectMaterializedView || result[0].Type != types.DiffAdd {
+		t.Errorf("Expected ADD MATERIALIZED_VIEW, got %s %s", result[0].Type, result[0].Object)
+	}
+}
+
+func TestCompare_Function(t *testing.T) {
+	source := &types.Schema{
+		Functions: []types.Function{
+			{Name: "get_user", Arguments: "integer", Definition: "SELECT * FROM users WHERE id = $1"},
+		},
+	}
+	target := &types.Schema{
+		Functions: []types.Function{
+			{Name: "get_user", Arguments: "text", Definition: "SELECT * FROM users WHERE name = $1"}, // Overload drop case
+		},
+	}
+
+	result := Compare(source, target)
+
+	if len(result) != 2 {
+		t.Fatalf("Expected 2 differences (Add get_user(integer), Drop get_user(text)), got %d", len(result))
+	}
+}
+
+func TestCompare_Trigger(t *testing.T) {
+	source := &types.Schema{
+		Triggers: []types.Trigger{
+			{Table: "users", Name: "update_timestamp", Definition: "EXECUTE FUNCTION update_ts()"},
+		},
+	}
+	target := &types.Schema{
+		Triggers: []types.Trigger{
+			{Table: "users", Name: "update_timestamp", Definition: "EXECUTE PROCEDURE update_ts()"},
+		},
+	}
+
+	result := Compare(source, target)
+
+	if len(result) != 1 || result[0].Object != types.ObjectTrigger || result[0].Type != types.DiffAlter {
+		t.Errorf("Expected ALTER TRIGGER, got %v", result)
+	}
+}
+
+func TestCompare_Grant(t *testing.T) {
+	source := &types.Schema{
+		Grants: []types.Grant{
+			{Table: "users", Grantee: "web_api", Privilege: "SELECT", IsGrantable: true},
+		},
+	}
+	target := &types.Schema{}
+
+	result := Compare(source, target)
+
+	if len(result) != 1 || result[0].Object != types.ObjectGrant || result[0].Type != types.DiffAdd {
+		t.Errorf("Expected ADD GRANT, got %v", result)
+	}
+}

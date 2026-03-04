@@ -175,3 +175,71 @@ func TestSQLGenerator_MultipleDiffs(t *testing.T) {
 		t.Errorf("Expected all table names in output, got: %s", sql)
 	}
 }
+
+func TestSQLGenerator_View(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAdd, Object: types.ObjectView, Name: "active_users", NewValue: "SELECT * FROM users;"},
+	}
+	gen := NewSQLGenerator(diffs, "")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "CREATE OR REPLACE VIEW active_users") {
+		t.Errorf("Invalid view format: %s", sql)
+	}
+}
+
+func TestSQLGenerator_MaterializedView(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffDrop, Object: types.ObjectMaterializedView, Name: "daily_stats"},
+	}
+	gen := NewSQLGenerator(diffs, "")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "DROP MATERIALIZED VIEW IF EXISTS daily_stats CASCADE") {
+		t.Errorf("Invalid materialized view format: %s", sql)
+	}
+}
+
+func TestSQLGenerator_Function(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAdd, Object: types.ObjectFunction, Name: "get_user(integer)", NewValue: "CREATE OR REPLACE FUNCTION get_user(integer) RETURNS void;"},
+	}
+	gen := NewSQLGenerator(diffs, "")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "CREATE OR REPLACE FUNCTION get_user(integer) RETURNS void;") {
+		t.Errorf("Invalid function format: %s", sql)
+	}
+}
+
+func TestSQLGenerator_Trigger(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAlter, Object: types.ObjectTrigger, Name: "update_timestamp", TableName: "users", NewValue: "CREATE TRIGGER update_timestamp BEFORE UPDATE..."},
+	}
+	gen := NewSQLGenerator(diffs, "")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "DROP TRIGGER IF EXISTS update_timestamp ON users CASCADE") {
+		t.Errorf("Expected alter trigger to invoke drop: %s", sql)
+	}
+	if !strings.Contains(sql, "CREATE TRIGGER update_timestamp") {
+		t.Errorf("Expected alter trigger to invoke create after drop: %s", sql)
+	}
+}
+
+func TestSQLGenerator_Grant(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAdd, Object: types.ObjectGrant, Name: "SELECT", TableName: "users", NewValue: "api_role", OldValue: "true"},
+	}
+	gen := NewSQLGenerator(diffs, "")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "GRANT SELECT ON TABLE users TO api_role WITH GRANT OPTION") {
+		t.Errorf("Invalid grant format: %s", sql)
+	}
+}
