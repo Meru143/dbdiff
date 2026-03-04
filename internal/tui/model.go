@@ -147,32 +147,6 @@ func (m *Model) updateViewport() {
 		return
 	}
 
-	// Format left pane (List of differences)
-	var listItems []string
-	for i, diffItem := range m.diffs {
-		cursorPtr := "  " // No cursor
-		if m.cursor == i {
-			cursorPtr = "> " // Render cursor indicator
-		}
-
-		checked := uncheckedBox
-		if _, ok := m.selected[i]; ok {
-			checked = checkedBox
-		}
-
-		label := fmt.Sprintf("%s %s %s", string(diffItem.Type), diffItem.Object, diffItem.Name)
-
-		itemLine := fmt.Sprintf("%s%s %s", cursorPtr, checked, label)
-
-		if m.cursor == i {
-			itemLine = selectedItemStyle.Render(itemLine)
-		} else {
-			itemLine = unselectedItemStyle.Render(itemLine)
-		}
-
-		listItems = append(listItems, itemLine)
-	}
-
 	// Format Right Pane (SQL Preview)
 	previewText := "No item selected."
 	if m.cursor >= 0 && m.cursor < len(m.diffs) {
