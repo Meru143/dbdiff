@@ -243,3 +243,104 @@ func TestSQLGenerator_Grant(t *testing.T) {
 		t.Errorf("Invalid grant format: %s", sql)
 	}
 }
+
+// --- MySQL Dialect Tests ---
+
+func TestSQLGeneratorMySQL_AddColumn(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAdd, Object: types.ObjectColumn, Name: "email", TableName: "users", NewValue: "varchar(255)"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "ADD COLUMN email varchar(255)") {
+		t.Errorf("Expected ADD COLUMN text, got: %s", sql)
+	}
+}
+
+func TestSQLGeneratorMySQL_AlterColumn(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAlter, Object: types.ObjectColumn, Name: "email", TableName: "users", OldValue: "varchar(255)", NewValue: "text"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "MODIFY COLUMN email text") {
+		t.Errorf("Expected MODIFY COLUMN, got: %s", sql)
+	}
+}
+
+func TestSQLGeneratorMySQL_DropForeignKey(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffDrop, Object: types.ObjectForeignKey, Name: "fk_users_org", TableName: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "DROP FOREIGN KEY fk_users_org") {
+		t.Errorf("Expected DROP FOREIGN KEY, got: %s", sql)
+	}
+}
+
+func TestSQLGeneratorMySQL_DropConstraint(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffDrop, Object: types.ObjectConstraint, Name: "chk_age", TableName: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	// MySQL uses DROP CONSTRAINT (same keyword)
+	if !strings.Contains(sql, "DROP CONSTRAINT chk_age") {
+		t.Errorf("Expected DROP CONSTRAINT, got: %s", sql)
+	}
+}
+
+func TestSQLGeneratorMySQL_CreateTable(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "CREATE TABLE") {
+		t.Errorf("Expected CREATE TABLE, got: %s", sql)
+	}
+}
+
+func TestSQLGeneratorMySQL_DropColumn(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffDrop, Object: types.ObjectColumn, Name: "email", TableName: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	// MySQL drop column doesn't use IF EXISTS or CASCADE
+	if !strings.Contains(sql, "DROP COLUMN email") {
+		t.Errorf("Expected DROP COLUMN without IF EXISTS, got: %s", sql)
+	}
+	if strings.Contains(sql, "CASCADE") {
+		t.Errorf("MySQL DROP COLUMN should not use CASCADE, got: %s", sql)
+	}
+}
+
+func TestSQLGeneratorMySQL_AlterForeignKey(t *testing.T) {
+	diffs := types.DiffList{
+		{Type: types.DiffAlter, Object: types.ObjectForeignKey, Name: "fk_users_org", TableName: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "", "mysql")
+	gen.SetTransaction(false)
+	sql := gen.Generate()
+
+	if !strings.Contains(sql, "DROP FOREIGN KEY fk_users_org") {
+		t.Errorf("Expected DROP FOREIGN KEY in alter, got: %s", sql)
+	}
+	if !strings.Contains(sql, "ADD CONSTRAINT fk_users_org") {
+		t.Errorf("Expected ADD CONSTRAINT after drop in alter, got: %s", sql)
+	}
+}
