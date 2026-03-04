@@ -11,6 +11,7 @@ type Schema struct {
 	Views             []View             `json:"views,omitempty"`
 	MaterializedViews []MaterializedView `json:"materialized_views,omitempty"`
 	Functions         []Function         `json:"functions,omitempty"`
+	Triggers          []Trigger          `json:"triggers,omitempty"`
 }
 
 type Table struct {
@@ -89,6 +90,13 @@ type Function struct {
 	Definition string `json:"definition"`
 }
 
+// Trigger represents a PostgreSQL trigger
+type Trigger struct {
+	Name       string `json:"name"`
+	Table      string `json:"table"`
+	Definition string `json:"definition"`
+}
+
 type DiffType string
 
 const (
@@ -111,6 +119,7 @@ const (
 	ObjectView             DiffObject = "VIEW"
 	ObjectMaterializedView DiffObject = "MATERIALIZED_VIEW"
 	ObjectFunction         DiffObject = "FUNCTION"
+	ObjectTrigger          DiffObject = "TRIGGER"
 )
 
 type Diff struct {

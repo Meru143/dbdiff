@@ -44,6 +44,9 @@ func (e *DiffEngine) Compare() types.DiffList {
 	// Function comparison
 	differences = append(differences, e.compareFunctions()...)
 
+	// Trigger comparison
+	differences = append(differences, e.compareTriggers()...)
+
 	return differences
 }
 
@@ -775,6 +778,62 @@ func (e *DiffEngine) compareFunctions() types.DiffList {
 				Type:   types.DiffDrop,
 				Object: types.ObjectFunction,
 				Name:   key,
+			})
+		}
+	}
+
+	return differences
+}
+
+func (e *DiffEngine) compareTriggers() types.DiffList {
+	var differences types.DiffList
+
+	sourceTriggers := make(map[string]*types.Trigger)
+	targetTriggers := make(map[string]*types.Trigger)
+
+	for i := range e.source.Triggers {
+		t := &e.source.Triggers[i]
+		// Use table.trigger as the unique identifier
+		key := fmt.Sprintf("%s.%s", t.Table, t.Name)
+		sourceTriggers[key] = t
+	}
+	for i := range e.target.Triggers {
+		t := &e.target.Triggers[i]
+		key := fmt.Sprintf("%s.%s", t.Table, t.Name)
+		targetTriggers[key] = t
+	}
+
+	// New and altered triggers
+	for key, sourceTrigger := range sourceTriggers {
+		if targetTrigger, exists := targetTriggers[key]; !exists {
+			differences = append(differences, types.Diff{
+				Type:      types.DiffAdd,
+				Object:    types.ObjectTrigger,
+				Name:      sourceTrigger.Name,
+				TableName: sourceTrigger.Table, // Store table since triggers belong to tables
+				NewValue:  sourceTrigger.Definition,
+			})
+		} else if sourceTrigger.Definition != targetTrigger.Definition {
+			// Definition changed
+			differences = append(differences, types.Diff{
+				Type:      types.DiffAlter,
+				Object:    types.ObjectTrigger,
+				Name:      sourceTrigger.Name,
+				TableName: sourceTrigger.Table,
+				OldValue:  targetTrigger.Definition,
+				NewValue:  sourceTrigger.Definition,
+			})
+		}
+	}
+
+	// Dropped triggers
+	for key, targetTrigger := range targetTriggers {
+		if _, exists := sourceTriggers[key]; !exists {
+			differences = append(differences, types.Diff{
+				Type:      types.DiffDrop,
+				Object:    types.ObjectTrigger,
+				Name:      targetTrigger.Name,
+				TableName: targetTrigger.Table,
 			})
 		}
 	}

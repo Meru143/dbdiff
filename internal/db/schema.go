@@ -35,6 +35,7 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 		Views:             make([]types.View, 0),
 		MaterializedViews: make([]types.MaterializedView, 0),
 		Functions:         make([]types.Function, 0),
+		Triggers:          make([]types.Trigger, 0),
 	}
 
 	// Get tables
@@ -138,9 +139,19 @@ func (i *Introspector) Introspect(ctx context.Context) (*types.Schema, error) {
 	}
 	schema.Functions = functions
 
+	// Get triggers
 	if i.verbose {
-		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views, %d functions",
-			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews), len(schema.Functions))
+		log.Println("Introspecting triggers...")
+	}
+	triggers, err := getTriggers(ctx, i.db, i.schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get triggers: %w", err)
+	}
+	schema.Triggers = triggers
+
+	if i.verbose {
+		log.Printf("Introspection complete: %d tables, %d sequences, %d types, %d views, %d materialized views, %d functions, %d triggers",
+			len(schema.Tables), len(schema.Sequences), len(schema.Types), len(schema.Views), len(schema.MaterializedViews), len(schema.Functions), len(schema.Triggers))
 	}
 
 	return schema, nil

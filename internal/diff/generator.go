@@ -136,6 +136,7 @@ func (g *SQLGenerator) topologicalSort() types.DiffList {
 			types.ObjectView:             7,
 			types.ObjectMaterializedView: 8,
 			types.ObjectFunction:         9,
+			types.ObjectTrigger:          10,
 		}
 		return order[alters[i].Object] < order[alters[j].Object]
 	})
@@ -180,6 +181,8 @@ func (g *SQLGenerator) generateStatement(diff *types.Diff) string {
 		return g.generateMaterializedViewDiff(diff)
 	case types.ObjectFunction:
 		return g.generateFunctionDiff(diff)
+	case types.ObjectTrigger:
+		return g.generateTriggerDiff(diff)
 	default:
 		return ""
 	}
@@ -490,6 +493,24 @@ func (g *SQLGenerator) generateFunctionDiff(diff *types.Diff) string {
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop function: %s\nDROP FUNCTION IF EXISTS %s%s CASCADE;",
 			diff.Name, schema, diff.Name)
+	default:
+		return ""
+	}
+}
+
+func (g *SQLGenerator) generateTriggerDiff(diff *types.Diff) string {
+	schema := schemaPrefix(g.schemaName)
+	definition := strings.TrimRight(diff.NewValue, " \t\r\n;")
+	switch diff.Type {
+	case types.DiffAdd:
+		return fmt.Sprintf("-- Create trigger: %s on %s\n%s;",
+			diff.Name, diff.TableName, definition)
+	case types.DiffAlter:
+		return fmt.Sprintf("-- Alter trigger: %s on %s\nDROP TRIGGER IF EXISTS %s ON %s%s CASCADE;\n%s;",
+			diff.Name, diff.TableName, diff.Name, schema, diff.TableName, definition)
+	case types.DiffDrop:
+		return fmt.Sprintf("-- Drop trigger: %s on %s\nDROP TRIGGER IF EXISTS %s ON %s%s CASCADE;",
+			diff.Name, diff.TableName, diff.Name, schema, diff.TableName)
 	default:
 		return ""
 	}

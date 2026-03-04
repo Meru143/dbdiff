@@ -416,3 +416,32 @@ func getFunctions(ctx context.Context, db *DB, schemaName string) ([]types.Funct
 	}
 	return functions, rows.Err()
 }
+
+func getTriggers(ctx context.Context, db *DB, schemaName string) ([]types.Trigger, error) {
+	// Query to extract triggers (excluding internal/constraint triggers)
+	query := `
+		SELECT 
+			tr.tgname as name,
+			tbl.relname as table,
+			pg_get_triggerdef(tr.oid) as definition
+		FROM pg_trigger tr
+		JOIN pg_class tbl ON tr.tgrelid = tbl.oid
+		JOIN pg_namespace n ON tbl.relnamespace = n.oid
+		WHERE n.nspname = $1 AND tr.tgisinternal = false
+	`
+	rows, err := db.Query(ctx, query, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var triggers []types.Trigger
+	for rows.Next() {
+		var t types.Trigger
+		if err := rows.Scan(&t.Name, &t.Table, &t.Definition); err != nil {
+			return nil, err
+		}
+		triggers = append(triggers, t)
+	}
+	return triggers, rows.Err()
+}
