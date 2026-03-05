@@ -176,9 +176,7 @@ func parseMySQLTCP(raw string) (*Config, error) {
 	}
 
 	// Parse /dbname?params
-	if strings.HasPrefix(afterParen, "/") {
-		afterParen = afterParen[1:]
-	}
+	afterParen = strings.TrimPrefix(afterParen, "/")
 
 	if qIdx := strings.Index(afterParen, "?"); qIdx != -1 {
 		cfg.Database = afterParen[:qIdx]
