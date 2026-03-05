@@ -107,8 +107,13 @@ func applySSLConfig(config *pgxpool.Config, sslMode string) error {
 // GetPoolStats returns current pool statistics
 func (db *DB) GetPoolStats() map[string]int {
 	stats := make(map[string]int)
-	// Note: pgxpool doesn't expose stats directly in v5
-	// Would need to implement custom metrics collection
+	if db.Pool != nil {
+		poolStat := db.Pool.Stat()
+		stats["TotalConns"] = int(poolStat.TotalConns())
+		stats["AcquiredConns"] = int(poolStat.AcquiredConns())
+		stats["IdleConns"] = int(poolStat.IdleConns())
+		stats["MaxConns"] = int(poolStat.MaxConns())
+	}
 	return stats
 }
 
