@@ -119,7 +119,7 @@ var isTerminalFunc func(*os.File) bool = func(f *os.File) bool {
 
 // isatty checks if file descriptor is a TTY
 func isatty(fd uintptr) bool {
-	return term.IsTerminal(int(fd))
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
 var rootCmd = &cobra.Command{

@@ -2,7 +2,6 @@ package diff
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/meru143/dbdiff/pkg/types"
@@ -136,8 +135,8 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: strconv.FormatInt(targetSeq.Start, 10),
-					NewValue: strconv.FormatInt(sourceSeq.Start, 10),
+					OldValue: fmt.Sprintf("%d", targetSeq.Start),
+					NewValue: fmt.Sprintf("%d", sourceSeq.Start),
 				})
 			}
 			if sourceSeq.Increment != targetSeq.Increment {
@@ -145,8 +144,8 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: "INCREMENT BY " + strconv.FormatInt(targetSeq.Increment, 10),
-					NewValue: "INCREMENT BY " + strconv.FormatInt(sourceSeq.Increment, 10),
+					OldValue: fmt.Sprintf("INCREMENT BY %d", targetSeq.Increment),
+					NewValue: fmt.Sprintf("INCREMENT BY %d", sourceSeq.Increment),
 				})
 			}
 			// Min value change
@@ -155,8 +154,8 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: "MINVALUE " + strconv.FormatInt(targetSeq.MinValue, 10),
-					NewValue: "MINVALUE " + strconv.FormatInt(sourceSeq.MinValue, 10),
+					OldValue: fmt.Sprintf("MINVALUE %d", targetSeq.MinValue),
+					NewValue: fmt.Sprintf("MINVALUE %d", sourceSeq.MinValue),
 				})
 			}
 			// Max value change
@@ -165,8 +164,8 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: "MAXVALUE " + strconv.FormatInt(targetSeq.MaxValue, 10),
-					NewValue: "MAXVALUE " + strconv.FormatInt(sourceSeq.MaxValue, 10),
+					OldValue: fmt.Sprintf("MAXVALUE %d", targetSeq.MaxValue),
+					NewValue: fmt.Sprintf("MAXVALUE %d", sourceSeq.MaxValue),
 				})
 			}
 		}
