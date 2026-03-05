@@ -22,21 +22,32 @@ type DBTestConfig struct {
 	TargetURL string
 }
 
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func main() {
 	fmt.Println("=== dbdiff Integration Tests ===")
 
 	configs := []DBTestConfig{
 		{
-			Name:      "PostgreSQL",
-			Dialect:   "postgresql",
-			SourceURL: "postgres://testuser:testpass@localhost:5433/sourcedb?sslmode=disable",
-			TargetURL: "postgres://testuser:testpass@localhost:5434/targetdb?sslmode=disable",
+			Name:    "PostgreSQL",
+			Dialect: "postgresql",
+			SourceURL: envOrDefault("PG_SOURCE_DSN",
+				"postgres://testuser:testpass@localhost:5433/sourcedb?sslmode=disable"),
+			TargetURL: envOrDefault("PG_TARGET_DSN",
+				"postgres://testuser:testpass@localhost:5434/targetdb?sslmode=disable"),
 		},
 		{
-			Name:      "MySQL",
-			Dialect:   "mysql",
-			SourceURL: "mysql://testuser:testpass@tcp(localhost:3307)/sourcedb?multiStatements=true&parseTime=true",
-			TargetURL: "mysql://testuser:testpass@tcp(localhost:3308)/targetdb?multiStatements=true&parseTime=true",
+			Name:    "MySQL",
+			Dialect: "mysql",
+			SourceURL: envOrDefault("MYSQL_SOURCE_DSN",
+				"mysql://testuser:testpass@tcp(localhost:3307)/sourcedb?multiStatements=true&parseTime=true"),
+			TargetURL: envOrDefault("MYSQL_TARGET_DSN",
+				"mysql://testuser:testpass@tcp(localhost:3308)/targetdb?multiStatements=true&parseTime=true"),
 		},
 	}
 

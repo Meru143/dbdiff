@@ -128,5 +128,5 @@ jobs:
         env:
           PG_SOURCE_DSN: "postgres://testuser:testpass@localhost:5432/sourcedb?sslmode=disable"
           PG_TARGET_DSN: "postgres://testuser:testpass@localhost:5433/targetdb?sslmode=disable"
-          MYSQL_SOURCE_DSN: "testuser:testpass@tcp(localhost:3306)/sourcedb?multiStatements=true"
-          MYSQL_TARGET_DSN: "testuser:testpass@tcp(localhost:3307)/targetdb?multiStatements=true"
+          MYSQL_SOURCE_DSN: "mysql://testuser:testpass@tcp(localhost:3306)/sourcedb?multiStatements=true&parseTime=true"
+          MYSQL_TARGET_DSN: "mysql://testuser:testpass@tcp(localhost:3307)/targetdb?multiStatements=true&parseTime=true"
