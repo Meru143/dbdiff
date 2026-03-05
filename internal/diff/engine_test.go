@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/meru143/dbdiff/pkg/types"
@@ -482,4 +483,504 @@ func TestCompare_Grant(t *testing.T) {
 	if len(result) != 1 || result[0].Object != types.ObjectGrant || result[0].Type != types.DiffAdd {
 		t.Errorf("Expected ADD GRANT, got %v", result)
 	}
+}
+
+// --- Additional edge-case tests ---
+
+func TestCompare_DropView(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		Views: []types.View{
+			{Name: "old_view", Definition: "SELECT 1"},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop || result[0].Object != types.ObjectView {
+		t.Errorf("Expected DROP VIEW, got %v", result)
+	}
+}
+
+func TestCompare_AddView(t *testing.T) {
+	source := &types.Schema{
+		Views: []types.View{
+			{Name: "new_view", Definition: "SELECT 1"},
+		},
+	}
+	target := &types.Schema{}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffAdd || result[0].Object != types.ObjectView {
+		t.Errorf("Expected ADD VIEW, got %v", result)
+	}
+}
+
+func TestCompare_Sequence_Add(t *testing.T) {
+	source := &types.Schema{
+		Sequences: []types.Sequence{
+			{Name: "user_id_seq", Start: 1, Increment: 1},
+		},
+	}
+	target := &types.Schema{}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffAdd || result[0].Object != types.ObjectSequence {
+		t.Errorf("Expected ADD SEQUENCE, got %v", result)
+	}
+}
+
+func TestCompare_Sequence_Drop(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		Sequences: []types.Sequence{
+			{Name: "old_seq", Start: 1, Increment: 1},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop || result[0].Object != types.ObjectSequence {
+		t.Errorf("Expected DROP SEQUENCE, got %v", result)
+	}
+}
+
+func TestCompare_Sequence_Alter(t *testing.T) {
+	source := &types.Schema{
+		Sequences: []types.Sequence{
+			{Name: "user_id_seq", Start: 1, Increment: 1, MinValue: 1, MaxValue: 100},
+		},
+	}
+	target := &types.Schema{
+		Sequences: []types.Sequence{
+			{Name: "user_id_seq", Start: 1, Increment: 5, MinValue: 1, MaxValue: 100},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectSequence && d.Type == types.DiffAlter {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ALTER SEQUENCE for increment change, got %v", result)
+	}
+}
+
+func TestCompare_Type_Add(t *testing.T) {
+	source := &types.Schema{
+		Types: []types.Type{
+			{Name: "status_enum", Kind: "enum", Values: []string{"active", "inactive"}},
+		},
+	}
+	target := &types.Schema{}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffAdd {
+		t.Errorf("Expected ADD TYPE, got %v", result)
+	}
+}
+
+func TestCompare_Type_Drop(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		Types: []types.Type{
+			{Name: "old_type", Kind: "enum", Values: []string{"a", "b"}},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop {
+		t.Errorf("Expected DROP TYPE, got %v", result)
+	}
+}
+
+func TestCompare_Type_SameName_NoDiff(t *testing.T) {
+	// The engine only detects add/drop for types, not value changes
+	source := &types.Schema{
+		Types: []types.Type{
+			{Name: "status_enum", Kind: "enum", Values: []string{"active", "inactive", "pending"}},
+		},
+	}
+	target := &types.Schema{
+		Types: []types.Type{
+			{Name: "status_enum", Kind: "enum", Values: []string{"active", "inactive"}},
+		},
+	}
+
+	result := Compare(source, target)
+	// Types with the same name are not compared for alterations in the current engine
+	for _, d := range result {
+		if d.Name == "status_enum" {
+			t.Errorf("Did not expect diff for same-named type, got %v", d)
+		}
+	}
+}
+
+func TestCompare_Index_Add(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "users",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "email", DataType: "varchar"}},
+				Indexes: []types.Index{
+					{Name: "idx_email", Columns: []string{"email"}, IsUnique: true},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "users",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "email", DataType: "varchar"}},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectIndex && d.Type == types.DiffAdd {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ADD INDEX, got %v", result)
+	}
+}
+
+func TestCompare_Index_Drop(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "users",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "users",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}},
+				Indexes: []types.Index{
+					{Name: "idx_old", Columns: []string{"id"}},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectIndex && d.Type == types.DiffDrop {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected DROP INDEX, got %v", result)
+	}
+}
+
+func TestCompare_Constraint_Add(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "orders",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "amount", DataType: "numeric"}},
+				Constraints: []types.Constraint{
+					{Name: "chk_amount", Type: "CHECK", Columns: []string{"amount"}},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "orders",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "amount", DataType: "numeric"}},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectConstraint && d.Type == types.DiffAdd {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ADD CONSTRAINT, got %v", result)
+	}
+}
+
+func TestCompare_ForeignKey_Add(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "orders",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "user_id", DataType: "integer"}},
+				ForeignKeys: []types.ForeignKey{
+					{Name: "fk_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "orders",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "user_id", DataType: "integer"}},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectForeignKey && d.Type == types.DiffAdd {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ADD FOREIGN KEY, got %v", result)
+	}
+}
+
+func TestCompare_ForeignKey_Alter(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "orders",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "user_id", DataType: "integer"}},
+				ForeignKeys: []types.ForeignKey{
+					{Name: "fk_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name:    "orders",
+				Columns: []types.Column{{Name: "id", DataType: "integer"}, {Name: "user_id", DataType: "integer"}},
+				ForeignKeys: []types.ForeignKey{
+					{Name: "fk_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectForeignKey && d.Type == types.DiffAlter {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ALTER FOREIGN KEY for OnDelete change, got %v", result)
+	}
+}
+
+func TestCompare_DropMaterializedView(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		MaterializedViews: []types.MaterializedView{
+			{Name: "old_matview", Definition: "SELECT 1"},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop || result[0].Object != types.ObjectMaterializedView {
+		t.Errorf("Expected DROP MATERIALIZED_VIEW, got %v", result)
+	}
+}
+
+func TestCompare_AlterMaterializedView(t *testing.T) {
+	source := &types.Schema{
+		MaterializedViews: []types.MaterializedView{
+			{Name: "stats", Definition: "SELECT count(*) FROM users"},
+		},
+	}
+	target := &types.Schema{
+		MaterializedViews: []types.MaterializedView{
+			{Name: "stats", Definition: "SELECT count(*) FROM orders"},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectMaterializedView && d.Type == types.DiffAlter {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ALTER MATERIALIZED_VIEW, got %v", result)
+	}
+}
+
+func TestCompare_DropFunction(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		Functions: []types.Function{
+			{Name: "old_func", Arguments: "integer", Definition: "SELECT 1"},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop || result[0].Object != types.ObjectFunction {
+		t.Errorf("Expected DROP FUNCTION, got %v", result)
+	}
+}
+
+func TestCompare_DropTrigger(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		Triggers: []types.Trigger{
+			{Table: "users", Name: "old_trigger", Definition: "EXECUTE old()"},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop || result[0].Object != types.ObjectTrigger {
+		t.Errorf("Expected DROP TRIGGER, got %v", result)
+	}
+}
+
+func TestCompare_DropGrant(t *testing.T) {
+	source := &types.Schema{}
+	target := &types.Schema{
+		Grants: []types.Grant{
+			{Table: "users", Grantee: "admin", Privilege: "ALL"},
+		},
+	}
+
+	result := Compare(source, target)
+	if len(result) != 1 || result[0].Type != types.DiffDrop || result[0].Object != types.ObjectGrant {
+		t.Errorf("Expected DROP GRANT, got %v", result)
+	}
+}
+
+func TestCompare_ColumnNullableChange(t *testing.T) {
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Columns: []types.Column{
+					{Name: "email", DataType: "varchar", IsNullable: false},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Columns: []types.Column{
+					{Name: "email", DataType: "varchar", IsNullable: true},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectColumn && d.Type == types.DiffAlter {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ALTER COLUMN for nullable change, got %v", result)
+	}
+}
+
+func TestCompare_ColumnDefaultChange(t *testing.T) {
+	defaultVal := "'active'"
+	source := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Columns: []types.Column{
+					{Name: "status", DataType: "varchar", DefaultValue: &defaultVal},
+				},
+			},
+		},
+	}
+	target := &types.Schema{
+		Tables: []types.Table{
+			{
+				Name: "users",
+				Columns: []types.Column{
+					{Name: "status", DataType: "varchar"},
+				},
+			},
+		},
+	}
+
+	result := Compare(source, target)
+	found := false
+	for _, d := range result {
+		if d.Object == types.ObjectColumn && d.Type == types.DiffAlter {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected ALTER COLUMN for default change, got %v", result)
+	}
+}
+
+// --- SQL Server dialect generator tests ---
+
+func TestSQLGenerator_SqlServer_AlterColumn(t *testing.T) {
+	diffs := types.DiffList{
+		{Object: types.ObjectColumn, Type: types.DiffAlter, Name: "age", TableName: "users",
+			OldValue: "int", NewValue: "bigint"},
+	}
+	gen := NewSQLGenerator(diffs, "dbo", "sqlserver")
+	sql := gen.Generate()
+	if !containsStr(sql, "ALTER COLUMN age bigint") {
+		t.Errorf("Expected ALTER COLUMN for sqlserver, got: %s", sql)
+	}
+}
+
+func TestSQLGenerator_SqlServer_DropColumn(t *testing.T) {
+	diffs := types.DiffList{
+		{Object: types.ObjectColumn, Type: types.DiffDrop, Name: "old_col", TableName: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "dbo", "sqlserver")
+	sql := gen.Generate()
+	if containsStr(sql, "CASCADE") || containsStr(sql, "IF EXISTS") {
+		t.Errorf("SQL Server should not use CASCADE or IF EXISTS for DROP COLUMN, got: %s", sql)
+	}
+}
+
+func TestSQLGenerator_SqlServer_DropConstraint(t *testing.T) {
+	diffs := types.DiffList{
+		{Object: types.ObjectConstraint, Type: types.DiffDrop, Name: "uq_email", TableName: "users"},
+	}
+	gen := NewSQLGenerator(diffs, "dbo", "sqlserver")
+	sql := gen.Generate()
+	if !containsStr(sql, "DROP CONSTRAINT uq_email") {
+		t.Errorf("Expected DROP CONSTRAINT for sqlserver, got: %s", sql)
+	}
+}
+
+func TestSQLGenerator_SqlServer_DropForeignKey(t *testing.T) {
+	diffs := types.DiffList{
+		{Object: types.ObjectForeignKey, Type: types.DiffDrop, Name: "fk_user", TableName: "orders"},
+	}
+	gen := NewSQLGenerator(diffs, "dbo", "sqlserver")
+	sql := gen.Generate()
+	if !containsStr(sql, "DROP CONSTRAINT fk_user") {
+		t.Errorf("Expected DROP CONSTRAINT for FK in sqlserver, got: %s", sql)
+	}
+}
+
+func containsStr(s, sub string) bool {
+	return len(s) >= len(sub) && strings.Contains(s, sub)
 }
