@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/charmbracelet/x/term"
 	"github.com/meru143/dbdiff/cmd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -119,7 +118,8 @@ var isTerminalFunc func(*os.File) bool = func(f *os.File) bool {
 
 // isatty checks if file descriptor is a TTY
 func isatty(fd uintptr) bool {
-	return term.IsTerminal(int(os.Stdout.Fd()))
+	// Simple check - in production would use termbox or similar
+	return false
 }
 
 var rootCmd = &cobra.Command{

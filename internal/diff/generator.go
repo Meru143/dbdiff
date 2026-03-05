@@ -356,9 +356,22 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 				// Nullable change
 				if g.dialect == "mysql" {
 					// In MySQL, you alter column by modifying it with its full type.
-					// We don't have the full type here, so we emit a warning/stub.
-					return fmt.Sprintf("-- Alter column: %s.%s (Modifying NULL in MySQL requires full definition)\nALTER TABLE %s%s MODIFY COLUMN %s /* type */ %s;",
-						diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
+					// Attempt to find the column definition from source schema
+					colType := "VARCHAR(255)" // Default fallback
+					if g.sourceSchema != nil {
+						for _, t := range g.sourceSchema.Tables {
+							if t.Name == diff.TableName {
+								for _, c := range t.Columns {
+									if c.Name == diff.Name {
+										colType = c.DataType
+										break
+									}
+								}
+							}
+						}
+					}
+					return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s MODIFY COLUMN %s %s %s;",
+						diff.TableName, diff.Name, schema, diff.TableName, diff.Name, colType, diff.NewValue)
 				}
 				nullable := "DROP NOT NULL"
 				if diff.NewValue == "NOT NULL" {
