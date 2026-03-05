@@ -1,0 +1,89 @@
+version: 2
+
+project_name: dbdiff
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: dbdiff
+    main: ./
+    binary: dbdiff
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+  groups:
+    - title: '🚀 Features'
+      regexp: '^.*?feat(\(.+\))?\!?:.+$'
+    - title: '🐛 Bug Fixes'
+      regexp: '^.*?fix(\(.+\))?\!?:.+$'
+    - title: '🔧 Refactoring'
+      regexp: '^.*?refactor(\(.+\))?\!?:.+$'
+    - title: '📦 Other'
+      order: 999
+
+release:
+  github:
+    owner: Meru143
+    name: dbdiff
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+  header: |
+    ## dbdiff v{{ .Version }}
+
+    Multi-database schema comparison and migration CLI tool.
+    Supports PostgreSQL, MySQL, and SQL Server.
+  footer: |
+    **Full Changelog**: https://github.com/Meru143/dbdiff/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+brews:
+  - repository:
+      owner: Meru143
+      name: homebrew-dbdiff
+    name: dbdiff
+    homepage: "https://github.com/Meru143/dbdiff"
+    description: "Multi-database schema comparison and migration CLI tool"
+    license: "MIT"
+    install: bin.install "dbdiff"
+    test: system "#{bin}/dbdiff", "--help"
