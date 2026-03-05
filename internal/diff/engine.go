@@ -92,82 +92,18 @@ func (e *DiffEngine) compareTables() types.DiffList {
 		}
 	}
 
-	// Dropped tables (in target but not in source)
-	// Check for potential renames first
-	detectedRenames := make(map[string]string) // oldName -> newName
-	for targetName := range targetTables {
-		if _, exists := sourceTables[targetName]; !exists {
-			// Check if this might be a renamed table
-			sourceName := findPotentialRename(targetName, sourceTables, targetTables)
-			if sourceName != "" && detectedRenames[targetName] == "" {
-				// Check if source table also appears to be a rename
-				reverseName := findPotentialRename(sourceName, targetTables, sourceTables)
-				if reverseName == targetName {
-					detectedRenames[targetName] = sourceName
-					differences = append(differences, types.Diff{
-						Type:        types.DiffRename,
-						Object:      types.ObjectTable,
-						Name:        sourceName,
-						OldValue:    targetName,
-						NewValue:    sourceName,
-						Description: "Table renamed (heuristic: similar column structure)",
-					})
-				}
-			}
-		}
-	}
-
-	// Dropped tables (skip if it's a rename)
+	// Dropped tables
 	for name := range targetTables {
 		if _, exists := sourceTables[name]; !exists {
-			if _, isRename := detectedRenames[name]; !isRename {
-				differences = append(differences, types.Diff{
-					Type:   types.DiffDrop,
-					Object: types.ObjectTable,
-					Name:   name,
-				})
-			}
+			differences = append(differences, types.Diff{
+				Type:   types.DiffDrop,
+				Object: types.ObjectTable,
+				Name:   name,
+			})
 		}
 	}
 
 	return differences
-}
-
-// findPotentialRename finds if a dropped table might be renamed to a new table
-// by comparing column structures
-func findPotentialRename(droppedTable string, sourceTables, targetTables map[string]*types.Table) string {
-	dropped := targetTables[droppedTable]
-	if dropped == nil || len(dropped.Columns) == 0 {
-		return ""
-	}
-
-	var bestMatch string
-	bestMatchScore := 0
-
-	for name, table := range sourceTables {
-		if len(table.Columns) == 0 {
-			continue
-		}
-		// Compare column names
-		droppedCols := make(map[string]bool)
-		for _, c := range dropped.Columns {
-			droppedCols[c.Name] = true
-		}
-		matchScore := 0
-		for _, c := range table.Columns {
-			if droppedCols[c.Name] {
-				matchScore++
-			}
-		}
-		// If more than 70% columns match, consider it a potential rename
-		threshold := len(dropped.Columns) * 7 / 10
-		if matchScore > bestMatchScore && matchScore >= threshold {
-			bestMatchScore = matchScore
-			bestMatch = name
-		}
-	}
-
-	return bestMatch
 }
 
 func (e *DiffEngine) compareSequences() types.DiffList {
