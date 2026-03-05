@@ -343,7 +343,7 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 		return fmt.Sprintf("-- Add column: %s to %s\nALTER TABLE %s%s ADD COLUMN %s %s;",
 			diff.Name, diff.TableName, schema, diff.TableName, diff.Name, dataType)
 	case types.DiffDrop:
-		if g.dialect == "mysql" {
+		if g.dialect == "mysql" || g.dialect == "sqlserver" {
 			return fmt.Sprintf("-- Drop column: %s from %s\nALTER TABLE %s%s DROP COLUMN %s;",
 				diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
 		}
@@ -370,6 +370,10 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 			// Type change
 			if g.dialect == "mysql" {
 				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s MODIFY COLUMN %s %s;",
+					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
+			}
+			if g.dialect == "sqlserver" {
+				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s %s;",
 					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
 			}
 			return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s TYPE %s USING (%s::%s);",
@@ -416,7 +420,7 @@ func (g *SQLGenerator) generateConstraintDiff(diff *types.Diff) string {
 		return fmt.Sprintf("-- Add constraint: %s\nALTER TABLE %s%s ADD CONSTRAINT %s;",
 			diff.Name, schema, diff.TableName, diff.Name)
 	case types.DiffDrop:
-		if g.dialect == "mysql" {
+		if g.dialect == "mysql" || g.dialect == "sqlserver" {
 			return fmt.Sprintf("-- Drop constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;",
 				diff.Name, schema, diff.TableName, diff.Name)
 		}
@@ -444,6 +448,10 @@ func (g *SQLGenerator) generateForeignKeyDiff(diff *types.Diff) string {
 	case types.DiffDrop:
 		if g.dialect == "mysql" {
 			return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP FOREIGN KEY %s;",
+				diff.Name, schema, diff.TableName, diff.Name)
+		}
+		if g.dialect == "sqlserver" {
+			return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;",
 				diff.Name, schema, diff.TableName, diff.Name)
 		}
 		return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;",

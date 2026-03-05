@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/meru143/dbdiff/branch/main/graph/badge.svg)](https://codecov.io/gh/meru143/dbdiff)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/meru143/dbdiff)](https://github.com/meru143/dbdiff)
 
-Multi-database schema comparison and migration CLI tool. Supports **PostgreSQL** and **MySQL**.
+Multi-database schema comparison and migration CLI tool. Supports **PostgreSQL**, **MySQL**, and **SQL Server**.
 
 ## Features
 
@@ -60,6 +60,16 @@ dbdiff compare mysql://user:pass@tcp(localhost:3306)/db1 mysql://user:pass@tcp(l
 dbdiff migrate -s mysql://user:pass@tcp(localhost:3306)/db1 -t mysql://user:pass@tcp(localhost:3306)/db2 -o migration.sql
 ```
 
+### SQL Server
+
+```bash
+# Compare two SQL Server databases
+dbdiff compare "sqlserver://sa:Password@localhost:1433?database=db1" "sqlserver://sa:Password@localhost:1433?database=db2"
+
+# Generate migration
+dbdiff migrate -s "sqlserver://sa:Password@localhost:1433?database=db1" -t "sqlserver://sa:Password@localhost:1433?database=db2" -o migration.sql
+```
+
 ### General Commands
 
 ```bash
@@ -87,10 +97,11 @@ ignore_patterns:
 
 ## Supported Databases
 
-| Database   | Introspection | Migration SQL | Dialect-Aware DDL |
-|------------|:---:|:---:|:---:|
-| PostgreSQL | ✅ | ✅ | ✅ |
-| MySQL 8.0+ | ✅ | ✅ | ✅ |
+| Database       | Introspection | Migration SQL | Dialect-Aware DDL |
+|----------------|:---:|:---:|:---:|
+| PostgreSQL     | ✅ | ✅ | ✅ |
+| MySQL 8.0+     | ✅ | ✅ | ✅ |
+| SQL Server     | ✅ | ✅ | ✅ |
 
 ## Flags
 

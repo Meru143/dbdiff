@@ -1,9 +1,9 @@
 package db
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/meru143/dbdiff/internal/db/mssql"
 	"github.com/meru143/dbdiff/internal/db/mysql"
 	"github.com/meru143/dbdiff/internal/db/postgres"
 )
@@ -11,8 +11,8 @@ import (
 // NewDriver creates a Driver instance based on the connection string scheme.
 // Supported schemes:
 //   - postgres://, postgresql:// → PostgreSQL driver
-//   - mysql://, mysql+tcp://     → MySQL driver (planned)
-//   - sqlserver://               → SQL Server driver (planned)
+//   - mysql://, mysql+tcp://     → MySQL driver
+//   - sqlserver://               → SQL Server driver
 func NewDriver(connStr string) (Driver, error) {
 	lower := strings.ToLower(connStr)
 
@@ -26,7 +26,7 @@ func NewDriver(connStr string) (Driver, error) {
 		return mysql.New(), nil
 
 	case strings.HasPrefix(lower, "sqlserver://"):
-		return nil, fmt.Errorf("sql server support is not yet implemented — coming soon")
+		return mssql.New(), nil
 
 	default:
 		// Default to PostgreSQL for backwards compatibility with raw host:port strings
