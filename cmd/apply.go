@@ -67,6 +67,22 @@ var ApplyCmd = &cobra.Command{
 			}
 		}
 
+		// Interactive confirmation if not forced
+		if !cfg.Force {
+			fmt.Printf("\nYou are about to apply migration '%s' to target database.\n", version)
+			fmt.Print("Are you sure you want to proceed? [y/N]: ")
+			var response string
+			if _, err := fmt.Scanln(&response); err != nil {
+				logging.Warn("Operation aborted.")
+				return nil
+			}
+			response = strings.ToLower(strings.TrimSpace(response))
+			if response != "y" && response != "yes" {
+				logging.Warn("Operation aborted by user.")
+				return nil
+			}
+		}
+
 		// Apply the sql
 		logging.Info(fmt.Sprintf("Applying migration: %s", version))
 
