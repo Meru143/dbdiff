@@ -22,8 +22,8 @@ func TestSchemaIntrospectionIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Setup Postgres Testcontainer
-	pgContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("docker.io/postgres:16-alpine"),
+	pgContainer, err := postgres.Run(ctx,
+		"docker.io/postgres:16-alpine",
 		postgres.WithDatabase("testdb"),
 		postgres.WithUsername("testuser"),
 		postgres.WithPassword("testpass"),
