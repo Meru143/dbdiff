@@ -12,7 +12,7 @@ import (
 
 func main() {
 	fmt.Println("=== DBDiff E2E Tests ===")
-	
+
 	tests := []struct {
 		name    string
 		cmd     string
@@ -27,31 +27,40 @@ func main() {
 		{"tables no args", "dbdiff", []string{"tables"}, true},
 		{"validate no args", "dbdiff", []string{"validate"}, true},
 	}
-	
+
+	cwd, _ := os.Getwd()
+	// If running from within /test/e2e directory, go up two levels
+	if strings.Contains(cwd, "test") {
+		// Find the index of "test" and trim from there
+		index := strings.LastIndex(cwd, "test")
+		if index != -1 {
+			cwd = cwd[:index]
+		}
+	}
+
 	failed := 0
 	for _, tt := range tests {
-		cmd := exec.Command(tt.cmd, tt.args...)
-		cmd.Dir = "/home/meru/workspace/dbdiff"
-		err := cmd.Run()
-		
+		// Use "go run main.go" from the root
+		cmd := exec.Command("go", append([]string{"run", "main.go"}, tt.args...)...)
+		cmd.Dir = cwd
+		out, err := cmd.CombinedOutput()
+
 		gotErr := err != nil
 		if gotErr != tt.wantErr {
 			fmt.Printf("❌ %s: expected error=%v, got error=%v\n", tt.name, tt.wantErr, gotErr)
-			if err != nil {
-				fmt.Printf("   Error: %v\n", err)
-			}
+			fmt.Printf("   Output: %s\n", string(out))
 			failed++
 		} else {
 			fmt.Printf("✅ %s\n", tt.name)
 		}
 	}
-	
+
 	// Test help output contains expected commands
-	cmd := exec.Command("dbdiff", "--help")
-	cmd.Dir = "/home/meru/workspace/dbdiff"
+	cmd := exec.Command("go", "run", "main.go", "--help")
+	cmd.Dir = cwd
 	out, _ := cmd.Output()
 	output := string(out)
-	
+
 	expectedCommands := []string{"compare", "migrate", "diff", "tables", "validate"}
 	for _, c := range expectedCommands {
 		if !strings.Contains(output, c) {
@@ -61,11 +70,11 @@ func main() {
 			fmt.Printf("✅ Help contains: %s\n", c)
 		}
 	}
-	
+
 	if failed > 0 {
 		fmt.Printf("\n❌ %d tests failed\n", failed)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("\n=== All E2E Tests Passed ✅ ===")
 }

@@ -1,4 +1,4 @@
-package db_test
+package postgres_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/meru143/dbdiff/internal/db"
+	_ "github.com/meru143/dbdiff/internal/db/postgres"
 	"github.com/meru143/dbdiff/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestSchemaIntrospectionIntegration(t *testing.T) {
+func TestPostgresIntrospectionIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
