@@ -144,7 +144,7 @@ go test ./...
 
 # Integration tests (requires Docker)
 docker compose -f docker-compose.test.yml up -d
-go run -tags=integration test/integration_main.go
+go run -tags=integration test/integration/main.go
 docker compose -f docker-compose.test.yml down
 ```
 

@@ -115,7 +115,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
 
       - name: Download dependencies
         run: go mod download
@@ -124,7 +124,7 @@ jobs:
         run: sleep 15
 
       - name: Run Integration Tests
-        run: go run -tags=integration test/integration_main.go
+        run: go run -tags=integration test/integration/main.go
         env:
           PG_SOURCE_DSN: "postgres://testuser:testpass@localhost:5432/sourcedb?sslmode=disable"
           PG_TARGET_DSN: "postgres://testuser:testpass@localhost:5433/targetdb?sslmode=disable"

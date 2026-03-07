@@ -41,11 +41,11 @@ test-integration:
 		echo "docker-compose not found. Skipping integration tests."; \
 		exit 0; \
 	fi
-	./run_integration_tests.sh
+	./scripts/run_integration_tests.sh
 
 test-e2e:
 	@echo "Running E2E tests..."
-	go run -tags=e2e test/e2e_test.go
+	go run -tags=e2e test/e2e/main.go
 
 test-coverage:
 	go test -race -coverprofile=coverage.out ./...
