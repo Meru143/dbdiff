@@ -29,6 +29,9 @@ type Driver interface {
 	// Dialect returns the SQL dialect for DDL generation
 	Dialect() string
 
+	// NormalizeType normalizes a database-specific data type into a standard format
+	NormalizeType(dataType string) string
+
 	// ListTables returns table names in the given schema
 	ListTables(ctx context.Context, schema string, ignorePatterns []string) ([]string, error)
 

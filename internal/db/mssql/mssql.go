@@ -85,6 +85,22 @@ func (d *Driver) Dialect() string {
 	return "sqlserver"
 }
 
+// NormalizeType normalizes a database-specific data type into a standard format
+func (d *Driver) NormalizeType(dataType string) string {
+	switch dataType {
+	case "int", "bigint", "smallint", "tinyint":
+		return "integer"
+	case "nvarchar", "varchar", "nchar", "char", "text", "ntext":
+		return "varchar"
+	case "decimal", "numeric", "money", "smallmoney", "float", "real":
+		return "numeric"
+	case "datetime", "datetime2", "smalldatetime":
+		return "timestamp"
+	default:
+		return dataType
+	}
+}
+
 // Introspect performs full schema introspection for SQL Server
 func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
 	if schema == "" {

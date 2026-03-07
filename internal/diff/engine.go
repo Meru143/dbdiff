@@ -9,15 +9,20 @@ import (
 
 // DiffEngine compares two schemas and generates differences
 type DiffEngine struct {
-	source *types.Schema
-	target *types.Schema
+	source        *types.Schema
+	target        *types.Schema
+	normalizeFunc func(string) string
 }
 
 // NewDiffEngine creates a new DiffEngine
-func NewDiffEngine(source, target *types.Schema) *DiffEngine {
+func NewDiffEngine(source, target *types.Schema, normalize func(string) string) *DiffEngine {
+	if normalize == nil {
+		normalize = func(s string) string { return s }
+	}
 	return &DiffEngine{
-		source: source,
-		target: target,
+		source:        source,
+		target:        target,
+		normalizeFunc: normalize,
 	}
 }
 
@@ -54,7 +59,7 @@ func (e *DiffEngine) Compare() types.DiffList {
 
 // Legacy Compare function
 func Compare(source, target *types.Schema) types.DiffList {
-	engine := NewDiffEngine(source, target)
+	engine := NewDiffEngine(source, target, nil)
 	return engine.Compare()
 }
 
@@ -84,7 +89,7 @@ func (e *DiffEngine) compareTables() types.DiffList {
 		} else {
 			// Table exists in both - compare columns, indexes, constraints
 			targetTable := targetTables[name]
-			differences = append(differences, compareColumns(sourceTable, targetTable)...)
+			differences = append(differences, e.compareColumns(sourceTable, targetTable)...)
 			differences = append(differences, compareIndexes(sourceTable, targetTable)...)
 			differences = append(differences, compareConstraints(sourceTable, targetTable)...)
 			differences = append(differences, compareForeignKeys(sourceTable, targetTable)...)
@@ -225,7 +230,7 @@ func (e *DiffEngine) compareTypes() types.DiffList {
 	return differences
 }
 
-func compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
+func (e *DiffEngine) compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
 	var differences types.DiffList
 	sourceCols := make(map[string]*types.Column)
 	targetCols := make(map[string]*types.Column)
@@ -260,7 +265,7 @@ func compareColumns(sourceTable, targetTable *types.Table) types.DiffList {
 	for name, sourceCol := range sourceCols {
 		if targetCol, exists := targetCols[name]; exists {
 			// Type change
-			if sourceCol.DataType != targetCol.DataType {
+			if e.normalizeFunc(sourceCol.DataType) != e.normalizeFunc(targetCol.DataType) {
 				differences = append(differences, types.Diff{
 					Type:      types.DiffAlter,
 					Object:    types.ObjectColumn,

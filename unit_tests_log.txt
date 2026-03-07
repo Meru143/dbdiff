@@ -1,0 +1,952 @@
+unit-tests	UNKNOWN STEP	﻿2026-03-06T09:34:41.7709837Z Current runner version: '2.332.0'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7745806Z ##[group]Runner Image Provisioner
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7747193Z Hosted Compute Agent
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7748078Z Version: 20260213.493
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7749251Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7750454Z Build Date: 2026-02-13T00:28:41Z
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7751525Z Worker ID: {88a68257-d9ba-4a5e-a58c-682ff3cd8e44}
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7752890Z Azure Region: eastus2
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7753860Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7755992Z ##[group]Operating System
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7757387Z Ubuntu
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7758163Z 24.04.3
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7758986Z LTS
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7759844Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7760724Z ##[group]Runner Image
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7761721Z Image: ubuntu-24.04
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7762694Z Version: 20260302.42.1
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7764849Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7767907Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7769494Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7771352Z ##[group]GITHUB_TOKEN Permissions
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7775657Z Contents: read
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7776840Z Metadata: read
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7777641Z Packages: read
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7778629Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7781632Z Secret source: Actions
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.7783111Z Prepare workflow directory
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.8249291Z Prepare all required actions
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:41.8304508Z Getting action download info
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:42.2219039Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:42.3924122Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:42.6903631Z Download action repository 'golangci/golangci-lint-action@v4' (SHA:d6238b002a20823d52840fda27e2d4891c5952dc)
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.0365077Z Download action repository 'codecov/codecov-action@v4' (SHA:b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238)
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.4135351Z Complete job name: unit-tests
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.4999975Z ##[group]Run actions/checkout@v4
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5001272Z with:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5001991Z   repository: Meru143/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5003169Z   token: ***
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5003868Z   ssh-strict: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5004593Z   ssh-user: git
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5005413Z   persist-credentials: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5006568Z   clean: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5007560Z   sparse-checkout-cone-mode: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5008622Z   fetch-depth: 1
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5009431Z   fetch-tags: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5010333Z   show-progress: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5011219Z   lfs: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5012021Z   submodules: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5012832Z   set-safe-directory: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.5014485Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6157422Z Syncing repository: Meru143/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6160316Z ##[group]Getting Git version info
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6161812Z Working directory is '/home/runner/work/dbdiff/dbdiff'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6163761Z [command]/usr/bin/git version
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6241939Z git version 2.53.0
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6271365Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6298644Z Temporarily overriding HOME='/home/runner/work/_temp/b59ee30d-ce1c-42a3-a079-8598e126cd52' before making global git config changes
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6303611Z Adding repository directory to the temporary git global config as a safe directory
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6307744Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/dbdiff/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6355888Z Deleting the contents of '/home/runner/work/dbdiff/dbdiff'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6360817Z ##[group]Initializing the repository
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6366709Z [command]/usr/bin/git init /home/runner/work/dbdiff/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6492735Z hint: Using 'master' as the name for the initial branch. This default branch name
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6496090Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6498803Z hint: to use in all of your new repositories, which will suppress this warning,
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6500319Z hint: call:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6501146Z hint:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6502717Z hint: 	git config --global init.defaultBranch <name>
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6504725Z hint:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6506694Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6508893Z hint: 'development'. The just-created branch can be renamed via this command:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6511144Z hint:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6512475Z hint: 	git branch -m <name>
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6513902Z hint:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6515176Z hint: Disable this message with "git config set advice.defaultBranchName false"
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6517626Z Initialized empty Git repository in /home/runner/work/dbdiff/dbdiff/.git/
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6520969Z [command]/usr/bin/git remote add origin https://github.com/Meru143/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6555226Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6557505Z ##[group]Disabling automatic garbage collection
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6559833Z [command]/usr/bin/git config --local gc.auto 0
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6592332Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6594163Z ##[group]Setting up auth
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6598866Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.6633140Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7023242Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7061003Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7302646Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7348754Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7629096Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7672126Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7683004Z ##[group]Fetching the repository
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:43.7688001Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +af4d00f9176f00bc3b162ec05cec7324ed140ef2:refs/remotes/origin/main
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0565010Z From https://github.com/Meru143/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0567000Z  * [new ref]         af4d00f9176f00bc3b162ec05cec7324ed140ef2 -> origin/main
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0602056Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0603659Z ##[group]Determining the checkout info
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0605529Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0610855Z [command]/usr/bin/git sparse-checkout disable
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0657643Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0687733Z ##[group]Checking out the ref
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0691158Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0817292Z Switched to a new branch 'main'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0820109Z branch 'main' set up to track 'origin/main'.
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0828933Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0865320Z [command]/usr/bin/git log -1 --format=%H
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.0889881Z af4d00f9176f00bc3b162ec05cec7324ed140ef2
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1189266Z ##[group]Run actions/setup-go@v5
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1190299Z with:
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1191055Z   go-version-file: go.mod
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1192099Z   check-latest: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1193185Z   token: ***
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1193947Z   cache: true
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.1194765Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.2881722Z Setup go version spec 1.24.2
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.2892463Z Attempting to download 1.24.2...
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.6567759Z matching 1.24.2...
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:44.6622602Z Acquiring 1.24.2 from https://github.com/actions/go-versions/releases/download/1.24.2-14210955142/go-1.24.2-linux-x64.tar.gz
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:45.2864767Z Extracting Go...
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:45.3006526Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/4449e084-ae77-4782-926c-5fbdb233fac4 -f /home/runner/work/_temp/089394ed-0f3d-48cb-9e38-1bcc08809da1
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:47.1563268Z Successfully extracted go to /home/runner/work/_temp/4449e084-ae77-4782-926c-5fbdb233fac4
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:47.1564355Z Adding to the cache ...
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.6896770Z Successfully cached go to /opt/hostedtoolcache/go/1.24.2/x64
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.6904633Z Added go to the path
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.6905137Z Successfully set up Go version 1.24.2
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7129201Z [command]/opt/hostedtoolcache/go/1.24.2/x64/bin/go env GOMODCACHE
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7162221Z [command]/opt/hostedtoolcache/go/1.24.2/x64/bin/go env GOCACHE
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7197735Z /home/runner/go/pkg/mod
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7214124Z /home/runner/.cache/go-build
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7853598Z Cache is not found
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7875031Z go version go1.24.2 linux/amd64
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7875264Z 
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:52.7875568Z ##[group]go env
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1994690Z AR='ar'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1995089Z CC='gcc'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1995454Z CGO_CFLAGS='-O2 -g'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1995834Z CGO_CPPFLAGS=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1996070Z CGO_CXXFLAGS='-O2 -g'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1996557Z CGO_ENABLED='1'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1996833Z CGO_FFLAGS='-O2 -g'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1997049Z CGO_LDFLAGS='-O2 -g'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1997247Z CXX='g++'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1997444Z GCCGO='gccgo'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1997638Z GO111MODULE=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1997818Z GOAMD64='v1'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1998003Z GOARCH='amd64'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1998239Z GOAUTH='netrc'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1998421Z GOBIN=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1998620Z GOCACHE='/home/runner/.cache/go-build'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1998904Z GOCACHEPROG=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1999104Z GODEBUG=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1999342Z GOENV='/home/runner/.config/go/env'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1999600Z GOEXE=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1999782Z GOEXPERIMENT=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.1999978Z GOFIPS140='off'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2000155Z GOFLAGS=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2000799Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build1129332584=/tmp/go-build -gno-record-gcc-switches'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2001465Z GOHOSTARCH='amd64'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2001676Z GOHOSTOS='linux'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2001865Z GOINSECURE=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2002118Z GOMOD='/home/runner/work/dbdiff/dbdiff/go.mod'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2002414Z GOMODCACHE='/home/runner/go/pkg/mod'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2002662Z GONOPROXY=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2002837Z GONOSUMDB=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2003013Z GOOS='linux'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2003250Z GOPATH='/home/runner/go'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2003474Z GOPRIVATE=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2003728Z GOPROXY='https://proxy.golang.org,direct'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2004044Z GOROOT='/opt/hostedtoolcache/go/1.24.2/x64'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2004321Z GOSUMDB='sum.golang.org'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2004534Z GOTELEMETRY='local'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2004784Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2005093Z GOTMPDIR=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2005277Z GOTOOLCHAIN='auto'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2005578Z GOTOOLDIR='/opt/hostedtoolcache/go/1.24.2/x64/pkg/tool/linux_amd64'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2005915Z GOVCS=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2006661Z GOVERSION='go1.24.2'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2006929Z GOWORK=''
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2007126Z PKG_CONFIG='pkg-config'
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2007268Z 
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2008027Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2211785Z ##[group]Run go mod download
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2212116Z [36;1mgo mod download[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2269000Z shell: /usr/bin/bash -e {0}
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:53.2269488Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:55.8520410Z ##[group]Run go build -v ./...
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:55.8520713Z [36;1mgo build -v ./...[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:55.8570265Z shell: /usr/bin/bash -e {0}
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:55.8570522Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0543159Z internal/unsafeheader
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0543907Z internal/goarch
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0561296Z internal/byteorder
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0630646Z internal/cpu
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0650851Z internal/abi
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0651249Z internal/coverage/rtcov
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0787285Z internal/godebugs
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0804959Z internal/chacha8rand
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.0921563Z internal/goexperiment
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1009130Z internal/goos
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1098985Z internal/profilerecord
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1192845Z internal/runtime/atomic
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1362347Z internal/bytealg
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1382499Z internal/asan
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1512957Z internal/msan
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1667082Z internal/runtime/math
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1847718Z internal/runtime/sys
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.1986090Z internal/runtime/exithook
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2194501Z internal/runtime/syscall
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2203657Z cmp
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2279548Z internal/itoa
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2338448Z internal/stringslite
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2478447Z math/bits
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2636694Z unicode/utf8
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2716970Z sync/atomic
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.2889525Z math
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3090240Z unicode
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3228582Z internal/race
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3408018Z internal/runtime/maps
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3429289Z internal/sync
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3723694Z github.com/clipperhouse/stringish
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3800362Z encoding
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.3899230Z unicode/utf16
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.4061964Z image/color
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.4532579Z github.com/rivo/uniseg
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.4904080Z log/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.4967047Z internal/nettrace
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5008084Z container/list
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5272487Z crypto/internal/fips140/alias
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5377068Z crypto/internal/fips140deps/byteorder
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5603829Z crypto/internal/fips140deps/cpu
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5628810Z github.com/charmbracelet/x/ansi/parser
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5686543Z crypto/internal/fips140/subtle
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5820873Z runtime
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.5909828Z crypto/internal/boring/sig
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6045093Z vendor/golang.org/x/crypto/cryptobyte/asn1
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6217647Z vendor/golang.org/x/crypto/internal/alias
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6340966Z golang.org/x/text/encoding/internal/identifier
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6562879Z golang.org/x/text/internal/utf8internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6635170Z github.com/pelletier/go-toml/v2/internal/characters
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6728577Z github.com/spf13/viper/internal/features
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6797569Z log/slog/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6809929Z github.com/jackc/puddle/v2/internal/genstack
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:56.6863463Z github.com/microsoft/go-mssqldb/internal/github.com/swisscom/mssql-always-encrypted/pkg/encryption
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5028083Z iter
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5029257Z internal/reflectlite
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5029845Z sync
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5031039Z weak
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5130771Z crypto/subtle
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5148790Z slices
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.5292763Z maps
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.6138000Z sort
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.6143497Z errors
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.6298536Z internal/bisect
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.6327230Z internal/testlog
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.6505296Z strconv
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.6532532Z io
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.7222165Z internal/oserror
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.7398675Z path
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.7488564Z internal/godebug
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.7544887Z syscall
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.7767279Z bytes
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.9273489Z reflect
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.9351685Z strings
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:58.9397174Z math/rand
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.0508095Z runtime/cgo
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.1089156Z bufio
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.2197782Z github.com/clipperhouse/uax29/v2/graphemes
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.2497917Z time
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.3048769Z internal/syscall/unix
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.3352251Z internal/syscall/execenv
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.3466933Z github.com/clipperhouse/displaywidth
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.4572486Z regexp/syntax
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.7864097Z io/fs
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.8119289Z internal/poll
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.9051304Z internal/filepathlite
+unit-tests	UNKNOWN STEP	2026-03-06T09:34:59.9702012Z context
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.0599681Z regexp
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.0688792Z internal/fmtsort
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.0741894Z os
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.1319737Z encoding/binary
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.2468187Z image
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.3827795Z encoding/base64
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.4807201Z golang.org/x/sys/unix
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.4961371Z github.com/go-viper/mapstructure/v2/internal/errors
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.5164670Z vendor/golang.org/x/net/dns/dnsmessage
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.5626864Z fmt
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.7777734Z github.com/mattn/go-runewidth
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.8472917Z io/ioutil
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.8735570Z encoding/hex
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.9016486Z database/sql/driver
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.9084418Z encoding/json
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:00.9870037Z net/url
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.0327574Z os/user
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.1490265Z path/filepath
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.2684519Z os/exec
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.4122073Z github.com/aymanbagabas/go-osc52/v2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.4522526Z text/template/parse
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.5388156Z github.com/charmbracelet/x/term
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.5488049Z github.com/lucasb-eyer/go-colorful
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.5799164Z github.com/mattn/go-isatty
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.6088430Z github.com/muesli/ansi
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.6687075Z github.com/muesli/ansi/compressor
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.7172413Z github.com/muesli/cancelreader
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.7495245Z text/template
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.7624306Z github.com/charmbracelet/x/ansi
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.7807844Z log
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.8436731Z os/signal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.8844713Z runtime/debug
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:01.9827776Z encoding/csv
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.0642696Z github.com/fsnotify/fsnotify/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.1291934Z github.com/fsnotify/fsnotify
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.1587040Z github.com/muesli/termenv
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.2237768Z internal/singleflight
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.2429656Z unique
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.2719358Z github.com/xo/terminfo
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.2833584Z github.com/sourcegraph/conc/panics
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.3089230Z github.com/sourcegraph/conc
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.3294707Z github.com/sourcegraph/conc/pool
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.3872021Z github.com/spf13/afero/internal/common
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.3923797Z net/netip
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.4041248Z github.com/spf13/afero/mem
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.4577935Z golang.org/x/text/transform
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.4887687Z compress/flate
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.4917475Z github.com/charmbracelet/colorprofile
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.5199064Z golang.org/x/text/runes
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.5957655Z golang.org/x/text/unicode/norm
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.6684803Z github.com/charmbracelet/x/cellbuf
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.7248948Z hash
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.7492425Z hash/crc32
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.8247906Z compress/gzip
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.8661028Z crypto
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.8845271Z crypto/internal/fips140deps/godebug
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.8851448Z net
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.9147838Z crypto/internal/fips140
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.9512100Z crypto/internal/impl
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:02.9819101Z crypto/internal/fips140/sha256
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.0942723Z crypto/internal/fips140/sha3
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.1296549Z crypto/internal/fips140/sha512
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2143604Z crypto/internal/sysrand
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2309474Z crypto/internal/fips140/hmac
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2370907Z github.com/charmbracelet/lipgloss
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2407629Z crypto/internal/entropy
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2529587Z math/rand/v2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2552728Z crypto/internal/fips140/check
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.2763811Z crypto/internal/fips140/aes
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.3237160Z crypto/internal/randutil
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.3352172Z math/big
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.3619533Z crypto/internal/fips140/drbg
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.4068207Z crypto/internal/fips140/aes/gcm
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.5167278Z crypto/internal/fips140only
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.5414178Z crypto/cipher
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.6302317Z crypto/internal/boring
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.6522054Z crypto/aes
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.6647529Z crypto/des
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.7081576Z crypto/internal/fips140/nistec/fiat
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:03.7701128Z github.com/charmbracelet/bubbletea
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.0031668Z crypto/rand
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.0268527Z crypto/internal/fips140/edwards25519/field
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.0818874Z crypto/internal/boring/bbig
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.1003650Z crypto/internal/fips140/bigmod
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.1012376Z crypto/sha3
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.1569555Z crypto/internal/fips140hash
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.1757928Z crypto/sha512
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.2087751Z encoding/asn1
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.2316986Z crypto/internal/fips140/nistec
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.2544463Z crypto/internal/fips140/edwards25519
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.3607744Z crypto/internal/fips140/ed25519
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.4032759Z crypto/ed25519
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.4215291Z vendor/golang.org/x/crypto/cryptobyte
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.4333148Z crypto/hmac
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.4548930Z crypto/internal/fips140/hkdf
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.4791623Z crypto/internal/fips140/mlkem
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.5681058Z crypto/internal/fips140/tls12
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.5907727Z crypto/internal/fips140/tls13
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.6127382Z vendor/golang.org/x/crypto/chacha20
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.6319562Z vendor/golang.org/x/crypto/internal/poly1305
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.6561423Z vendor/golang.org/x/sys/cpu
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.6844844Z crypto/md5
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.7257783Z vendor/golang.org/x/crypto/chacha20poly1305
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.7345039Z crypto/rc4
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.7526826Z crypto/internal/fips140/rsa
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.9057413Z crypto/sha1
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:04.9847798Z crypto/internal/fips140/ecdh
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.0522368Z crypto/ecdh
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.0577446Z crypto/elliptic
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.0794151Z crypto/internal/fips140/ecdsa
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.2004452Z crypto/internal/hpke
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.3097473Z crypto/rsa
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.3667859Z crypto/ecdsa
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.3817288Z crypto/sha256
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.4009284Z crypto/tls/internal/fips140tls
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.4134430Z crypto/dsa
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.4766908Z crypto/x509/pkix
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.4892928Z encoding/pem
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.5190054Z vendor/golang.org/x/text/transform
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.5400721Z vendor/golang.org/x/text/unicode/bidi
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.5602054Z github.com/go-viper/mapstructure/v2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.6043818Z vendor/golang.org/x/text/unicode/norm
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.7028992Z crypto/x509
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.7911803Z vendor/golang.org/x/text/secure/bidirule
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.8137383Z net/textproto
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.9017837Z vendor/golang.org/x/net/http2/hpack
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:05.9616623Z mime
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.0354507Z mime/quotedprintable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.0753269Z net/http/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.1477777Z net/http/internal/ascii
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.1630839Z github.com/spf13/cast/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.1710296Z vendor/golang.org/x/net/idna
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.2024287Z html
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.3217129Z html/template
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.3767401Z mime/multipart
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.4307196Z vendor/golang.org/x/net/http/httpguts
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.4506376Z crypto/tls
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.4586483Z vendor/golang.org/x/net/http/httpproxy
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.5097018Z flag
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.5307372Z golang.org/x/text/encoding
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.6348742Z golang.org/x/text/encoding/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.6643025Z golang.org/x/text/encoding/unicode
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.6796954Z github.com/spf13/pflag
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.7138158Z github.com/subosito/gotenv
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.7286367Z github.com/spf13/cast
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.7616012Z github.com/spf13/viper/internal/encoding/json
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.7767870Z github.com/pelletier/go-toml/v2/internal/danger
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.7954551Z github.com/pelletier/go-toml/v2/unstable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:06.9425759Z github.com/pelletier/go-toml/v2/internal/tracker
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.0442301Z github.com/pelletier/go-toml/v2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.1228850Z github.com/spf13/viper/internal/encoding/dotenv
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.1451814Z go.yaml.in/yaml/v3
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.4861550Z log/slog/internal/buffer
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.5504758Z log/slog
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.6854733Z github.com/spf13/viper/internal/encoding/toml
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:07.7206811Z database/sql
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.0665589Z github.com/spf13/viper/internal/encoding/yaml
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.0796907Z github.com/jackc/pgx/v5/internal/pgio
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.0953557Z github.com/jackc/pgx/v5/internal/sanitize
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.1487344Z crypto/internal/fips140/pbkdf2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.1488148Z github.com/jackc/pgpassfile
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.1918042Z crypto/pbkdf2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.2071500Z github.com/jackc/pgservicefile
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.2131639Z github.com/jackc/pgx/v5/internal/iobufpool
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.2597837Z github.com/jackc/pgx/v5/pgconn/ctxwatch
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.2603175Z github.com/jackc/pgx/v5/pgconn/internal/bgreader
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.2967770Z github.com/jackc/pgx/v5/pgproto3
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.2974207Z golang.org/x/text/internal/tag
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.3255904Z golang.org/x/text/internal/language
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.4501309Z net/http/httptrace
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.4618154Z golang.org/x/text/unicode/bidi
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.4907802Z net/http
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.6157932Z golang.org/x/text/internal/language/compact
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.6621494Z golang.org/x/text/secure/bidirule
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.6934463Z golang.org/x/text/width
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.6965073Z golang.org/x/text/language
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.8317794Z encoding/xml
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.8591754Z golang.org/x/sync/semaphore
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.8947670Z github.com/jackc/puddle/v2
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.8970344Z golang.org/x/text/internal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.9220828Z golang.org/x/text/cases
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.9237369Z github.com/meru143/dbdiff/pkg/types
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.9415299Z github.com/golang-sql/civil
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:08.9812976Z github.com/golang-sql/sqlexp
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.0501027Z github.com/google/uuid
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.1420478Z golang.org/x/text/secure/precis
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.2677659Z github.com/microsoft/go-mssqldb/aecmk
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.2995787Z github.com/microsoft/go-mssqldb/msdsn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.3821959Z github.com/jackc/pgx/v5/pgconn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.4082010Z github.com/jackc/pgx/v5/pgtype
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.4199899Z github.com/microsoft/go-mssqldb/integratedauth
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.4417421Z golang.org/x/crypto/md4
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.4642311Z github.com/microsoft/go-mssqldb/integratedauth/ntlm
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.5302468Z github.com/microsoft/go-mssqldb/internal/cp
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.7672009Z github.com/jackc/pgx/v5/internal/stmtcache
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.7934934Z github.com/microsoft/go-mssqldb/internal/decimal
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.8290173Z github.com/microsoft/go-mssqldb/internal/github.com/swisscom/mssql-always-encrypted/pkg/crypto
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.8633240Z github.com/microsoft/go-mssqldb/internal/github.com/swisscom/mssql-always-encrypted/pkg/utils
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.9027825Z github.com/microsoft/go-mssqldb/internal/github.com/swisscom/mssql-always-encrypted/pkg/keys
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.9197560Z github.com/microsoft/go-mssqldb/internal/github.com/swisscom/mssql-always-encrypted/pkg/algorithms
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.9565593Z github.com/microsoft/go-mssqldb/internal/querytext
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:09.9882658Z hash/adler32
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:10.0084044Z compress/zlib
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:10.0489321Z filippo.io/edwards25519/field
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:10.1698116Z filippo.io/edwards25519
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:10.4174189Z github.com/go-sql-driver/mysql
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:10.5165497Z github.com/microsoft/go-mssqldb
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.2227871Z github.com/meru143/dbdiff/internal/db/mysql
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.3447923Z github.com/meru143/dbdiff/internal/diff
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.5612031Z github.com/mattn/go-colorable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.6041692Z github.com/rs/zerolog/internal/json
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.6527780Z github.com/meru143/dbdiff/internal/db/mssql
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.6668538Z github.com/spf13/afero
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.7216730Z github.com/rs/zerolog
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.7252146Z github.com/meru143/dbdiff/internal/safety
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.7586542Z github.com/charmbracelet/bubbles/key
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.7757339Z github.com/charmbracelet/bubbles/viewport
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:11.8528933Z github.com/spf13/cobra
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.1540064Z github.com/sagikazarmark/locafero
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.2352390Z github.com/meru143/dbdiff/internal/logging
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.2389554Z github.com/spf13/viper
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.2651085Z github.com/meru143/dbdiff/internal/db/dsn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.3297709Z github.com/meru143/dbdiff/internal/errors
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.3691460Z internal/sysinfo
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.4120044Z runtime/trace
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.4827645Z testing
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:12.7075562Z github.com/meru143/dbdiff/internal/config
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:13.1642897Z github.com/meru143/dbdiff/internal/testhelper
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.1532749Z github.com/jackc/pgx/v5
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.3783214Z github.com/jackc/pgx/v5/pgxpool
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.4786538Z github.com/meru143/dbdiff/internal/db/postgres
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.5609784Z github.com/meru143/dbdiff/internal/db
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.6590550Z github.com/meru143/dbdiff/internal/output
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.7128170Z github.com/meru143/dbdiff/internal/tui
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.7374188Z github.com/meru143/dbdiff/cmd
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:14.7977813Z github.com/meru143/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:15.4949111Z ##[group]Run go test -v -race -coverprofile=coverage.out ./...
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:15.4949603Z [36;1mgo test -v -race -coverprofile=coverage.out ./...[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:15.4999113Z shell: /usr/bin/bash -e {0}
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:15.4999365Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:39.9095625Z 	github.com/meru143/dbdiff		coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:39.9104319Z 	github.com/meru143/dbdiff/cmd		coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9463753Z === RUN   TestLoad_Defaults
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9466918Z --- PASS: TestLoad_Defaults (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9468584Z === RUN   TestLoad_FlagBinding
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9470113Z --- PASS: TestLoad_FlagBinding (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9471674Z === RUN   TestLoad_ConfigFile
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9489614Z --- PASS: TestLoad_ConfigFile (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9490179Z === RUN   TestLoad_IgnorePatterns
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9490638Z --- PASS: TestLoad_IgnorePatterns (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9491188Z === RUN   TestLoad_BackupConfig
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9491612Z --- PASS: TestLoad_BackupConfig (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9492060Z === RUN   TestLoad_FromEnv
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9492434Z --- PASS: TestLoad_FromEnv (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9492934Z === RUN   TestLoad_Validation
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9493345Z --- PASS: TestLoad_Validation (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9493759Z === RUN   TestLoad_AllFlags
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9494147Z --- PASS: TestLoad_AllFlags (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9494553Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9494859Z coverage: 93.3% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:42.9495494Z ok  	github.com/meru143/dbdiff/internal/config	1.018s	coverage: 93.3% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6359834Z === RUN   TestSchemaIntrospectionIntegration
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6360755Z 2026/03/06 09:35:48 github.com/testcontainers/testcontainers-go - Connected to docker: 
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6361465Z   Server Version: 28.0.4
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6361878Z   API Version: 1.48
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6381717Z   Operating System: Ubuntu 24.04.3 LTS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6382236Z   Total Memory: 15990 MB
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6382683Z   Testcontainers for Go Version: v0.40.0
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6383210Z   Resolved Docker Host: unix:///var/run/docker.sock
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6383766Z   Resolved Docker Socket Path: /var/run/docker.sock
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6384490Z   Test SessionID: 099371e2277699b275084e7c8349d3f52f07ca1cd96cecf668dae235dad99bb8
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6385238Z   Test ProcessID: f3e197ab-aba9-4203-bf42-011b5638710d
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6387325Z 2026/03/06 09:35:48 No image auth found for docker.io. Setting empty credentials for the image: docker.io/postgres:16-alpine. This is expected for public images. Details: credentials not found in native keychain
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6389691Z 2026/03/06 09:35:52 🐳 Creating container for image docker.io/postgres:16-alpine
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6390742Z 2026/03/06 09:35:53 🐳 Creating container for image testcontainers/ryuk:0.13.0
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6391611Z 2026/03/06 09:35:53 ✅ Container created: 480ba459a187
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6392297Z 2026/03/06 09:35:53 🐳 Starting container: 480ba459a187
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6392968Z 2026/03/06 09:35:53 ✅ Container started: 480ba459a187
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6394232Z 2026/03/06 09:35:53 ⏳ Waiting for container id 480ba459a187 image: testcontainers/ryuk:0.13.0. Waiting for: port 8080/tcp to be listening
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6395293Z 2026/03/06 09:35:53 Shell not found in container
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6396008Z 2026/03/06 09:35:53 🔔 Container is ready: 480ba459a187
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6397015Z 2026/03/06 09:35:53 ✅ Container created: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6397715Z 2026/03/06 09:35:53 🐳 Starting container: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6398385Z 2026/03/06 09:35:53 ✅ Container started: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6400074Z 2026/03/06 09:35:53 ⏳ Waiting for container id f2598ed7fd98 image: docker.io/postgres:16-alpine. Waiting for: all of: [log message "database system is ready to accept connections" (occurrence: 2)]
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6401937Z 2026/03/06 09:35:55 🔔 Container is ready: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6402676Z 2026/03/06 09:35:55 🐳 Stopping container: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6403358Z 2026/03/06 09:35:55 ✅ Container stopped: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6404058Z 2026/03/06 09:35:55 🐳 Terminating container: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6404793Z 2026/03/06 09:35:55 🚫 Container terminated: f2598ed7fd98
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6405445Z --- PASS: TestSchemaIntrospectionIntegration (7.54s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6405948Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6408225Z coverage: 0.8% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6408980Z ok  	github.com/meru143/dbdiff/internal/db	8.591s	coverage: 0.8% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6409694Z === RUN   TestParsePostgres
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6410254Z === RUN   TestParsePostgres/standard_URL
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6410777Z === RUN   TestParsePostgres/postgresql_scheme
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6411317Z === RUN   TestParsePostgres/default_port
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6411827Z --- PASS: TestParsePostgres (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6412297Z     --- PASS: TestParsePostgres/standard_URL (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6412727Z     --- PASS: TestParsePostgres/postgresql_scheme (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6413115Z     --- PASS: TestParsePostgres/default_port (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6413421Z === RUN   TestParseMySQLStandard
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6413689Z --- PASS: TestParseMySQLStandard (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6413975Z === RUN   TestParseMySQLTCP
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6414212Z --- PASS: TestParseMySQLTCP (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6414470Z === RUN   TestParseSQLServer
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6414723Z --- PASS: TestParseSQLServer (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6414980Z === RUN   TestUnsupportedFormat
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6415237Z --- PASS: TestUnsupportedFormat (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6415506Z === RUN   TestToNativeDSN_Postgres
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6415782Z --- PASS: TestToNativeDSN_Postgres (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6416056Z === RUN   TestToNativeDSN_MySQL
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6416584Z --- PASS: TestToNativeDSN_MySQL (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6416863Z === RUN   TestToNativeDSN_SQLServer
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6417139Z --- PASS: TestToNativeDSN_SQLServer (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6417405Z === RUN   TestRoundTrip
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6417631Z --- PASS: TestRoundTrip (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6417855Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6418032Z coverage: 85.5% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6418413Z ok  	github.com/meru143/dbdiff/internal/db/dsn	1.019s	coverage: 85.5% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6418800Z === RUN   TestConnect
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6419014Z --- PASS: TestConnect (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6419475Z === RUN   TestEnsureMigrationsTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6419755Z --- PASS: TestEnsureMigrationsTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6420048Z === RUN   TestGetAppliedMigrations
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6420397Z --- PASS: TestGetAppliedMigrations (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6420709Z === RUN   TestRecordMigration
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6420947Z --- PASS: TestRecordMigration (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6421208Z === RUN   TestRemoveMigration
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6421456Z --- PASS: TestRemoveMigration (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6421696Z === RUN   TestExec
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6421892Z --- PASS: TestExec (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6422096Z === RUN   TestClose
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6422292Z --- PASS: TestClose (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6422514Z === RUN   TestNameAndDialect
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6422753Z --- PASS: TestNameAndDialect (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6422999Z === RUN   TestGetServerInfo
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6423229Z --- PASS: TestGetServerInfo (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6423483Z === RUN   TestIntrospectMocked
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6423738Z --- PASS: TestIntrospectMocked (0.01s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6424341Z === RUN   TestListTables
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6424745Z --- PASS: TestListTables (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6425143Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6425451Z coverage: 77.3% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6426131Z ok  	github.com/meru143/dbdiff/internal/db/mssql	1.035s	coverage: 77.3% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6426794Z === RUN   TestConnect
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6427215Z --- PASS: TestConnect (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6427468Z === RUN   TestEnsureMigrationsTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6427753Z --- PASS: TestEnsureMigrationsTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6428043Z === RUN   TestGetAppliedMigrations
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6428319Z --- PASS: TestGetAppliedMigrations (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6428593Z === RUN   TestRecordMigration
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6428830Z --- PASS: TestRecordMigration (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6429089Z === RUN   TestRemoveMigration
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6429324Z --- PASS: TestRemoveMigration (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6429577Z === RUN   TestExec
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6429769Z --- PASS: TestExec (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6429985Z === RUN   TestClose
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6430180Z --- PASS: TestClose (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6430412Z === RUN   TestIntrospectMocked
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6430663Z --- PASS: TestIntrospectMocked (0.01s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6430921Z === RUN   TestIgnorePatterns
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6431168Z === RUN   TestIgnorePatterns/exact_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6431443Z === RUN   TestIgnorePatterns/no_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6431709Z === RUN   TestIgnorePatterns/prefix_star
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6432002Z === RUN   TestIgnorePatterns/prefix_star_no_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6432299Z === RUN   TestIgnorePatterns/suffix_star
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6432569Z === RUN   TestIgnorePatterns/question_mark
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6432875Z === RUN   TestIgnorePatterns/question_mark_no_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6433429Z --- PASS: TestIgnorePatterns (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6433782Z     --- PASS: TestIgnorePatterns/exact_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6434145Z     --- PASS: TestIgnorePatterns/no_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6434500Z     --- PASS: TestIgnorePatterns/prefix_star (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6434896Z     --- PASS: TestIgnorePatterns/prefix_star_no_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6435289Z     --- PASS: TestIgnorePatterns/suffix_star (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6435668Z     --- PASS: TestIgnorePatterns/question_mark (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6436082Z     --- PASS: TestIgnorePatterns/question_mark_no_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6436646Z === RUN   TestFilterColumns
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6436888Z --- PASS: TestFilterColumns (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6437125Z === RUN   TestListTables
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6437352Z --- PASS: TestListTables (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6437587Z === RUN   TestGetServerInfo
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6437818Z --- PASS: TestGetServerInfo (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6438038Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6438218Z coverage: 79.5% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6438729Z ok  	github.com/meru143/dbdiff/internal/db/mysql	1.034s	coverage: 79.5% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6439134Z === RUN   TestIgnorePatterns
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6439373Z === RUN   TestIgnorePatterns/exact_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6439643Z === RUN   TestIgnorePatterns/no_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6439909Z === RUN   TestIgnorePatterns/prefix_star
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6440195Z === RUN   TestIgnorePatterns/prefix_star_no_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6440494Z === RUN   TestIgnorePatterns/suffix_star
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6440762Z === RUN   TestIgnorePatterns/question_mark
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6441066Z === RUN   TestIgnorePatterns/question_mark_no_match
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6441358Z --- PASS: TestIgnorePatterns (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6441694Z     --- PASS: TestIgnorePatterns/exact_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6442047Z     --- PASS: TestIgnorePatterns/no_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6442396Z     --- PASS: TestIgnorePatterns/prefix_star (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6442787Z     --- PASS: TestIgnorePatterns/prefix_star_no_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6443178Z     --- PASS: TestIgnorePatterns/suffix_star (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6443543Z     --- PASS: TestIgnorePatterns/question_mark (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6443951Z     --- PASS: TestIgnorePatterns/question_mark_no_match (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6444238Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6444410Z coverage: 4.1% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6444906Z ok  	github.com/meru143/dbdiff/internal/db/postgres	1.015s	coverage: 4.1% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6445347Z === RUN   TestCompare_EmptySchemas
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6445615Z --- PASS: TestCompare_EmptySchemas (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6445886Z === RUN   TestCompare_NewTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6446128Z --- PASS: TestCompare_NewTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6446615Z === RUN   TestCompare_DroppedTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6446878Z --- PASS: TestCompare_DroppedTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6447138Z === RUN   TestCompare_NewColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6447384Z --- PASS: TestCompare_NewColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6447650Z === RUN   TestCompare_TypeChange
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6447907Z --- PASS: TestCompare_TypeChange (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6448165Z === RUN   TestCompare_IndexDiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6448406Z --- PASS: TestCompare_IndexDiff (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6448669Z === RUN   TestCompare_DroppedColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6448933Z --- PASS: TestCompare_DroppedColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6449223Z === RUN   TestCompare_DefaultValueChange
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6449520Z --- PASS: TestCompare_DefaultValueChange (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6449811Z === RUN   TestCompare_DroppedIndex
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6450077Z --- PASS: TestCompare_DroppedIndex (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6450346Z === RUN   TestCompare_NewForeignKey
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6450602Z --- PASS: TestCompare_NewForeignKey (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6450885Z === RUN   TestCompare_DroppedForeignKey
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6451176Z --- PASS: TestCompare_DroppedForeignKey (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6451457Z === RUN   TestCompare_Sequence
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6451702Z --- PASS: TestCompare_Sequence (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6451951Z === RUN   TestCompare_View
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6452184Z --- PASS: TestCompare_View (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6452430Z === RUN   TestCompare_MaterializedView
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6452709Z --- PASS: TestCompare_MaterializedView (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6452981Z === RUN   TestCompare_Function
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6453221Z --- PASS: TestCompare_Function (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6453481Z === RUN   TestCompare_Trigger
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6453717Z --- PASS: TestCompare_Trigger (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6453966Z === RUN   TestCompare_Grant
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6454196Z --- PASS: TestCompare_Grant (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6454438Z === RUN   TestCompare_DropView
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6454670Z --- PASS: TestCompare_DropView (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6454921Z === RUN   TestCompare_AddView
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6455148Z --- PASS: TestCompare_AddView (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6455942Z === RUN   TestCompare_Sequence_Add
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6456635Z --- PASS: TestCompare_Sequence_Add (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6457152Z === RUN   TestCompare_Sequence_Drop
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6457505Z --- PASS: TestCompare_Sequence_Drop (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6457788Z === RUN   TestCompare_Sequence_Alter
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6458070Z --- PASS: TestCompare_Sequence_Alter (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6458336Z === RUN   TestCompare_Type_Add
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6458592Z --- PASS: TestCompare_Type_Add (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6458845Z === RUN   TestCompare_Type_Drop
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6459097Z --- PASS: TestCompare_Type_Drop (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6459393Z === RUN   TestCompare_Type_SameName_NoDiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6459691Z --- PASS: TestCompare_Type_SameName_NoDiff (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6459974Z === RUN   TestCompare_Index_Add
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6460215Z --- PASS: TestCompare_Index_Add (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6460464Z === RUN   TestCompare_Index_Drop
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6460716Z --- PASS: TestCompare_Index_Drop (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6460986Z === RUN   TestCompare_Constraint_Add
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6461255Z --- PASS: TestCompare_Constraint_Add (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6461518Z === RUN   TestCompare_ForeignKey_Add
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6461782Z --- PASS: TestCompare_ForeignKey_Add (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6462058Z === RUN   TestCompare_ForeignKey_Alter
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6462333Z --- PASS: TestCompare_ForeignKey_Alter (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6463064Z === RUN   TestCompare_DropMaterializedView
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6463437Z --- PASS: TestCompare_DropMaterializedView (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6463771Z === RUN   TestCompare_AlterMaterializedView
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6464082Z --- PASS: TestCompare_AlterMaterializedView (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6464378Z === RUN   TestCompare_DropFunction
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6464638Z --- PASS: TestCompare_DropFunction (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6464905Z === RUN   TestCompare_DropTrigger
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6465175Z --- PASS: TestCompare_DropTrigger (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6465449Z === RUN   TestCompare_DropGrant
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6465700Z --- PASS: TestCompare_DropGrant (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6465968Z === RUN   TestCompare_ColumnNullableChange
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6466522Z --- PASS: TestCompare_ColumnNullableChange (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6466829Z === RUN   TestCompare_ColumnDefaultChange
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6467122Z --- PASS: TestCompare_ColumnDefaultChange (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6467439Z === RUN   TestSQLGenerator_SqlServer_AlterColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6467991Z --- PASS: TestSQLGenerator_SqlServer_AlterColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6468362Z === RUN   TestSQLGenerator_SqlServer_DropColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6468686Z --- PASS: TestSQLGenerator_SqlServer_DropColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6469021Z === RUN   TestSQLGenerator_SqlServer_DropConstraint
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6469365Z --- PASS: TestSQLGenerator_SqlServer_DropConstraint (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6469710Z === RUN   TestSQLGenerator_SqlServer_DropForeignKey
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6470057Z --- PASS: TestSQLGenerator_SqlServer_DropForeignKey (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6470383Z === RUN   TestSQLGenerator_CreateTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6470664Z --- PASS: TestSQLGenerator_CreateTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6470942Z === RUN   TestSQLGenerator_DropTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6471212Z --- PASS: TestSQLGenerator_DropTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6471482Z === RUN   TestSQLGenerator_AddColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6471752Z --- PASS: TestSQLGenerator_AddColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6472018Z === RUN   TestSQLGenerator_DropColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6472294Z --- PASS: TestSQLGenerator_DropColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6472564Z === RUN   TestSQLGenerator_AlterColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6472837Z --- PASS: TestSQLGenerator_AlterColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6473118Z === RUN   TestSQLGenerator_CreateIndex
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6473386Z --- PASS: TestSQLGenerator_CreateIndex (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6473660Z === RUN   TestSQLGenerator_DropIndex
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6474088Z --- PASS: TestSQLGenerator_DropIndex (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6474364Z === RUN   TestSQLGenerator_AddConstraint
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6474646Z --- PASS: TestSQLGenerator_AddConstraint (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6474938Z === RUN   TestSQLGenerator_DropConstraint
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6475227Z --- PASS: TestSQLGenerator_DropConstraint (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6475520Z === RUN   TestSQLGenerator_CreateSequence
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6475809Z --- PASS: TestSQLGenerator_CreateSequence (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6476111Z === RUN   TestSQLGenerator_TransactionWrapper
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6476657Z --- PASS: TestSQLGenerator_TransactionWrapper (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6476958Z === RUN   TestSQLGenerator_EmptyDiffs
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6477233Z --- PASS: TestSQLGenerator_EmptyDiffs (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6477507Z === RUN   TestSQLGenerator_MultipleDiffs
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6477797Z --- PASS: TestSQLGenerator_MultipleDiffs (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6478076Z === RUN   TestSQLGenerator_View
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6478331Z --- PASS: TestSQLGenerator_View (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6478606Z === RUN   TestSQLGenerator_MaterializedView
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6478901Z --- PASS: TestSQLGenerator_MaterializedView (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6479197Z === RUN   TestSQLGenerator_Function
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6479454Z --- PASS: TestSQLGenerator_Function (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6479720Z === RUN   TestSQLGenerator_Trigger
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6479972Z --- PASS: TestSQLGenerator_Trigger (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6480373Z === RUN   TestSQLGenerator_Grant
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6480622Z --- PASS: TestSQLGenerator_Grant (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6480891Z === RUN   TestSQLGeneratorMySQL_AddColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6481183Z --- PASS: TestSQLGeneratorMySQL_AddColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6481478Z === RUN   TestSQLGeneratorMySQL_AlterColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6481774Z --- PASS: TestSQLGeneratorMySQL_AlterColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6482083Z === RUN   TestSQLGeneratorMySQL_DropForeignKey
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6482413Z --- PASS: TestSQLGeneratorMySQL_DropForeignKey (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6482729Z === RUN   TestSQLGeneratorMySQL_DropConstraint
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6483046Z --- PASS: TestSQLGeneratorMySQL_DropConstraint (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6483358Z === RUN   TestSQLGeneratorMySQL_CreateTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6483652Z --- PASS: TestSQLGeneratorMySQL_CreateTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6483955Z === RUN   TestSQLGeneratorMySQL_DropColumn
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6484251Z --- PASS: TestSQLGeneratorMySQL_DropColumn (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6484566Z === RUN   TestSQLGeneratorMySQL_AlterForeignKey
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6484884Z --- PASS: TestSQLGeneratorMySQL_AlterForeignKey (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6485317Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6485496Z coverage: 73.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6485859Z ok  	github.com/meru143/dbdiff/internal/diff	1.029s	coverage: 73.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6486558Z 	github.com/meru143/dbdiff/internal/errors		coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6487058Z 	github.com/meru143/dbdiff/internal/logging		coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6487421Z === RUN   TestFormatSQL
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6487638Z --- PASS: TestFormatSQL (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6487873Z === RUN   TestFormatTable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6488094Z --- PASS: TestFormatTable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6488339Z === RUN   TestFormatMigration
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6488576Z --- PASS: TestFormatMigration (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6488832Z === RUN   TestFormatExecutable
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6489084Z --- PASS: TestFormatExecutable (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6489312Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6489481Z coverage: 50.3% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6489839Z ok  	github.com/meru143/dbdiff/internal/output	1.019s	coverage: 50.3% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6490257Z === RUN   TestBackupManager_NewBackupManager
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6490570Z --- PASS: TestBackupManager_NewBackupManager (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6490873Z === RUN   TestBackupManager_Backup
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6491136Z --- PASS: TestBackupManager_Backup (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6491559Z === RUN   TestBackupManager_RestorePath
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6491850Z --- PASS: TestBackupManager_RestorePath (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6492139Z === RUN   TestBackupManager_CustomPrefix
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6492431Z --- PASS: TestBackupManager_CustomPrefix (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6492716Z === RUN   TestValidator_NewValidator
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6492985Z --- PASS: TestValidator_NewValidator (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6493259Z === RUN   TestValidator_IsProtected
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6493531Z === RUN   TestValidator_IsProtected/users_table
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6493832Z === RUN   TestValidator_IsProtected/accounts_table
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6494134Z === RUN   TestValidator_IsProtected/other_table
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6494413Z === RUN   TestValidator_IsProtected/empty
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6494690Z --- PASS: TestValidator_IsProtected (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6495073Z     --- PASS: TestValidator_IsProtected/users_table (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6495502Z     --- PASS: TestValidator_IsProtected/accounts_table (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6495917Z     --- PASS: TestValidator_IsProtected/other_table (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6496510Z     --- PASS: TestValidator_IsProtected/empty (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6496811Z === RUN   TestValidator_ValidateDiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6497081Z --- PASS: TestValidator_ValidateDiff (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6497365Z === RUN   TestValidator_SetProtectedObjects
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6497795Z --- PASS: TestValidator_SetProtectedObjects (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6498064Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6498247Z coverage: 51.6% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6498606Z ok  	github.com/meru143/dbdiff/internal/safety	1.017s	coverage: 51.6% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6499142Z 	github.com/meru143/dbdiff/internal/testhelper		coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6499510Z === RUN   TestInitialModel
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6499741Z --- PASS: TestInitialModel (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6499991Z === RUN   TestModelSelectionToggle
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6500259Z --- PASS: TestModelSelectionToggle (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6500506Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6500680Z coverage: 28.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6501033Z ok  	github.com/meru143/dbdiff/internal/tui	1.018s	coverage: 28.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6501397Z === RUN   TestSchema_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6501617Z --- PASS: TestSchema_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6501844Z === RUN   TestTable_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6502067Z --- PASS: TestTable_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6502292Z === RUN   TestColumn_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6502511Z --- PASS: TestColumn_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6502738Z === RUN   TestForeignKey_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6502978Z --- PASS: TestForeignKey_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6503228Z === RUN   TestSequence_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6503451Z --- PASS: TestSequence_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6503689Z === RUN   TestIndex_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6503899Z --- PASS: TestIndex_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6504137Z === RUN   TestConstraint_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6504366Z --- PASS: TestConstraint_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6504611Z === RUN   TestView_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6504817Z --- PASS: TestView_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6505054Z === RUN   TestMaterializedView_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6505326Z --- PASS: TestMaterializedView_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6505586Z === RUN   TestFunction_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6505812Z --- PASS: TestFunction_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6506045Z === RUN   TestTrigger_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6506567Z --- PASS: TestTrigger_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6506804Z === RUN   TestGrant_JSON
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6507023Z --- PASS: TestGrant_JSON (0.00s)
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6507233Z PASS
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6507412Z coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.6507747Z ok  	github.com/meru143/dbdiff/pkg/types	1.016s	coverage: 0.0% of statements
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7602168Z ##[group]Run COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7603724Z [36;1mCOVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7604543Z [36;1mecho "Coverage: $COVERAGE%"[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7605060Z [36;1mif (( $(echo "$COVERAGE < 20" | bc -l) )); then[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7605658Z [36;1m  echo "Coverage $COVERAGE% is below 20% threshold"[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7606692Z [36;1m  exit 1[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7607039Z [36;1mfi[0m
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7657921Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.7658252Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9042760Z Coverage: 43.8%
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9288769Z ##[group]Run golangci/golangci-lint-action@v4
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9289082Z with:
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9289256Z   version: latest
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9289654Z   github-token: ***
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9289853Z   only-new-issues: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9290057Z   skip-cache: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9290248Z   skip-pkg-cache: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9290464Z   skip-build-cache: false
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9290681Z   install-mode: binary
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:56.9290869Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.0893191Z ##[group]prepare environment
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.0897859Z Checking for go.mod: go.mod
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2397428Z ##[warning]Failed to restore: Cache service responded with 400
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2407297Z Cache not found for input keys: golangci-lint.cache-2931-9207c6e53e92310b846448b07c236ddcb8fcee3c, golangci-lint.cache-2931-
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2408476Z Finding needed golangci-lint version...
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2623141Z Requested golangci-lint 'latest', using 'v1.64.8', calculation took 24ms
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2623649Z Installation mode: binary
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2624606Z Installing golangci-lint binary v1.64.8...
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.2627468Z Downloading binary https://github.com/golangci/golangci-lint/releases/download/v1.64.8/golangci-lint-1.64.8-linux-amd64.tar.gz ...
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.4259481Z [command]/usr/bin/tar xz --overwrite --warning=no-unknown-keyword --overwrite -C /home/runner -f /home/runner/work/_temp/4d188c51-6575-4dca-a3cf-b4905727587a
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.6456688Z Installed golangci-lint into /home/runner/golangci-lint-1.64.8-linux-amd64/golangci-lint in 383ms
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.6457683Z Prepared env in 556ms
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.6458452Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.6460069Z ##[group]run golangci-lint
+unit-tests	UNKNOWN STEP	2026-03-06T09:35:57.6465674Z Running [/home/runner/golangci-lint-1.64.8-linux-amd64/golangci-lint run --out-format=github-actions] in [] ...
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2757766Z ##[error]SA1019: postgres.RunContainer is deprecated: use Run instead RunContainer creates an instance of the Postgres container type  (staticcheck)
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2759894Z 
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2760675Z level=warning msg="[config_reader] The output format `github-actions` is deprecated, please use `colored-line-number`"
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2761484Z 
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2762316Z ##[error]issues found
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2763409Z Ran golangci-lint in 13628ms
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2764103Z ##[endgroup]
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.2934672Z Post job cleanup.
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:11.4919409Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/dbdiff/dbdiff --files-from manifest.txt --use-compress-program zstdmt
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.5897047Z ##[warning]Failed to save: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0DaCqaQAAAACzF3TQpClhSphNlo9LUBZPUEhMMzBFREdFMDIwNwBFZGdl
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.6447362Z Saved cache for golangci-lint from paths '/home/runner/.cache/golangci-lint, /home/runner/.cache/go-build, /home/runner/go/pkg' in 2188ms
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.6601756Z Post job cleanup.
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7594640Z [command]/usr/bin/git version
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7651413Z git version 2.53.0
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7717876Z Temporarily overriding HOME='/home/runner/work/_temp/510a277c-4e33-449b-9457-7cde2864a161' before making global git config changes
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7719699Z Adding repository directory to the temporary git global config as a safe directory
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7738089Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/dbdiff/dbdiff
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7792339Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.7837433Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8116620Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8140810Z http.https://github.com/.extraheader
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8153621Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8186090Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8439232Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8472728Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+unit-tests	UNKNOWN STEP	2026-03-06T09:36:13.8822625Z Cleaning up orphan processes

@@ -92,7 +92,7 @@ var MigrateCmd = &cobra.Command{
 			return fmt.Errorf("failed to introspect target: %w", err)
 		}
 
-		differences := diff.Compare(sourceSchema, targetSchema)
+		differences := diff.NewDiffEngine(sourceSchema, targetSchema, sourceDriver.NormalizeType).Compare()
 
 		if len(differences) == 0 {
 			logging.Info("No differences found!")

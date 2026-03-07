@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/meru143/dbdiff/internal/db/mssql"
@@ -29,8 +30,7 @@ func NewDriver(connStr string) (Driver, error) {
 		return mssql.New(), nil
 
 	default:
-		// Default to PostgreSQL for backwards compatibility with raw host:port strings
-		return postgres.New(), nil
+		return nil, fmt.Errorf("unsupported database scheme or missing prefix in connection string: %s", connStr)
 	}
 }
 

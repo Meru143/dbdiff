@@ -13,56 +13,63 @@ type Schema struct {
 	Functions         []Function         `json:"functions,omitempty"`
 	Triggers          []Trigger          `json:"triggers,omitempty"`
 	Grants            []Grant            `json:"grants,omitempty"`
+	Options           map[string]any     `json:"options,omitempty"`
 }
 
 type Table struct {
-	Name        string       `json:"name"`
-	Columns     []Column     `json:"columns"`
-	Indexes     []Index      `json:"indexes,omitempty"`
-	Constraints []Constraint `json:"constraints,omitempty"`
-	ForeignKeys []ForeignKey `json:"foreign_keys,omitempty"`
+	Name        string         `json:"name"`
+	Columns     []Column       `json:"columns"`
+	Indexes     []Index        `json:"indexes,omitempty"`
+	Constraints []Constraint   `json:"constraints,omitempty"`
+	ForeignKeys []ForeignKey   `json:"foreign_keys,omitempty"`
+	Options     map[string]any `json:"options,omitempty"`
 }
 
 type Column struct {
-	Name         string  `json:"name"`
-	DataType     string  `json:"data_type"`
-	DefaultValue *string `json:"default_value,omitempty"`
-	IsNullable   bool    `json:"is_nullable"`
-	IsPrimaryKey bool    `json:"is_primary_key,omitempty"`
+	Name         string         `json:"name"`
+	DataType     string         `json:"data_type"`
+	DefaultValue *string        `json:"default_value,omitempty"`
+	IsNullable   bool           `json:"is_nullable"`
+	IsPrimaryKey bool           `json:"is_primary_key,omitempty"`
+	Options      map[string]any `json:"options,omitempty"`
 }
 
 type Index struct {
-	Name       string   `json:"name"`
-	Columns    []string `json:"columns,omitempty"`
-	IsUnique   bool     `json:"is_unique"`
-	IsPrimary  bool     `json:"is_primary"`
-	Definition string   `json:"definition"`
+	Name       string         `json:"name"`
+	Columns    []string       `json:"columns,omitempty"`
+	IsUnique   bool           `json:"is_unique"`
+	IsPrimary  bool           `json:"is_primary"`
+	Definition string         `json:"definition"`
+	Options    map[string]any `json:"options,omitempty"`
 }
 
 type Constraint struct {
-	Name    string   `json:"name"`
-	Type    string   `json:"type"` // PRIMARY KEY, UNIQUE, CHECK, FOREIGN KEY
-	Columns []string `json:"columns,omitempty"`
+	Name    string         `json:"name"`
+	Type    string         `json:"type"` // PRIMARY KEY, UNIQUE, CHECK, FOREIGN KEY
+	Columns []string       `json:"columns,omitempty"`
+	Options map[string]any `json:"options,omitempty"`
 }
 
 type ForeignKey struct {
-	Name                 string   `json:"name"`
-	Columns              []string `json:"columns"`
-	RefTable             string   `json:"reference_table"`
-	RefColumns           []string `json:"reference_columns"`
-	UniqueConstraintName string   `json:"unique_constraint_name,omitempty"`
-	OnDelete             string   `json:"on_delete,omitempty"`
-	OnUpdate             string   `json:"on_update,omitempty"`
+	Name                 string         `json:"name"`
+	Columns              []string       `json:"columns"`
+	RefTable             string         `json:"reference_table"`
+	RefColumns           []string       `json:"reference_columns"`
+	UniqueConstraintName string         `json:"unique_constraint_name,omitempty"`
+	OnDelete             string         `json:"on_delete,omitempty"`
+	OnUpdate             string         `json:"on_update,omitempty"`
+	Options              map[string]any `json:"options,omitempty"`
 }
 
 type Sequence struct {
-	Name      string `json:"name"`
-	Start     int64  `json:"start,omitempty"`
-	MinValue  int64  `json:"min_value,omitempty"`
-	MaxValue  int64  `json:"max_value,omitempty"`
-	Increment int64  `json:"increment,omitempty"`
-	Cache     int64  `json:"cache,omitempty"`
-	Cycle     bool   `json:"cycle,omitempty"`
+	Name      string         `json:"name"`
+	Start     int64          `json:"start,omitempty"`
+	MinValue  int64          `json:"min_value,omitempty"`
+	MaxValue  int64          `json:"max_value,omitempty"`
+	Increment int64          `json:"increment,omitempty"`
+	Cache     int64          `json:"cache,omitempty"`
+	Cycle     bool           `json:"cycle,omitempty"`
+	Options   map[string]any `json:"options,omitempty"`
 }
 
 // Type represents a custom PostgreSQL type
@@ -74,14 +81,16 @@ type Type struct {
 
 // View represents a database view
 type View struct {
-	Name       string `json:"name"`
-	Definition string `json:"definition"`
+	Name       string         `json:"name"`
+	Definition string         `json:"definition"`
+	Options    map[string]any `json:"options,omitempty"`
 }
 
 // MaterializedView represents a PostgreSQL materialized view
 type MaterializedView struct {
-	Name       string `json:"name"`
-	Definition string `json:"definition"`
+	Name       string         `json:"name"`
+	Definition string         `json:"definition"`
+	Options    map[string]any `json:"options,omitempty"`
 }
 
 // Function represents a PostgreSQL stored procedure or function

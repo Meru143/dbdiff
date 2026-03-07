@@ -27,6 +27,28 @@ func New() *Driver {
 func (d *Driver) Name() string    { return "postgres" }
 func (d *Driver) Dialect() string { return "postgresql" }
 
+// NormalizeType normalizes a database-specific data type into a standard format
+func (d *Driver) NormalizeType(dataType string) string {
+	switch dataType {
+	case "character varying", "varchar":
+		return "varchar"
+	case "integer", "int4":
+		return "integer"
+	case "bigint", "int8":
+		return "bigint"
+	case "timestamp without time zone":
+		return "timestamp"
+	case "timestamp with time zone":
+		return "timestamptz"
+	case "boolean", "bool":
+		return "boolean"
+	case "numeric", "decimal":
+		return "numeric"
+	default:
+		return dataType
+	}
+}
+
 // Connect establishes a connection to PostgreSQL with retry logic
 func (d *Driver) Connect(ctx context.Context, connStr, sslMode string, timeout time.Duration) error {
 	var lastErr error

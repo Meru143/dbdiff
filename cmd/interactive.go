@@ -67,7 +67,7 @@ var InteractiveCmd = &cobra.Command{
 			return fmt.Errorf("failed to introspect target: %w", err)
 		}
 
-		differences := diff.Compare(sourceSchema, targetSchema)
+		differences := diff.NewDiffEngine(sourceSchema, targetSchema, sourceDriver.NormalizeType).Compare()
 
 		if len(differences) == 0 {
 			logging.Info("Both schemas are perfectly equivalent! No differences found.")

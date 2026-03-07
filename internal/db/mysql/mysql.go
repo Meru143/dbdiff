@@ -82,6 +82,22 @@ func (d *Driver) Dialect() string {
 	return "mysql"
 }
 
+// NormalizeType normalizes a database-specific data type into a standard format
+func (d *Driver) NormalizeType(dataType string) string {
+	switch dataType {
+	case "int", "integer", "mediumint", "smallint", "tinyint":
+		return "integer"
+	case "varchar", "char", "text", "mediumtext", "longtext", "tinytext":
+		return "varchar"
+	case "decimal", "numeric", "double", "float":
+		return "numeric"
+	case "datetime", "timestamp":
+		return "timestamp"
+	default:
+		return dataType
+	}
+}
+
 // Introspect performs full schema introspection for MySQL
 func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
 	if schema == "" {
