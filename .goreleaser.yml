@@ -76,13 +76,13 @@ release:
   footer: |
     **Full Changelog**: https://github.com/Meru143/dbdiff/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-brews:
-  - repository:
-      owner: Meru143
-      name: homebrew-dbdiff
-    name: dbdiff
-    homepage: "https://github.com/Meru143/dbdiff"
-    description: "Multi-database schema comparison and migration CLI tool"
-    license: "MIT"
-    install: bin.install "dbdiff"
-    test: system "#{bin}/dbdiff", "--help"
+# brews:
+#   - repository:
+#       owner: Meru143
+#       name: homebrew-dbdiff
+#     name: dbdiff
+#     homepage: "https://github.com/Meru143/dbdiff"
+#     description: "Multi-database schema comparison and migration CLI tool"
+#     license: "MIT"
+#     install: bin.install "dbdiff"
+#     test: system "#{bin}/dbdiff", "--help"
