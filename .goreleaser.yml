@@ -76,7 +76,7 @@ release:
   footer: |
     **Full Changelog**: https://github.com/Meru143/dbdiff/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-homebrews:
+brews:
   - repository:
       owner: Meru143
       name: homebrew-dbdiff
