@@ -8,7 +8,7 @@ before:
 
 builds:
   - id: dbdiff
-    main: ./
+    main: .
     binary: dbdiff
     env:
       - CGO_ENABLED=0
@@ -76,7 +76,7 @@ release:
   footer: |
     **Full Changelog**: https://github.com/Meru143/dbdiff/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-brews:
+homebrews:
   - repository:
       owner: Meru143
       name: homebrew-dbdiff
