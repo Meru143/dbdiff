@@ -21,6 +21,12 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Run GoReleaser Check
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          args: check
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
