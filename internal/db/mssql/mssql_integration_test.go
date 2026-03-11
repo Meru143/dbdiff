@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/docker/go-connections/nat"
 )
 
 func TestMSSQLIntrospectionIntegration(t *testing.T) {
@@ -31,7 +32,9 @@ func TestMSSQLIntrospectionIntegration(t *testing.T) {
 			"ACCEPT_EULA":       "Y",
 			"MSSQL_SA_PASSWORD": "StrongPassword123!",
 		},
-		WaitingFor: wait.ForLog("SQL Server is now ready for client connections.").WithStartupTimeout(120 * time.Second),
+		WaitingFor: wait.ForSQL("1433/tcp", "sqlserver", func(host string, port nat.Port) string {
+			return fmt.Sprintf("sqlserver://sa:StrongPassword123!@%s:%s?database=master&encrypt=disable", host, port.Port())
+		}).WithStartupTimeout(120 * time.Second),
 	}
 
 	mssqlC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
