@@ -7,6 +7,10 @@
 
 Multi-database schema comparison and migration CLI tool. Supports **PostgreSQL**, **MySQL**, and **SQL Server**.
 
+Live page: [merup.me/dbdiff](https://merup.me/dbdiff/)
+
+DBDiff keeps schema comparison and migration generation in one CLI so you can inspect drift, review the generated SQL, and move forward without bouncing between separate tools or dialect-specific scripts.
+
 ## Features
 
 - Compare database schemas between two instances

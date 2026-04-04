@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DBDiff | Compare database schemas and generate migration SQL</title>
+    <meta
+      name="description"
+      content="DBDiff compares PostgreSQL, MySQL, and SQL Server schemas and generates migration SQL with dialect-aware output."
+    />
+    <meta property="og:title" content="DBDiff | Compare database schemas and generate migration SQL" />
+    <meta
+      property="og:description"
+      content="Diff two database schemas, review the generated migration plan, and keep the workflow in one CLI across PostgreSQL, MySQL, and SQL Server."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://merup.me/dbdiff/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Source+Code+Pro:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <a class="brand" href="https://github.com/Meru143/dbdiff">DBDiff</a>
+        <nav>
+          <a href="#compare">Compare</a>
+          <a href="#dialects">Dialects</a>
+          <a href="#install">Install</a>
+          <a href="https://github.com/Meru143/dbdiff">GitHub</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Schema diff and migration SQL</p>
+            <h1>Review the schema drift before you run the migration.</h1>
+            <p class="lede">
+              DBDiff compares two databases, highlights structural differences, and generates
+              dialect-aware migration SQL for PostgreSQL, MySQL, and SQL Server from one CLI.
+            </p>
+            <div class="actions">
+              <a class="button primary" href="https://github.com/Meru143/dbdiff">Star on GitHub</a>
+              <a class="button secondary" href="#install">Install DBDiff</a>
+            </div>
+          </div>
+
+          <div class="schema-board">
+            <div class="schema-card source">
+              <p class="label">Source</p>
+              <pre><code>users
+id bigint pk
+email text unique
+name text
+created_at timestamptz</code></pre>
+            </div>
+            <div class="schema-card target">
+              <p class="label">Target</p>
+              <pre><code>users
+id bigint pk
+email varchar(255) unique
+display_name text
+created_at timestamptz
+updated_at timestamptz</code></pre>
+            </div>
+            <div class="schema-card sql">
+              <p class="label">Generated SQL</p>
+              <pre><code>ALTER TABLE users
+  RENAME COLUMN name TO display_name;
+
+ALTER TABLE users
+  ADD COLUMN updated_at timestamptz;</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="compare" class="section">
+          <div class="section-head">
+            <p class="eyebrow">Compare</p>
+            <h2>One CLI for schema inspection, SQL generation, and safer review loops.</h2>
+            <p>
+              The practical win is speed of review. Instead of flipping between different tools
+              for inspection and migration output, DBDiff keeps the diff, the dialect, and the
+              generated SQL in one flow.
+            </p>
+          </div>
+
+          <div class="cards">
+            <article class="card">
+              <h3>Diff first</h3>
+              <p>Compare two instances before you touch production and catch drift while it is still explainable.</p>
+            </article>
+            <article class="card">
+              <h3>Generate SQL</h3>
+              <p>Produce migration scripts in SQL, JSON, or table output depending on where the result needs to go next.</p>
+            </article>
+            <article class="card">
+              <h3>Dry run by default</h3>
+              <p>Review is the default posture, which makes it easier to trust the tool inside a delivery workflow.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="dialects" class="section split">
+          <div class="section-head">
+            <p class="eyebrow">Dialects</p>
+            <h2>PostgreSQL, MySQL, and SQL Server with dialect-aware DDL.</h2>
+            <p>
+              The tool is useful precisely because it does not flatten everything to one generic
+              SQL dialect. It keeps the generated statements close to the actual target platform.
+            </p>
+          </div>
+
+          <div class="dialect-grid">
+            <div class="dialect">
+              <span>PostgreSQL</span>
+              <p>`ALTER COLUMN TYPE`, schema-aware introspection, and transaction-friendly flows.</p>
+            </div>
+            <div class="dialect">
+              <span>MySQL</span>
+              <p>`MODIFY COLUMN` generation and MySQL-specific comparison behavior.</p>
+            </div>
+            <div class="dialect">
+              <span>SQL Server</span>
+              <p>Cross-instance diffing with SQL Server connection support built into the same CLI.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="install" class="section install">
+          <div class="section-head">
+            <p class="eyebrow">Install</p>
+            <h2>Short path to the first diff.</h2>
+            <p>
+              Go install is the cleanest starting point. After that, compare two schemas and inspect
+              the generated SQL before you wire the tool into a wider migration process.
+            </p>
+          </div>
+
+          <div class="install-grid">
+            <pre><code>go install github.com/meru143/dbdiff@latest
+
+dbdiff compare postgres://source postgres://target
+dbdiff migrate -s postgres://source -t postgres://target -o migration.sql</code></pre>
+            <pre><code>Output modes:
+
+- sql
+- table
+- json
+- dry-run review first</code></pre>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
