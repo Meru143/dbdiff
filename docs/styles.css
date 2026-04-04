@@ -1,12 +1,13 @@
 :root {
-  --bg: #eef4fb;
-  --panel: rgba(255, 255, 255, 0.82);
-  --panel-strong: rgba(255, 255, 255, 0.96);
+  --bg: #e8f0fa;
+  --panel: rgba(250, 252, 255, 0.84);
+  --panel-strong: rgba(252, 254, 255, 0.97);
   --ink: #132033;
   --muted: #58697f;
   --line: rgba(19, 32, 51, 0.1);
   --accent: #376dff;
   --accent-2: #15b89a;
+  --accent-3: #8e5cff;
   --shadow: 0 24px 80px rgba(18, 39, 84, 0.14);
 }
 
@@ -16,10 +17,23 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(55, 109, 255, 0.14), transparent 18%),
-    radial-gradient(circle at bottom right, rgba(21, 184, 154, 0.14), transparent 18%),
-    linear-gradient(180deg, #eef4fb 0%, #e8f0fa 100%);
+    radial-gradient(circle at top left, rgba(55, 109, 255, 0.16), transparent 20%),
+    radial-gradient(circle at 82% 18%, rgba(142, 92, 255, 0.12), transparent 16%),
+    radial-gradient(circle at bottom right, rgba(21, 184, 154, 0.16), transparent 20%),
+    linear-gradient(180deg, #edf4fc 0%, #dfe9f7 100%);
   font-family: "Syne", system-ui, sans-serif;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(19, 32, 51, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 32, 51, 0.025) 1px, transparent 1px);
+  background-size: 54px 54px;
+  content: "";
+  pointer-events: none;
 }
 
 a { color: inherit; text-decoration: none; }
