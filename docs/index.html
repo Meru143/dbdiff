@@ -15,6 +15,11 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://merup.me/dbdiff/" />
+    <meta property="og:image" content="https://merup.me/og/dbdiff.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://merup.me/og/dbdiff.jpg" />
+    <link rel="canonical" href="https://merup.me/dbdiff/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -84,7 +89,7 @@ ALTER TABLE users
             <p class="eyebrow">Compare</p>
             <h2>One CLI for schema inspection, SQL generation, and safer review loops.</h2>
             <p>
-              The practical win is speed of review. Instead of flipping between different tools
+              Review faster. Instead of flipping between different tools
               for inspection and migration output, DBDiff keeps the diff, the dialect, and the
               generated SQL in one flow.
             </p>
@@ -111,8 +116,8 @@ ALTER TABLE users
             <p class="eyebrow">Dialects</p>
             <h2>PostgreSQL, MySQL, and SQL Server with dialect-aware DDL.</h2>
             <p>
-              The tool is useful precisely because it does not flatten everything to one generic
-              SQL dialect. It keeps the generated statements close to the actual target platform.
+              DBDiff does not flatten everything to one generic SQL dialect. Generated statements
+              stay close to the actual target platform.
             </p>
           </div>
 
@@ -156,6 +161,12 @@ dbdiff migrate -s postgres://source -t postgres://target -o migration.sql</code>
           </div>
         </section>
       </main>
+
+      <footer class="site-footer">
+        An instrument by <a href="https://merup.me/">Meru Patel</a> ·
+        <a href="https://merup.me/work/dbdiff">Case study</a> ·
+        <a href="https://merup.me/#work">More instruments</a>
+      </footer>
     </div>
   </body>
 </html>
