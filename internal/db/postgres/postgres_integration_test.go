@@ -7,6 +7,7 @@ import (
 
 	"github.com/meru143/dbdiff/internal/db"
 	_ "github.com/meru143/dbdiff/internal/db/postgres"
+	testhelper "github.com/meru143/dbdiff/internal/testhelper"
 	"github.com/meru143/dbdiff/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,4 +107,7 @@ func TestPostgresIntrospectionIntegration(t *testing.T) {
 		}
 	}
 	assert.True(t, hasUsernameIdx, "Expected idx_users_username to exist")
+
+	// 6. Generated index DDL runs on the server and recreates the index exactly
+	testhelper.RoundTripIndex(ctx, t, driver, "public", "users", "idx_users_username")
 }

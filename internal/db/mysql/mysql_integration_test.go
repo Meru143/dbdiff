@@ -8,6 +8,7 @@ import (
 
 	"github.com/meru143/dbdiff/internal/db"
 	_ "github.com/meru143/dbdiff/internal/db/mysql"
+	testhelper "github.com/meru143/dbdiff/internal/testhelper"
 	"github.com/meru143/dbdiff/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,4 +136,7 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 		}
 	}
 	assert.True(t, foundView, "Expected v_active_products view to exist")
+
+	// Generated index DDL runs on the server and recreates the index exactly
+	testhelper.RoundTripIndex(ctx, t, driver, "testdb", "products", "idx_products_name")
 }

@@ -72,29 +72,152 @@ func TestSQLGenerator_AlterColumn(t *testing.T) {
 	}
 }
 
-func TestSQLGenerator_CreateIndex(t *testing.T) {
-	diffs := types.DiffList{
-		{Type: types.DiffAdd, Object: types.ObjectIndex, Name: "users_email_idx", TableName: "users"},
-	}
-	gen := NewSQLGenerator(diffs, "public", "postgresql")
-	gen.SetTransaction(false)
-	sql := gen.Generate()
+func TestSQLGenerator_IndexDDL(t *testing.T) {
+	email := &types.Index{Name: "idx_users_email", Columns: []string{"email"}}
+	orgEmail := &types.Index{Name: "uq_users_org_email", Columns: []string{"org_id", "email"}, IsUnique: true}
+	// What PostgreSQL's pg_get_indexdef returns: the predicate is lost if rebuilt from columns.
+	partial := &types.Index{Name: "idx_users_email", Columns: []string{"email"},
+		Definition: "CREATE INDEX idx_users_email ON public.users USING btree (email) WHERE (deleted_at IS NULL)"}
+	pgUnique := &types.Index{Name: "uq_users_email", Columns: []string{"email"}, IsUnique: true,
+		Definition: "CREATE UNIQUE INDEX uq_users_email ON public.users USING btree (email)"}
 
-	if !strings.Contains(sql, "CREATE INDEX") {
-		t.Errorf("Expected CREATE INDEX, got: %s", sql)
+	index := func(typ types.DiffType, idx *types.Index) types.Diff {
+		return types.Diff{Type: typ, Object: types.ObjectIndex, Name: idx.Name, TableName: "users", Index: idx}
+	}
+	drop := types.Diff{Type: types.DiffDrop, Object: types.ObjectIndex, Name: "idx_users_email", TableName: "users"}
+
+	tests := []struct {
+		name        string
+		dialect     string
+		schema      string
+		transaction bool
+		diff        types.Diff
+		want        string
+	}{
+		{
+			name: "postgresql/create from server definition inside a transaction", dialect: "postgresql", schema: "public",
+			transaction: true, diff: index(types.DiffAdd, partial),
+			want: "-- Create index: idx_users_email\n" +
+				"CREATE INDEX idx_users_email ON public.users USING btree (email) WHERE (deleted_at IS NULL);",
+		},
+		{
+			name: "postgresql/create concurrently outside a transaction", dialect: "postgresql", schema: "public",
+			diff: index(types.DiffAdd, partial),
+			want: "-- Create index: idx_users_email\n" +
+				"CREATE INDEX CONCURRENTLY idx_users_email ON public.users USING btree (email) WHERE (deleted_at IS NULL);",
+		},
+		{
+			name: "postgresql/create unique concurrently from server definition", dialect: "postgresql", schema: "public",
+			diff: index(types.DiffAdd, pgUnique),
+			want: "-- Create index: uq_users_email\n" +
+				"CREATE UNIQUE INDEX CONCURRENTLY uq_users_email ON public.users USING btree (email);",
+		},
+		{
+			name: "postgresql/create unique from columns", dialect: "postgresql", schema: "app",
+			diff: index(types.DiffAdd, orgEmail),
+			want: "-- Create index: uq_users_org_email\n" +
+				"CREATE UNIQUE INDEX CONCURRENTLY uq_users_org_email ON app.users (org_id, email);",
+		},
+		{
+			name: "postgresql/drop inside a transaction", dialect: "postgresql", schema: "public",
+			transaction: true, diff: drop,
+			want: "-- Drop index: idx_users_email\nDROP INDEX IF EXISTS idx_users_email;",
+		},
+		{
+			name: "postgresql/drop concurrently by schema-qualified name", dialect: "postgresql", schema: "app",
+			diff: drop,
+			want: "-- Drop index: idx_users_email\nDROP INDEX CONCURRENTLY IF EXISTS app.idx_users_email;",
+		},
+		{
+			name: "postgresql/recreate inside a transaction", dialect: "postgresql", schema: "public",
+			transaction: true, diff: index(types.DiffAlter, partial),
+			want: "-- Recreate index: idx_users_email\n" +
+				"DROP INDEX IF EXISTS idx_users_email;\n" +
+				"CREATE INDEX idx_users_email ON public.users USING btree (email) WHERE (deleted_at IS NULL);",
+		},
+		{
+			name: "postgresql/recreate concurrently", dialect: "postgresql", schema: "public",
+			diff: index(types.DiffAlter, email),
+			want: "-- Recreate index: idx_users_email\n" +
+				"DROP INDEX CONCURRENTLY IF EXISTS idx_users_email;\n" +
+				"CREATE INDEX CONCURRENTLY idx_users_email ON users (email);",
+		},
+		{
+			name: "mysql/create never uses CONCURRENTLY", dialect: "mysql",
+			diff: index(types.DiffAdd, email),
+			want: "-- Create index: idx_users_email\nCREATE INDEX idx_users_email ON users (email);",
+		},
+		{
+			name: "mysql/create unique ignores a PostgreSQL definition", dialect: "mysql",
+			diff: index(types.DiffAdd, pgUnique),
+			want: "-- Create index: uq_users_email\nCREATE UNIQUE INDEX uq_users_email ON users (email);",
+		},
+		{
+			name: "mysql/drop names the table", dialect: "mysql",
+			diff: drop,
+			want: "-- Drop index: idx_users_email\nDROP INDEX idx_users_email ON users;",
+		},
+		{
+			name: "mysql/recreate", dialect: "mysql", transaction: true,
+			diff: index(types.DiffAlter, orgEmail),
+			want: "-- Recreate index: uq_users_org_email\n" +
+				"DROP INDEX uq_users_org_email ON users;\n" +
+				"CREATE UNIQUE INDEX uq_users_org_email ON users (org_id, email);",
+		},
+		{
+			name: "sqlserver/create unique", dialect: "sqlserver", schema: "dbo",
+			diff: index(types.DiffAdd, orgEmail),
+			want: "-- Create index: uq_users_org_email\nCREATE UNIQUE INDEX uq_users_org_email ON dbo.users (org_id, email);",
+		},
+		{
+			name: "sqlserver/drop names the table", dialect: "sqlserver", schema: "dbo",
+			diff: drop,
+			want: "-- Drop index: idx_users_email\nDROP INDEX idx_users_email ON dbo.users;",
+		},
+		{
+			name: "sqlserver/recreate", dialect: "sqlserver", schema: "dbo", transaction: true,
+			diff: index(types.DiffAlter, partial),
+			want: "-- Recreate index: idx_users_email\n" +
+				"DROP INDEX idx_users_email ON dbo.users;\n" +
+				"CREATE INDEX idx_users_email ON dbo.users (email);",
+		},
+		{
+			name: "missing definition never drops the index", dialect: "postgresql",
+			diff: types.Diff{Type: types.DiffAlter, Object: types.ObjectIndex, Name: "idx_users_email", TableName: "users"},
+			want: "-- Index idx_users_email on users: definition not available, write this change by hand",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := NewSQLGenerator(types.DiffList{tt.diff}, tt.schema, tt.dialect)
+			gen.SetTransaction(tt.transaction)
+			if got := gen.generateIndexDiff(&tt.diff); got != tt.want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestSQLGenerator_DropIndex(t *testing.T) {
+func TestSQLGenerator_ConcurrentlyNeverInsideTransaction(t *testing.T) {
+	idx := &types.Index{Name: "idx_users_email", Columns: []string{"email"}}
 	diffs := types.DiffList{
-		{Type: types.DiffDrop, Object: types.ObjectIndex, Name: "users_email_idx"},
+		{Type: types.DiffAdd, Object: types.ObjectIndex, Name: idx.Name, TableName: "users", Index: idx},
+		{Type: types.DiffDrop, Object: types.ObjectIndex, Name: "idx_users_old", TableName: "users"},
 	}
+
+	// The generator's own DO block is a function body, where CONCURRENTLY is rejected too.
+	wrapped := NewSQLGenerator(diffs, "public", "postgresql").Generate()
+	if !strings.Contains(wrapped, "DO $$") || strings.Contains(wrapped, "CONCURRENTLY") {
+		t.Errorf("Expected a DO block without CONCURRENTLY, got: %s", wrapped)
+	}
+
+	// A caller that adds its own BEGIN/COMMIT turns CONCURRENTLY off.
 	gen := NewSQLGenerator(diffs, "public", "postgresql")
 	gen.SetTransaction(false)
-	sql := gen.Generate()
-
-	if !strings.Contains(sql, "DROP INDEX") {
-		t.Errorf("Expected DROP INDEX, got: %s", sql)
+	gen.SetConcurrently(false)
+	if sql := gen.Generate(); strings.Contains(sql, "CONCURRENTLY") {
+		t.Errorf("Expected no CONCURRENTLY, got: %s", sql)
 	}
 }
 

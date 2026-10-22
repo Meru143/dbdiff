@@ -377,6 +377,7 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 				Object:    types.ObjectIndex,
 				Name:      name,
 				TableName: sourceTable.Name,
+				Index:     idx,
 			})
 		} else {
 			// Index definition change
@@ -389,6 +390,7 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 					TableName: sourceTable.Name,
 					OldValue:  targetIdx.Definition,
 					NewValue:  idx.Definition,
+					Index:     idx,
 				})
 			}
 		}

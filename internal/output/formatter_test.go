@@ -3,6 +3,7 @@ package output
 import (
 	"testing"
 
+	dbdiff "github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -13,7 +14,7 @@ func TestFormatSQL(t *testing.T) {
 		{Type: types.DiffAdd, Object: types.ObjectColumn, Name: "email", TableName: "users"},
 	}
 
-	result := formatter.formatSQL(diffs)
+	result := formatter.formatSQL(diffs, false)
 
 	if len(result) == 0 {
 		t.Error("Expected non-empty result")
@@ -100,6 +101,39 @@ func TestFormatExecutable(t *testing.T) {
 		if !contains(result, exp) {
 			t.Errorf("Expected executable script to contain %q", exp)
 		}
+	}
+}
+
+func TestFormatMigration_IndexConcurrentlyOnlyOutsideTransaction(t *testing.T) {
+	idx := types.Index{Name: "idx_users_email", Columns: []string{"email"},
+		Definition: "CREATE INDEX idx_users_email ON public.users USING btree (email)"}
+	source := &types.Schema{Tables: []types.Table{{Name: "users", Indexes: []types.Index{idx}}}}
+	target := &types.Schema{Tables: []types.Table{{Name: "users"}}}
+	diffs := dbdiff.Compare(source, target)
+
+	plain := "CREATE INDEX idx_users_email ON public.users USING btree (email);"
+	tests := []struct {
+		name        string
+		executable  bool
+		transaction bool
+		want        string
+	}{
+		{name: "wrapped in BEGIN/COMMIT", transaction: true, want: plain},
+		{name: "no transaction", transaction: false,
+			want: "CREATE INDEX CONCURRENTLY idx_users_email ON public.users USING btree (email);"},
+		{name: "executable script always wraps", executable: true, transaction: false, want: plain},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewFormatterWithOptions(FormatOptions{Format: "sql", IsExecutable: tt.executable})
+			result, err := formatter.FormatMigration(diffs, tt.transaction)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !contains(result, tt.want) {
+				t.Errorf("Expected %q in:\n%s", tt.want, result)
+			}
+		})
 	}
 }
 

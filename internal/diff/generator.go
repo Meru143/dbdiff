@@ -56,6 +56,12 @@ func (g *SQLGenerator) SetTransaction(useTransaction bool) {
 	g.transaction = useTransaction
 }
 
+// SetConcurrently controls CONCURRENTLY on PostgreSQL index changes. A caller that wraps
+// the generated SQL in its own transaction must turn it off.
+func (g *SQLGenerator) SetConcurrently(concurrently bool) {
+	g.concurrently = concurrently
+}
+
 // Generate produces SQL statements
 func (g *SQLGenerator) Generate() string {
 	var sql []string
@@ -399,30 +405,72 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 }
 
 func (g *SQLGenerator) generateIndexDiff(diff *types.Diff) string {
-	schema := schemaPrefix(g.schemaName)
-	concurrently := ""
-	if g.concurrently {
-		concurrently = "CONCURRENTLY "
-	}
 	switch diff.Type {
-	case types.DiffAdd:
-		// Note: Full index creation would need column list from source
-		return fmt.Sprintf("-- Create index: %s\nCREATE INDEX %sON %s%s ();",
-			diff.Name, concurrently, schema, diff.TableName)
-	case types.DiffDrop:
-		return fmt.Sprintf("-- Drop index: %s\nDROP INDEX IF EXISTS %s;",
-			concurrently, diff.Name)
-	case types.DiffAlter:
-		// Recreate index for definition changes
-		if g.dialect == "mysql" {
-			return fmt.Sprintf("-- Recreate index: %s\nDROP INDEX %s ON %s%s;\nCREATE INDEX %s ON %s%s ();",
-				diff.Name, diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName)
+	case types.DiffAdd, types.DiffAlter:
+		create := g.createIndexSQL(diff)
+		if create == "" {
+			// Never drop an index we can't rebuild.
+			return fmt.Sprintf("-- Index %s on %s: definition not available, write this change by hand",
+				diff.Name, diff.TableName)
 		}
-		return fmt.Sprintf("-- Recreate index: %s\nDROP INDEX IF EXISTS %s;\nCREATE INDEX %sON %s%s ();",
-			diff.Name, diff.Name, concurrently, schema, diff.TableName)
+		if diff.Type == types.DiffAdd {
+			return fmt.Sprintf("-- Create index: %s\n%s", diff.Name, create)
+		}
+		return fmt.Sprintf("-- Recreate index: %s\n%s\n%s", diff.Name, g.dropIndexSQL(diff), create)
+	case types.DiffDrop:
+		return fmt.Sprintf("-- Drop index: %s\n%s", diff.Name, g.dropIndexSQL(diff))
 	default:
 		return ""
 	}
+}
+
+// createIndexSQL returns CREATE INDEX for the index the diff carries, or "" without one.
+// PostgreSQL reuses the server's own definition (pg_get_indexdef), which keeps the access
+// method, predicate and ordering; MySQL and SQL Server are rebuilt from the column list.
+func (g *SQLGenerator) createIndexSQL(diff *types.Diff) string {
+	idx := diff.Index
+	if idx == nil {
+		return ""
+	}
+	postgres := g.dialect != "mysql" && g.dialect != "sqlserver"
+	if postgres && idx.Definition != "" {
+		def := strings.TrimRight(idx.Definition, " \t\r\n;")
+		// pg_get_indexdef reads CREATE [UNIQUE] INDEX name ON ..., so the first "INDEX " is the keyword.
+		return strings.Replace(def, "INDEX ", "INDEX "+g.concurrentlyClause(), 1) + ";"
+	}
+	if len(idx.Columns) == 0 {
+		return ""
+	}
+	unique := ""
+	if idx.IsUnique {
+		unique = "UNIQUE "
+	}
+	concurrently := ""
+	if postgres {
+		concurrently = g.concurrentlyClause()
+	}
+	return fmt.Sprintf("CREATE %sINDEX %s%s ON %s%s (%s);", unique, concurrently, diff.Name,
+		schemaPrefix(g.schemaName), diff.TableName, strings.Join(idx.Columns, ", "))
+}
+
+// dropIndexSQL returns DROP INDEX. PostgreSQL index names are schema-scoped; MySQL and
+// SQL Server name the table instead.
+func (g *SQLGenerator) dropIndexSQL(diff *types.Diff) string {
+	schema := schemaPrefix(g.schemaName)
+	if g.dialect == "mysql" || g.dialect == "sqlserver" {
+		return fmt.Sprintf("DROP INDEX %s ON %s%s;", diff.Name, schema, diff.TableName)
+	}
+	return fmt.Sprintf("DROP INDEX %sIF EXISTS %s%s;", g.concurrentlyClause(), schema, diff.Name)
+}
+
+// concurrentlyClause returns PostgreSQL's CONCURRENTLY, which builds and drops indexes
+// without blocking writes but cannot run inside a transaction block or a DO block, so it
+// is only used when neither this generator nor its caller wraps the migration in one.
+func (g *SQLGenerator) concurrentlyClause() string {
+	if g.concurrently && !g.transaction {
+		return "CONCURRENTLY "
+	}
+	return ""
 }
 
 func (g *SQLGenerator) generateConstraintDiff(diff *types.Diff) string {
