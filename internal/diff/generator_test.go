@@ -80,6 +80,9 @@ func TestSQLGenerator_IndexDDL(t *testing.T) {
 		Definition: "CREATE INDEX idx_users_email ON public.users USING btree (email) WHERE (deleted_at IS NULL)"}
 	pgUnique := &types.Index{Name: "uq_users_email", Columns: []string{"email"}, IsUnique: true,
 		Definition: "CREATE UNIQUE INDEX uq_users_email ON public.users USING btree (email)"}
+	// PostgreSQL introspection keeps primary key indexes; MySQL and SQL Server filter them out.
+	pkey := &types.Index{Name: "users_pkey", Columns: []string{"id"}, IsUnique: true, IsPrimary: true,
+		Definition: "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"}
 
 	index := func(typ types.DiffType, idx *types.Index) types.Diff {
 		return types.Diff{Type: typ, Object: types.ObjectIndex, Name: idx.Name, TableName: "users", Index: idx}
@@ -180,6 +183,16 @@ func TestSQLGenerator_IndexDDL(t *testing.T) {
 			want: "-- Recreate index: idx_users_email\n" +
 				"DROP INDEX idx_users_email ON dbo.users;\n" +
 				"CREATE INDEX idx_users_email ON dbo.users (email);",
+		},
+		{
+			name: "postgresql/primary key index is left to its constraint", dialect: "postgresql", schema: "public",
+			diff: index(types.DiffAdd, pkey),
+			want: "-- Index users_pkey backs the primary key of users: change it through the PRIMARY KEY constraint",
+		},
+		{
+			name: "postgresql/primary key index is never dropped directly", dialect: "postgresql", schema: "public",
+			diff: index(types.DiffDrop, pkey),
+			want: "-- Index users_pkey backs the primary key of users: change it through the PRIMARY KEY constraint",
 		},
 		{
 			name: "missing definition never drops the index", dialect: "postgresql",

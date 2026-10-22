@@ -405,6 +405,12 @@ func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
 }
 
 func (g *SQLGenerator) generateIndexDiff(diff *types.Diff) string {
+	if diff.Index != nil && diff.Index.IsPrimary {
+		// A primary key's index belongs to its constraint: DROP INDEX fails on it, and
+		// CREATE INDEX would not make a primary key.
+		return fmt.Sprintf("-- Index %s backs the primary key of %s: change it through the PRIMARY KEY constraint",
+			diff.Name, diff.TableName)
+	}
 	switch diff.Type {
 	case types.DiffAdd, types.DiffAlter:
 		create := g.createIndexSQL(diff)
