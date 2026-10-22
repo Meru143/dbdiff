@@ -15,7 +15,7 @@ DBDiff keeps schema comparison and migration generation in one CLI so you can in
 
 - Compare database schemas between two instances
 - Generate migration SQL scripts
-- **Multi-database support**: PostgreSQL and MySQL
+- **Multi-database support**: PostgreSQL, MySQL 8+ and SQL Server
 - Dialect-aware SQL generation (e.g., `MODIFY COLUMN` for MySQL, `ALTER COLUMN TYPE` for PostgreSQL)
 - Multiple output formats: SQL, Table, JSON
 - Dry-run mode (default)
@@ -34,10 +34,12 @@ go install github.com/meru143/dbdiff@latest
 # Via Homebrew
 brew install meru143/homebrew-dbdiff/dbdiff
 
-# Via binary
-curl -L https://github.com/meru143/dbdiff/releases/latest/download/dbdiff-linux-amd64 -o dbdiff
-chmod +x dbdiff
+# Via release binary (Linux x86-64 shown)
+curl -fsSL https://github.com/Meru143/dbdiff/releases/download/v1.1.0/dbdiff_1.1.0_linux_amd64.tar.gz | tar -xz dbdiff
+sudo mv dbdiff /usr/local/bin/
 ```
+
+Release archives are named `dbdiff_<version>_<os>_<arch>`: `.tar.gz` for `linux` and `darwin`, `.zip` for `windows`, each in `amd64` and `arm64`. They are listed with `checksums.txt` on the [releases page](https://github.com/Meru143/dbdiff/releases/latest).
 
 ## Usage
 
