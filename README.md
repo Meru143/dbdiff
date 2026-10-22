@@ -129,6 +129,8 @@ ignore_patterns:
 | --debug | | Debug output | |
 | --config | -c | Config file path | |
 
+With `--transaction=false`, PostgreSQL index changes use `CREATE INDEX CONCURRENTLY` and `DROP INDEX CONCURRENTLY`, so they don't block writes. PostgreSQL can't run those inside a transaction, so apply that migration with `psql -f migration.sql`: `dbdiff apply` sends the whole file as one batch, which PostgreSQL runs as a single transaction.
+
 ## Environment Variables
 
 | Variable | Description |

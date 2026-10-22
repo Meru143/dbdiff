@@ -68,13 +68,13 @@ func (f *Formatter) Format(diffs types.DiffList) (string, error) {
 		if f.options.IsExecutable {
 			return f.formatExecutable(diffs), nil
 		}
-		return f.formatSQL(diffs), nil
+		return f.formatSQL(diffs, false), nil
 	case "table":
 		return f.formatTable(diffs), nil
 	case "json":
 		return f.formatJSON(diffs), nil
 	default:
-		return f.formatSQL(diffs), nil
+		return f.formatSQL(diffs, false), nil
 	}
 }
 
@@ -88,15 +88,16 @@ func (f *Formatter) FormatMigration(diffs types.DiffList, transaction bool) (str
 		return sql, nil
 	}
 
-	sql = f.formatSQL(diffs)
+	sql = f.formatSQL(diffs, transaction)
 	if transaction {
 		sql = "BEGIN;\n\n" + sql + "\n\nCOMMIT;"
 	}
 	return sql, nil
 }
 
-// formatSQL generates formatted SQL with comments and basic indentation
-func (f *Formatter) formatSQL(diffs types.DiffList) string {
+// formatSQL generates formatted SQL with comments and basic indentation.
+// inTransaction reports whether the caller wraps the result in BEGIN/COMMIT.
+func (f *Formatter) formatSQL(diffs types.DiffList, inTransaction bool) string {
 	var sb strings.Builder
 
 	// Header comments
@@ -114,7 +115,7 @@ func (f *Formatter) formatSQL(diffs types.DiffList) string {
 
 	for _, diff := range diffs {
 		sb.WriteString(f.formatDiffComment(&diff))
-		sb.WriteString(f.formatDiffSQL(&diff))
+		sb.WriteString(f.formatDiffSQL(&diff, inTransaction))
 		sb.WriteString("\n")
 	}
 
@@ -151,7 +152,7 @@ func (f *Formatter) formatExecutable(diffs types.DiffList) string {
 	sb.WriteString("BEGIN;\n\n")
 
 	// Embed the entire raw SQL inside the hermetic bash wrapper
-	sql := f.formatSQL(diffs)
+	sql := f.formatSQL(diffs, true)
 	sb.WriteString(sql)
 
 	sb.WriteString("\nCOMMIT;\n")
@@ -243,9 +244,10 @@ func (f *Formatter) formatDiffComment(diff *types.Diff) string {
 	return sb.String()
 }
 
-func (f *Formatter) formatDiffSQL(diff *types.Diff) string {
+func (f *Formatter) formatDiffSQL(diff *types.Diff, inTransaction bool) string {
 	// Use SQLGenerator for proper SQL generation
-	// Disable transaction wrapper since FormatMigration handles that
+	// Disable transaction wrapper since FormatMigration handles that, and with it
+	// PostgreSQL's CONCURRENTLY, which cannot run inside a transaction block
 	dialect := db.DetectDialect(f.options.SourceDB)
 	var generator *dbdiff.SQLGenerator
 	if f.sourceSchema != nil {
@@ -254,6 +256,7 @@ func (f *Formatter) formatDiffSQL(diff *types.Diff) string {
 		generator = dbdiff.NewSQLGenerator(types.DiffList{*diff}, f.options.SourceDB, dialect)
 	}
 	generator.SetTransaction(false)
+	generator.SetConcurrently(!inTransaction)
 	return generator.Generate()
 }
 

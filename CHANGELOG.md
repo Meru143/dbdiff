@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+- Index migrations: `CREATE INDEX` now has the index name, columns and uniqueness (PostgreSQL reuses the server's own index definition), `DROP INDEX` uses each dialect's syntax (`DROP INDEX … ON table` for MySQL and SQL Server), and PostgreSQL's `CONCURRENTLY` is only used when the migration isn't wrapped in a transaction
+
 ## [1.1.0] - 2026-03-11
 
 ### Added
