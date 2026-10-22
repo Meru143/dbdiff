@@ -284,6 +284,9 @@ func TestCompare_DroppedIndex(t *testing.T) {
 	for _, diff := range result {
 		if diff.Object == types.ObjectIndex && diff.Type == types.DiffDrop && diff.Name == "users_email_idx" {
 			found = true
+			if diff.Index == nil || diff.Index.Name != "users_email_idx" {
+				t.Errorf("Expected the dropped index on the diff, got %v", diff.Index)
+			}
 		}
 	}
 	if !found {

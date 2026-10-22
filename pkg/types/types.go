@@ -157,7 +157,7 @@ type Diff struct {
 	NewValue    string     `json:"new_value,omitempty"`
 	SQL         string     `json:"sql,omitempty"`
 	Description string     `json:"description,omitempty"`
-	Index       *Index     `json:"index,omitempty"` // desired index on index ADD and ALTER diffs
+	Index       *Index     `json:"index,omitempty"` // index diffs: the desired index, or the dropped one on DROP
 }
 
 type DiffList []Diff

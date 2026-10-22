@@ -397,13 +397,14 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 	}
 
 	// Dropped indexes
-	for name := range targetIndexes {
+	for name, targetIdx := range targetIndexes {
 		if _, exists := sourceIndexes[name]; !exists {
 			differences = append(differences, types.Diff{
 				Type:      types.DiffDrop,
 				Object:    types.ObjectIndex,
 				Name:      name,
 				TableName: sourceTable.Name,
+				Index:     targetIdx,
 			})
 		}
 	}
