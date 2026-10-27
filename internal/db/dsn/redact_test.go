@@ -30,6 +30,7 @@ func TestRedact(t *testing.T) {
 		// without a scheme: go-sql-driver's DSN, and semicolon-separated settings
 		{"DSN without a scheme", "root:s3cret@tcp(localhost:3306)/app", "root:***@tcp(localhost:3306)/app"},
 		{"DSN with a space in the password", "root:my s3cret@tcp(host)/app", "root:***@tcp(host)/app"},
+		{"DSN with quote pairs in the password", "root:a\"s3\"c`r`et@tcp(host)/app", "root:***@tcp(host)/app"},
 		{"settings", "server=host;user id=sa;password=s3cret;database=app", "server=host;user id=sa;password=***;database=app"},
 
 		// nothing to hide
@@ -89,14 +90,16 @@ func TestRedact(t *testing.T) {
 // Any password in a URL's userinfo is hidden whole, whatever it holds (go test -fuzz
 // FuzzRedactPassword explores beyond these seeds).
 func FuzzRedactPassword(f *testing.F) {
-	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}"} {
+	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}", "a\"b\"c", "x`y`z"} {
 		f.Add("app", p)
 	}
 	f.Fuzz(func(t *testing.T, user, pass string) {
-		if pass == "" || strings.Trim(user, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._@-") != "" {
+		// "//" after "user:" would make the DSN without a scheme a URL with the scheme user.
+		if pass == "" || strings.HasPrefix(pass, "//") ||
+			strings.Trim(user, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._@-") != "" {
 			t.Skip()
 		}
-		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db"} {
+		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db", "%s@tcp(host:3306)/db"} {
 			got := Redact(strings.Replace(form, "%s", user+":"+pass, 1))
 			if want := strings.Replace(form, "%s", user+":***", 1); got != want {
 				t.Errorf("password %q: got %q, want %q", pass, got, want)
