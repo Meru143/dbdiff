@@ -55,16 +55,16 @@ func (g *SQLGenerator) SetConcurrently(concurrently bool) {
 // Generate produces SQL statements
 func (g *SQLGenerator) Generate() string {
 	var sql []string
-
-	// Sort diffs: CREATE TABLE first, then ALTER, then DROP (real topological sort)
-	sorted := g.topologicalSort()
-
-	// Generate each statement
-	for _, diff := range sorted {
-		stmt := g.generateStatement(&diff)
-		if stmt != "" {
-			sql = append(sql, withDetails(&diff, stmt))
+	seen := make(map[string]bool)
+	for _, step := range g.plan() {
+		// Several diffs can need the same statement: a MySQL column whose type and
+		// nullability both changed is one MODIFY COLUMN.
+		stmt := g.generateStatement(&step.diff)
+		if stmt == "" || seen[stmt] {
+			continue
 		}
+		seen[stmt] = true
+		sql = append(sql, withDetails(&step.details, stmt))
 	}
 	if len(sql) == 0 {
 		return ""
@@ -145,81 +145,96 @@ func withDetails(diff *types.Diff, stmt string) string {
 	return first + "\n" + comment + "\n" + rest
 }
 
-func (g *SQLGenerator) topologicalSort() types.DiffList {
-	// Build dependency graph
-	dependencies := make(map[string][]string) // diffName -> depends on
-
-	// Separate by type
-	var creates, alters, drops types.DiffList
-
-	for _, diff := range g.diffs {
-		switch diff.Type {
-		case types.DiffAdd:
-			// Track table dependencies for FKs
-			if diff.Object == types.ObjectForeignKey {
-				dependencies[diff.Name] = []string{diff.TableName, diff.NewValue}
-			}
-			creates = append(creates, diff)
-		case types.DiffAlter:
-			alters = append(alters, diff)
-		case types.DiffDrop:
-			// For drops, reverse order
-			drops = append([]types.Diff{diff}, drops...)
-		case types.DiffRename:
-			// Handle renames: drop old, add new
-			creates = append(creates, types.Diff{
-				Type:   types.DiffAdd,
-				Object: diff.Object,
-				Name:   diff.NewValue,
-			})
-			drops = append(drops, types.Diff{
-				Type:   types.DiffDrop,
-				Object: diff.Object,
-				Name:   diff.OldValue,
-			})
-		}
-	}
-
-	// Order creates by dependencies (tables before FKs)
-	sort.SliceStable(creates, func(i, j int) bool {
-		return !dependsOn(creates[i], creates[j], dependencies)
-	})
-
-	// Order alters
-	sort.SliceStable(alters, func(i, j int) bool {
-		// Columns before constraints
-		order := map[types.DiffObject]int{
-			types.ObjectColumn:           1,
-			types.ObjectIndex:            2,
-			types.ObjectConstraint:       3,
-			types.ObjectForeignKey:       4,
-			types.ObjectSequence:         5,
-			types.ObjectType:             6,
-			types.ObjectView:             7,
-			types.ObjectMaterializedView: 8,
-			types.ObjectFunction:         9,
-			types.ObjectTrigger:          10,
-			types.ObjectGrant:            11,
-		}
-		return order[alters[i].Object] < order[alters[j].Object]
-	})
-
-	// Order: creates, alters, drops
-	var sorted types.DiffList
-	sorted = append(sorted, creates...)
-	sorted = append(sorted, alters...)
-	sorted = append(sorted, drops...)
-
-	return sorted
+// step is one statement of the migration: the diff it is generated from, the diff whose
+// description and old and new values it shows, and where it runs.
+type step struct {
+	diff    types.Diff
+	details types.Diff
+	phase   int
+	key     string
 }
 
-func dependsOn(a, b types.Diff, deps map[string][]string) bool {
-	for _, dep := range deps[a.Name] {
-		if dep == b.Name {
-			return true
+// phases orders statements so each runs after what it depends on: foreign keys, views,
+// constraints and indexes go before the columns and tables they cover, tables and columns
+// exist before indexes, constraints and foreign keys are added to them, and functions,
+// views, triggers and grants come last. Each entry is {create or change, drop}.
+var phases = map[types.DiffObject][2]int{
+	types.ObjectForeignKey:       {12, 0},
+	types.ObjectGrant:            {16, 1},
+	types.ObjectTrigger:          {15, 1},
+	types.ObjectView:             {14, 1},
+	types.ObjectMaterializedView: {14, 1},
+	types.ObjectConstraint:       {11, 2},
+	types.ObjectIndex:            {10, 3},
+	types.ObjectType:             {4, 9},
+	types.ObjectSequence:         {4, 9},
+	types.ObjectTable:            {5, 8},
+	types.ObjectColumn:           {6, 7},
+	types.ObjectFunction:         {13, 17},
+}
+
+// plan puts the diffs in execution order. Recreating an index, constraint or foreign key is
+// split into its drop and its add, so the drop runs before the columns it covers change: SQL
+// Server refuses to alter or drop an indexed column, and MySQL drops a column's index with it.
+func (g *SQLGenerator) plan() []step {
+	var steps []step
+	add := func(diff, details types.Diff) {
+		p := phases[diff.Object]
+		phase := p[0]
+		if diff.Type == types.DiffDrop {
+			phase = p[1]
 		}
+		steps = append(steps, step{diff: diff, details: details, phase: phase, key: g.orderKey(diff)})
+	}
+	for _, diff := range g.diffs {
+		if diff.Type == types.DiffAlter && g.recreatable(&diff) {
+			drop, create := diff, diff
+			drop.Type, create.Type = types.DiffDrop, types.DiffAdd
+			add(drop, types.Diff{})
+			add(create, diff)
+			continue
+		}
+		add(diff, diff)
+	}
+	sort.SliceStable(steps, func(i, j int) bool {
+		if steps[i].phase != steps[j].phase {
+			return steps[i].phase < steps[j].phase
+		}
+		return steps[i].key < steps[j].key
+	})
+	return steps
+}
+
+// recreatable reports whether an ALTER of an index, constraint or foreign key can be split
+// into a drop and an add: only when the add can be written, so nothing is dropped that the
+// migration can't put back.
+func (g *SQLGenerator) recreatable(diff *types.Diff) bool {
+	switch diff.Object {
+	case types.ObjectIndex:
+		return (diff.Index == nil || !diff.Index.IsPrimary) && g.createIndexSQL(diff) != ""
+	case types.ObjectConstraint:
+		cons := g.sourceConstraint(diff.TableName, diff.Name)
+		return cons != nil && g.constraintDefinition(*cons) != ""
+	case types.ObjectForeignKey:
+		return g.sourceForeignKey(diff.TableName, diff.Name) != nil
 	}
 	return false
+}
+
+// orderKey orders statements within a phase: by object kind and table, and new columns in
+// their source order, so the migrated table lists them as the source does.
+func (g *SQLGenerator) orderKey(diff types.Diff) string {
+	name := diff.Name
+	if diff.Object == types.ObjectColumn && diff.Type == types.DiffAdd {
+		if t := g.sourceTable(diff.TableName); t != nil {
+			for i, col := range t.Columns {
+				if col.Name == diff.Name {
+					name = fmt.Sprintf("%06d", i)
+				}
+			}
+		}
+	}
+	return string(diff.Object) + "\x00" + diff.TableName + "\x00" + name
 }
 
 func (g *SQLGenerator) generateStatement(diff *types.Diff) string {
@@ -295,9 +310,8 @@ func (g *SQLGenerator) generateFullCreateTable(table *types.Table, schema string
 			parts = append(parts, def)
 		}
 	}
-	for _, fk := range table.ForeignKeys {
-		parts = append(parts, g.foreignKeyDefinition(fk))
-	}
+	// Foreign keys are added once every new table exists (their own diffs), so tables that
+	// reference each other can be created in any order.
 	return fmt.Sprintf("-- Create table: %s\nCREATE TABLE %s%s (\n  %s\n);",
 		table.Name, schema, table.Name, strings.Join(parts, ",\n  "))
 }

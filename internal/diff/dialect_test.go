@@ -63,16 +63,14 @@ func TestSQLGenerator_DialectStatements(t *testing.T) {
 			diff: object(types.DiffAdd, types.ObjectTable, "users"),
 			want: "-- Create table: users\nCREATE TABLE users (\n" +
 				"  id int NOT NULL,\n  org_id int NULL,\n  name varchar(100) NOT NULL,\n  status varchar(20) DEFAULT 'active' NULL,\n" +
-				"  CONSTRAINT users_pkey PRIMARY KEY (id),\n  CONSTRAINT uq_users_name UNIQUE (name),\n  CONSTRAINT chk_status CHECK (status <> ''),\n" +
-				"  CONSTRAINT fk_users_org FOREIGN KEY (org_id) REFERENCES orgs (id) ON DELETE CASCADE\n);",
+				"  CONSTRAINT users_pkey PRIMARY KEY (id),\n  CONSTRAINT uq_users_name UNIQUE (name),\n  CONSTRAINT chk_status CHECK (status <> '')\n);",
 		},
 		{
 			name: "mysql/create table leaves the primary key unnamed", dialect: "mysql",
 			diff: object(types.DiffAdd, types.ObjectTable, "users"),
 			want: "-- Create table: users\nCREATE TABLE users (\n" +
 				"  id int NOT NULL,\n  org_id int NULL,\n  name varchar(100) NOT NULL,\n  status varchar(20) DEFAULT 'active' NULL,\n" +
-				"  PRIMARY KEY (id),\n  CONSTRAINT uq_users_name UNIQUE (name),\n  CONSTRAINT chk_status CHECK (status <> ''),\n" +
-				"  CONSTRAINT fk_users_org FOREIGN KEY (org_id) REFERENCES orgs (id) ON DELETE CASCADE\n);",
+				"  PRIMARY KEY (id),\n  CONSTRAINT uq_users_name UNIQUE (name),\n  CONSTRAINT chk_status CHECK (status <> '')\n);",
 		},
 		{
 			name: "create table without the source schema is not guessed", dialect: "postgresql", noSource: true,
