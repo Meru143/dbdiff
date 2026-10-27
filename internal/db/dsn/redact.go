@@ -13,6 +13,10 @@ const mask = "***"
 // semicolon-separated settings (user id=sa;password=x).
 var secretParam = regexp.MustCompile(`(?i)(?:password|passwd|pwd)\s*=\s*`)
 
+// dsnAddr matches what follows the '@' of a go-sql-driver DSN: a network and its address,
+// both optional, then the '/' before the database: tcp(host:3306)/db, unix(/tmp/sock)/db, /db.
+var dsnAddr = regexp.MustCompile(`^[A-Za-z0-9]*(\([^)]*\))?/`)
+
 // Redact hides the secrets in s, a connection string or text that quotes them, and keeps
 // the rest, user and host included, since they tell a reviewer which database is meant:
 // postgres://user:***@host/db, mysql://user:***@tcp(host:3306)/db,
@@ -24,8 +28,11 @@ var secretParam = regexp.MustCompile(`(?i)(?:password|passwd|pwd)\s*=\s*`)
 // the whole string, unless the URL is in double quotes (Go's %q, as cobra and net/url quote
 // one in an error) or backticks (pgx), which then bound it. A DSN without a scheme, like
 // go-sql-driver's user:pass@tcp(host:3306)/db, is hidden the same way, in quotes or as the
-// whole of s.
+// whole of s, quotes in its password included.
 func Redact(s string) string {
+	if schemeLen(s) == 0 && userinfo(s, false) > 0 && dsnAddr.MatchString(s[strings.LastIndexByte(s, '@')+1:]) {
+		return redactOne(s)
+	}
 	var b strings.Builder
 	quoted := false
 	for i := 0; i < len(s); {
@@ -54,19 +61,31 @@ func Redact(s string) string {
 
 // redactOne hides the secrets of one connection string: the password between the first
 // ':' after the scheme and the last '@', and the value of each password-like parameter.
-// Without a scheme, t may be a user:pass@host DSN, unless the part before the ':' holds a
-// space, '=', ';' or '&', which no user name in one does: then t is prose, like a driver's
-// error, or settings.
 func redactOne(t string) string {
 	n := schemeLen(t)
 	head, rest := t[:n], t[n:]
-	if at := strings.LastIndexByte(rest, '@'); at > 0 {
-		if colon := strings.IndexByte(rest[:at], ':'); colon >= 0 && colon+1 < at &&
-			(n > 0 || !strings.ContainsAny(rest[:colon], " \t\r\n=;&")) {
-			rest = rest[:colon+1] + mask + rest[at:]
-		}
+	if colon := userinfo(rest, n > 0); colon > 0 {
+		at := strings.LastIndexByte(rest, '@')
+		rest = rest[:colon] + mask + rest[at:]
 	}
 	return head + redactParams(rest)
+}
+
+// userinfo returns the index after the ':' that starts a password in rest, the part of a
+// connection string after its scheme, or 0 if rest has none: the password runs from the
+// first ':' to the last '@'. Without a scheme, rest may be a user:pass@host DSN, unless the
+// part before the ':' holds a space, '=', ';' or '&', which no user name in one does: then
+// rest is prose, like a driver's error, or settings.
+func userinfo(rest string, scheme bool) int {
+	at := strings.LastIndexByte(rest, '@')
+	if at <= 0 {
+		return 0
+	}
+	colon := strings.IndexByte(rest[:at], ':')
+	if colon < 0 || colon+1 == at || !scheme && strings.ContainsAny(rest[:colon], " \t\r\n=;&") {
+		return 0
+	}
+	return colon + 1
 }
 
 // redactParams hides the values of password-like parameters in t.
