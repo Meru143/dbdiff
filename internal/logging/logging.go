@@ -24,7 +24,8 @@ func Init(debug, verbose bool) {
 			zerolog.SetGlobalLevel(zerolog.WarnLevel)
 		}
 
-		logger = zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
+		// stderr: stdout carries the SQL, table or JSON, which a log line would corrupt.
+		logger = zerolog.New(os.Stderr).With().Timestamp().Caller().Logger()
 	})
 }
 

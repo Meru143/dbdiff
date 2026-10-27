@@ -1,6 +1,9 @@
 package output
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	dbdiff "github.com/meru143/dbdiff/internal/diff"
@@ -203,5 +206,30 @@ func TestFormatMigration_ExecutableIsPostgresOnly(t *testing.T) {
 	formatter := NewFormatterWithOptions(FormatOptions{Format: "sql", IsExecutable: true, Dialect: "postgresql"})
 	if script, err := formatter.FormatMigration(diffs, true); err != nil || !contains(script, "psql") {
 		t.Errorf("expected a psql script, got %v:\n%s", err, script)
+	}
+}
+
+// compare --format json prints a valid result when nothing differs: an empty list, not null.
+func TestFormatJSON_NoDiffs(t *testing.T) {
+	out, err := NewFormatterWithOptions(FormatOptions{Format: "json", IncludeMeta: true}).Format(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct{ Diffs []types.Diff }
+	if err := json.Unmarshal([]byte(out), &result); err != nil || result.Diffs == nil || len(result.Diffs) != 0 {
+		t.Errorf("expected JSON with an empty diffs list, got %v:\n%s", err, out)
+	}
+}
+
+// A migration file ends with a newline after its COMMIT;.
+func TestWriteFileEndsWithNewline(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "migration.sql")
+	for content, want := range map[string]string{"BEGIN;\n\nCOMMIT;": "BEGIN;\n\nCOMMIT;\n", "SELECT 1;\n": "SELECT 1;\n"} {
+		if err := WriteFile(path, content); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := os.ReadFile(path); string(got) != want {
+			t.Errorf("WriteFile(%q) wrote %q, want %q", content, got, want)
+		}
 	}
 }

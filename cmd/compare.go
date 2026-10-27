@@ -69,8 +69,11 @@ var CompareCmd = &cobra.Command{
 		differences := diff.Compare(sourceSchema, targetSchema)
 
 		if len(differences) == 0 {
-			logging.Info("No differences found!")
-			return nil
+			noDifferences(cmd)
+			// JSON still prints its result, with no diffs, for whatever reads it.
+			if cfg.Format != "json" {
+				return nil
+			}
 		}
 
 		logging.Info(fmt.Sprintf("Found %d differences", len(differences)))
@@ -94,6 +97,13 @@ var CompareCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// noDifferences says the schemas match, on stderr, so that stdout keeps only the SQL,
+// table or JSON. It was an info log, which only -v shows: without it a comparison that
+// found nothing printed nothing.
+func noDifferences(cmd *cobra.Command) {
+	fmt.Fprintln(cmd.ErrOrStderr(), "No differences found.")
 }
 
 func loadConfig(cmd *cobra.Command) (*config.Config, error) {

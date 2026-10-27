@@ -148,7 +148,7 @@ func main() {
 	rootCmd.PersistentFlags().Bool("debug", false, "Debug mode")
 	rootCmd.PersistentFlags().String("log-level", "info", "Log level: debug, info, warn, error")
 	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
-	rootCmd.PersistentFlags().String("log-file", "", "Log to file (default: stdout)")
+	rootCmd.PersistentFlags().String("log-file", "", "Log to file (default: stderr)")
 	rootCmd.PersistentFlags().String("ssl-mode", "disable", "SSL mode")
 	rootCmd.PersistentFlags().String("backup-dir", "", "Backup directory for migrations")
 	rootCmd.PersistentFlags().Int("max-backups", 5, "Maximum number of backups to keep")
