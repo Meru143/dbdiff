@@ -10,13 +10,6 @@ import (
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
-// DefaultIgnorePatterns filters out internal SQL Server objects
-var DefaultIgnorePatterns = []string{
-	"sysdiagrams",
-	"__*",
-	"_dbdiff_*",
-}
-
 // ListTables returns table names in the given schema
 func (d *Driver) ListTables(ctx context.Context, schema string, ignorePatterns []string) ([]string, error) {
 	query := `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
