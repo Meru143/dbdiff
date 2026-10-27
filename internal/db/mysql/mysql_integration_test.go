@@ -165,12 +165,14 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 //   - a column that gains NOT NULL (MODIFY COLUMN must keep its varchar(100)) under an index
 //     whose columns change, one widened to bigint, one added with a default, and an indexed
 //     column dropped (MySQL drops the index with it, so DROP INDEX must come first);
-//   - a column, its foreign key and the table it points at dropped, and a dropped table.
+//   - a column, its foreign key and the table it points at dropped, and a dropped table;
+//   - a string default with a backslash, which a MySQL literal must double.
 const mysqlSource = `
 	CREATE TABLE teams (
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 		name varchar(100) NOT NULL,
 		status varchar(20) DEFAULT 'active',
+		path varchar(50) DEFAULT 'C:\\temp',
 		created_at timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 		CONSTRAINT chk_teams_status CHECK (status <> '')
 	);

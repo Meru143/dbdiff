@@ -126,6 +126,17 @@ func TestSQLGenerator_StatementOrder(t *testing.T) {
 			},
 		},
 		{
+			name: "functions are dropped before the types their signatures use", dialect: "postgresql",
+			diffs: types.DiffList{
+				{Type: types.DiffDrop, Object: types.ObjectType, Name: "mood"},
+				{Type: types.DiffDrop, Object: types.ObjectFunction, Name: "cheer(mood)"},
+			},
+			want: []string{
+				"DROP FUNCTION IF EXISTS cheer(mood) CASCADE;",
+				"DROP TYPE IF EXISTS mood;",
+			},
+		},
+		{
 			name: "new columns keep the source's order", dialect: "postgresql",
 			diffs: types.DiffList{
 				{Type: types.DiffAdd, Object: types.ObjectColumn, Name: "status", TableName: "users"},

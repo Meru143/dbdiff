@@ -143,7 +143,7 @@ func getColumns(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 // definition takes: a quoted literal, or an expression for DEFAULT_GENERATED defaults.
 func defaultExpr(value, extra string) string {
 	if !strings.Contains(extra, "DEFAULT_GENERATED") {
-		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+		return "'" + stringLiteralEscaper.Replace(value) + "'"
 	}
 	if strings.HasPrefix(strings.ToUpper(value), "CURRENT_TIMESTAMP") {
 		return value
@@ -170,7 +170,7 @@ func columnExtra(extra string) string {
 // prefix lengths, descending parts, functional parts and FULLTEXT/SPATIAL kinds included.
 // Unique keys are indexes here; MySQL lists them as constraints too, which getConstraints
 // leaves out.
-func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.Index, error) {
+func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName, qualifier string) ([]types.Index, error) {
 	query := `
 		SELECT
 			INDEX_NAME,
@@ -239,7 +239,7 @@ func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 		case idx.IsUnique:
 			prefix = "UNIQUE "
 		}
-		idx.Definition = fmt.Sprintf("CREATE %sINDEX %s ON %s (%s)", prefix, name, tableName, strings.Join(parts[name], ", "))
+		idx.Definition = fmt.Sprintf("CREATE %sINDEX %s ON %s%s (%s)", prefix, name, qualifier, tableName, strings.Join(parts[name], ", "))
 		indexes = append(indexes, *idx)
 	}
 	return indexes, rows.Err()
@@ -311,6 +311,10 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 }
 
 var sqlTextUnescaper = strings.NewReplacer(`\\`, `\`, `\'`, `'`)
+
+// stringLiteralEscaper quotes a value for a MySQL string literal, where a backslash starts
+// an escape sequence (\t, \n) unless it is doubled.
+var stringLiteralEscaper = strings.NewReplacer(`\`, `\\`, `'`, `''`)
 
 func getForeignKeys(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.ForeignKey, error) {
 	query := `

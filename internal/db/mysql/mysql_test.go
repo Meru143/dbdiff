@@ -190,7 +190,7 @@ func TestIntrospectMocked(t *testing.T) {
 		"COLUMN_NAME", "COLUMN_TYPE", "COLUMN_DEFAULT", "IS_NULLABLE", "is_primary_key", "EXTRA",
 	}).AddRow("id", "int", nil, "NO", 1, "auto_increment").
 		AddRow("email", "varchar(255)", nil, "YES", 0, "").
-		AddRow("status", "varchar(20)", "it's", "NO", 0, "").
+		AddRow("status", "varchar(20)", `it's C:\temp`, "NO", 0, "").
 		AddRow("created_at", "timestamp", "CURRENT_TIMESTAMP", "YES", 0, "DEFAULT_GENERATED on update CURRENT_TIMESTAMP").
 		AddRow("uid", "varchar(36)", "uuid()", "YES", 0, "DEFAULT_GENERATED")
 
@@ -255,7 +255,8 @@ func TestIntrospectMocked(t *testing.T) {
 	wantColumns := []types.Column{
 		{Name: "id", DataType: "int", IsPrimaryKey: true, Extra: "AUTO_INCREMENT"},
 		{Name: "email", DataType: "varchar(255)", IsNullable: true},
-		{Name: "status", DataType: "varchar(20)", DefaultValue: str("'it''s'")},
+		// A backslash starts an escape in a MySQL string literal, so it is doubled.
+		{Name: "status", DataType: "varchar(20)", DefaultValue: str(`'it''s C:\\temp'`)},
 		{Name: "created_at", DataType: "timestamp", DefaultValue: str("CURRENT_TIMESTAMP"), IsNullable: true,
 			Extra: "ON UPDATE CURRENT_TIMESTAMP"},
 		{Name: "uid", DataType: "varchar(36)", DefaultValue: str("(uuid())"), IsNullable: true},
@@ -267,10 +268,10 @@ func TestIntrospectMocked(t *testing.T) {
 	// Indexes carry their CREATE INDEX statement: prefix lengths, descending and functional
 	// parts and FULLTEXT survive a recreate.
 	wantIndexes := []types.Index{
-		{Name: "ft_bio", Columns: []string{"bio"}, Definition: "CREATE FULLTEXT INDEX ft_bio ON users (bio)"},
-		{Name: "idx_fn", Columns: []string{"(lower(`status`))"}, Definition: "CREATE INDEX idx_fn ON users ((lower(`status`)))"},
+		{Name: "ft_bio", Columns: []string{"bio"}, Definition: "CREATE FULLTEXT INDEX ft_bio ON test_schema.users (bio)"},
+		{Name: "idx_fn", Columns: []string{"(lower(`status`))"}, Definition: "CREATE INDEX idx_fn ON test_schema.users ((lower(`status`)))"},
 		{Name: "uq_email", Columns: []string{"email", "status"}, IsUnique: true,
-			Definition: "CREATE UNIQUE INDEX uq_email ON users (email(50), status DESC)"},
+			Definition: "CREATE UNIQUE INDEX uq_email ON test_schema.users (email(50), status DESC)"},
 	}
 	if !reflect.DeepEqual(schema.Tables[0].Indexes, wantIndexes) {
 		t.Errorf("indexes:\n got %+v\nwant %+v", schema.Tables[0].Indexes, wantIndexes)
