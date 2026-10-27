@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Security
 - **Migration files written by earlier versions hold the database passwords in their header** (`-- Source: postgres://user:password@host/db`, and the same for `-- Target:`). Scrub the ones you committed or shared, and rotate the passwords they name. dbdiff now hides the password wherever it prints a connection string, and keeps the user and host: the migration header of `migrate` and `interactive`, the `-v` logs of `compare`, `diff`, `migrate` and `tables`, `validate`'s output, and errors that quoted a URL or part of its password (a PostgreSQL or SQL Server URL that does not parse, a URL given where a command or a flag value belongs) show `***` in its place. The error for an unsupported scheme leaves the string out. That holds for URL passwords in every form (`postgres://`, `sqlserver://`, `mysql://user:pass@tcp(host:3306)/db`, with `@`, `:`, `/` or %-escapes in them) and for `password=`, `pwd=` and other password parameters, in a URL or in settings like `user id=sa;password=x`. The `--executable` script no longer prints its database URL when it can't connect
 
+### Fixed
+- `compare`, `diff`, `migrate` and `interactive` print "No differences found." on stderr when the schemas match. It was an info log, which only `-v` shows, so without it they printed nothing at all. `compare --format json` still prints its result on stdout, with `"diffs": []` (it was `null`)
+- Logs go to stderr instead of stdout, where they landed in the SQL or JSON on stdout: `dbdiff migrate src tgt > migration.sql` wrote a migration ending in a JSON log line, which `apply` could not run. And `migrate` no longer logs "Dry-run mode: migration not applied" on every run: it only writes migrations, and never applies one
+- Migration files end with a newline after their final `COMMIT;`
+
 ## [1.1.2] - 2026-10-28
 
 ### Fixed
