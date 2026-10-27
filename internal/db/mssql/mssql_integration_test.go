@@ -165,12 +165,18 @@ func TestMSSQLIntrospectionIntegration(t *testing.T) {
 	testhelper.RequireMigrationRoundTrip(ctx, t, connect("src"), connect("tgt"), mssqlSource, mssqlTarget)
 }
 
-// mssqlSource and mssqlTarget differ by a new table with an identity key, a check constraint
-// and defaults; another whose foreign key points at an existing table; a column that gains
-// NOT NULL under an index whose columns change (SQL Server refuses to alter an indexed
-// column), one that widens to bigint, one added with a default; a column dropped while it
-// still has an index and a DEFAULT constraint; a column, its foreign key and the table it
-// points at dropped; and a dropped table.
+// mssqlSource and mssqlTarget differ by:
+//   - a new table with an identity key, a check constraint and defaults;
+//   - a new table whose foreign key points at an existing table, with a descending,
+//     covering, filtered index;
+//   - a unique constraint added (its index belongs to the constraint), an index that becomes
+//     unique, and a check constraint whose expression changes on a column that widens (SQL
+//     Server refuses to alter a column a constraint or index depends on);
+//   - a column that gains NOT NULL under an index whose columns change, one widened to
+//     bigint, one added with a default, and a column dropped while it still has an index and
+//     a DEFAULT constraint;
+//   - a column, its foreign key and the table it points at dropped, and a dropped table.
+//
 // ponytail: keys are named; SQL Server names unnamed ones PK__users__<random>, which differs
 // between databases.
 const mssqlSource = `
@@ -185,16 +191,21 @@ const mssqlSource = `
 		id int IDENTITY(1,1) CONSTRAINT pk_users PRIMARY KEY,
 		email nvarchar(255) NOT NULL,
 		name nvarchar(100) NOT NULL,
+		handle nvarchar(50),
 		age bigint,
-		nickname nvarchar(50) DEFAULT 'none'
+		nickname nvarchar(50) DEFAULT 'none',
+		CONSTRAINT uq_users_email UNIQUE (email),
+		CONSTRAINT chk_users_age CHECK (age >= 18)
 	);
 	CREATE INDEX idx_users_name ON users (name, email);
+	CREATE UNIQUE INDEX idx_users_handle ON users (handle);
 	CREATE TABLE posts (
 		id int IDENTITY(1,1) CONSTRAINT pk_posts PRIMARY KEY,
 		user_id int NOT NULL,
 		title nvarchar(200) NOT NULL,
 		CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-	);`
+	);
+	CREATE INDEX idx_posts_user ON posts (user_id DESC) INCLUDE (title) WHERE title <> '';`
 
 const mssqlTarget = `
 	CREATE TABLE legacy_teams (id int CONSTRAINT pk_legacy_teams PRIMARY KEY);
@@ -202,11 +213,14 @@ const mssqlTarget = `
 		id int IDENTITY(1,1) CONSTRAINT pk_users PRIMARY KEY,
 		email nvarchar(255) NOT NULL,
 		name nvarchar(100),
+		handle nvarchar(50),
 		age int,
 		legacy nvarchar(10) DEFAULT 'x',
 		legacy_team_id int,
+		CONSTRAINT chk_users_age CHECK (age >= 0),
 		CONSTRAINT fk_users_legacy_team FOREIGN KEY (legacy_team_id) REFERENCES legacy_teams (id)
 	);
 	CREATE INDEX idx_users_name ON users (name);
+	CREATE INDEX idx_users_handle ON users (handle);
 	CREATE INDEX idx_users_legacy ON users (legacy);
 	CREATE TABLE audit (id int CONSTRAINT pk_audit PRIMARY KEY);`

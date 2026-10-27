@@ -166,15 +166,22 @@ func columnExtra(extra string) string {
 	return strings.Join(parts, " ")
 }
 
+// getIndexes reads every index but the primary key's, with its CREATE INDEX statement:
+// prefix lengths, descending parts, functional parts and FULLTEXT/SPATIAL kinds included.
+// Unique keys are indexes here; MySQL lists them as constraints too, which getConstraints
+// leaves out.
 func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.Index, error) {
 	query := `
-		SELECT 
-			INDEX_NAME, 
+		SELECT
+			INDEX_NAME,
 			NON_UNIQUE = 0 AS is_unique,
-			INDEX_NAME = 'PRIMARY' AS is_primary,
-			COLUMN_NAME
-		FROM information_schema.STATISTICS 
-		WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+			INDEX_TYPE,
+			COLUMN_NAME,
+			SUB_PART,
+			COLLATION,
+			EXPRESSION
+		FROM information_schema.STATISTICS
+		WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME <> 'PRIMARY'
 		ORDER BY INDEX_NAME, SEQ_IN_INDEX`
 
 	rows, err := dbConn.QueryContext(ctx, query, schemaName, tableName)
@@ -184,41 +191,62 @@ func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 	defer rows.Close()
 
 	idxMap := make(map[string]*types.Index)
+	parts := make(map[string][]string)
+	kinds := make(map[string]string)
 	var orderedNames []string
 
 	for rows.Next() {
-		var name string
-		var isUnique, isPrimary bool
-		var colName string
+		var name, kind string
+		var isUnique bool
+		var colName, collation, expression sql.NullString
+		var subPart sql.NullInt64
 
-		if err := rows.Scan(&name, &isUnique, &isPrimary, &colName); err != nil {
+		if err := rows.Scan(&name, &isUnique, &kind, &colName, &subPart, &collation, &expression); err != nil {
 			return nil, err
 		}
 
-		if idx, exists := idxMap[name]; exists {
-			idx.Columns = append(idx.Columns, colName)
-		} else {
-			idxMap[name] = &types.Index{
-				Name:      name,
-				IsUnique:  isUnique,
-				IsPrimary: isPrimary,
-				Columns:   []string{colName},
-			}
+		// A functional key part has no column, only an expression.
+		column, part := colName.String, colName.String
+		if !colName.Valid {
+			column = "(" + sqlTextUnescaper.Replace(expression.String) + ")"
+			part = column
+		}
+		if subPart.Valid && kind != "SPATIAL" { // a SPATIAL index reports its geometry's length
+			part += fmt.Sprintf("(%d)", subPart.Int64)
+		}
+		if collation.String == "D" {
+			part += " DESC"
+		}
+
+		idx, exists := idxMap[name]
+		if !exists {
+			idx = &types.Index{Name: name, IsUnique: isUnique}
+			idxMap[name] = idx
+			kinds[name] = kind
 			orderedNames = append(orderedNames, name)
 		}
+		idx.Columns = append(idx.Columns, column)
+		parts[name] = append(parts[name], part)
 	}
 
 	var indexes []types.Index
 	for _, name := range orderedNames {
 		idx := idxMap[name]
-		if !idx.IsPrimary { // Many tools separate PK from general indexes
-			indexes = append(indexes, *idx)
+		prefix := ""
+		switch {
+		case kinds[name] == "FULLTEXT" || kinds[name] == "SPATIAL":
+			prefix = kinds[name] + " "
+		case idx.IsUnique:
+			prefix = "UNIQUE "
 		}
+		idx.Definition = fmt.Sprintf("CREATE %sINDEX %s ON %s (%s)", prefix, name, tableName, strings.Join(parts[name], ", "))
+		indexes = append(indexes, *idx)
 	}
 	return indexes, rows.Err()
 }
 
 func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.Constraint, error) {
+	// Unique keys are read as indexes, with their prefix lengths and descending parts.
 	// CHECK constraints have no key columns, so KEY_COLUMN_USAGE is a LEFT JOIN. Constraint
 	// names are only unique per table (every primary key is called PRIMARY), so the join
 	// matches on the table too.
@@ -235,7 +263,7 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 		LEFT JOIN information_schema.CHECK_CONSTRAINTS cc
 			ON tc.CONSTRAINT_TYPE = 'CHECK' AND cc.CONSTRAINT_SCHEMA = tc.TABLE_SCHEMA
 			AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
-		WHERE tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE', 'CHECK')
+		WHERE tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'CHECK')
 		ORDER BY tc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`
 
 	rows, err := dbConn.QueryContext(ctx, query, schemaName, tableName)
@@ -261,7 +289,7 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 			if check.Valid {
 				// CHECK_CLAUSE escapes quotes and backslashes as if it were a string literal:
 				// (`status` <> _utf8mb4\'\').
-				cons.Definition = "CHECK " + checkClauseUnescaper.Replace(check.String)
+				cons.Definition = "CHECK " + sqlTextUnescaper.Replace(check.String)
 			}
 			consMap[name] = cons
 			orderedNames = append(orderedNames, name)
@@ -282,7 +310,7 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 	return constraints, rows.Err()
 }
 
-var checkClauseUnescaper = strings.NewReplacer(`\\`, `\`, `\'`, `'`)
+var sqlTextUnescaper = strings.NewReplacer(`\\`, `\`, `\'`, `'`)
 
 func getForeignKeys(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.ForeignKey, error) {
 	query := `

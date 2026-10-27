@@ -155,12 +155,17 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 	testhelper.RequireMigrationRoundTrip(ctx, t, root("src"), root("tgt"), mysqlSource, mysqlTarget)
 }
 
-// mysqlSource and mysqlTarget differ by a new table with an auto-increment key, a check
-// constraint and defaults; another whose foreign key points at an existing table; a column
-// that gains NOT NULL (MODIFY COLUMN must keep its varchar(100)) under an index whose columns
-// change, one that widens to bigint, one added with a default; an indexed column dropped
-// (MySQL drops the index with it, so DROP INDEX must come first); a column, its foreign key
-// and the table it points at dropped; and a dropped table.
+// mysqlSource and mysqlTarget differ by:
+//   - a new table with an auto-increment key, a check constraint and defaults;
+//   - a new table whose foreign key points at an existing table, with a prefix-length index
+//     on a TEXT column, a FULLTEXT and a functional index, and an explicit index the foreign
+//     key uses (created first, so MySQL doesn't add its own);
+//   - a unique key added, an index that becomes unique, and a check constraint whose
+//     expression changes on a column that widens;
+//   - a column that gains NOT NULL (MODIFY COLUMN must keep its varchar(100)) under an index
+//     whose columns change, one widened to bigint, one added with a default, and an indexed
+//     column dropped (MySQL drops the index with it, so DROP INDEX must come first);
+//   - a column, its foreign key and the table it points at dropped, and a dropped table.
 const mysqlSource = `
 	CREATE TABLE teams (
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -173,16 +178,25 @@ const mysqlSource = `
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 		email varchar(255) NOT NULL,
 		name varchar(100) NOT NULL,
+		handle varchar(50),
 		age bigint,
-		nickname varchar(50) DEFAULT 'none'
+		nickname varchar(50) DEFAULT 'none',
+		UNIQUE KEY uq_users_email (email),
+		CONSTRAINT chk_users_age CHECK (age >= 18)
 	);
 	CREATE INDEX idx_users_name ON users (name, email);
+	CREATE UNIQUE INDEX idx_users_handle ON users (handle);
 	CREATE TABLE posts (
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 		user_id int NOT NULL,
 		title varchar(200) NOT NULL,
+		body text,
+		KEY idx_posts_user (user_id),
 		CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-	);`
+	);
+	CREATE INDEX idx_posts_body ON posts (body(20), title DESC);
+	CREATE FULLTEXT INDEX ft_posts_body ON posts (body);
+	CREATE INDEX idx_posts_lower_title ON posts ((lower(title)));`
 
 const mysqlTarget = `
 	CREATE TABLE legacy_teams (id int PRIMARY KEY);
@@ -190,11 +204,14 @@ const mysqlTarget = `
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 		email varchar(255) NOT NULL,
 		name varchar(100),
+		handle varchar(50),
 		age int,
 		legacy varchar(10) DEFAULT 'x',
 		legacy_team_id int,
+		CONSTRAINT chk_users_age CHECK (age >= 0),
 		CONSTRAINT fk_users_legacy_team FOREIGN KEY (legacy_team_id) REFERENCES legacy_teams (id)
 	);
 	CREATE INDEX idx_users_name ON users (name);
+	CREATE INDEX idx_users_handle ON users (handle);
 	CREATE INDEX idx_users_legacy ON users (legacy);
 	CREATE TABLE audit (id int PRIMARY KEY);`

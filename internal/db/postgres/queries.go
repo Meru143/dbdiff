@@ -77,20 +77,28 @@ func getColumns(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName s
 }
 
 func getIndexes(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName string) ([]types.Index, error) {
+	// An index that backs a primary key, unique or exclusion constraint changes with its
+	// constraint. Expression indexes have no plain columns, hence the FILTER.
 	query := `
-		SELECT 
+		SELECT
 			i.relname as index_name,
 			ix.indisunique,
 			ix.indisprimary,
+			EXISTS (
+				SELECT 1 FROM pg_constraint con
+				WHERE con.conindid = ix.indexrelid AND con.conrelid = t.oid AND con.contype IN ('p', 'u', 'x')
+			) as is_constraint,
 			pg_get_indexdef(ix.indexrelid) as index_def,
-			COALESCE(array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)), ARRAY[]::text[]) as columns
+			COALESCE(
+				array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)) FILTER (WHERE a.attname IS NOT NULL),
+				ARRAY[]::name[]) as columns
 		FROM pg_class t
 		JOIN pg_index ix ON t.oid = ix.indrelid
 		JOIN pg_class i ON i.oid = ix.indexrelid
 		LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
-		WHERE t.relname = $2 
+		WHERE t.relname = $2
 			AND t.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = $1)
-		GROUP BY i.relname, ix.indisunique, ix.indisprimary, pg_get_indexdef(ix.indexrelid)
+		GROUP BY i.relname, ix.indisunique, ix.indisprimary, ix.indexrelid, t.oid
 		ORDER BY i.relname`
 	rows, err := pool.Query(ctx, query, schemaName, tableName)
 	if err != nil {
@@ -101,7 +109,7 @@ func getIndexes(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName s
 	var indexes []types.Index
 	for rows.Next() {
 		var idx types.Index
-		if err := rows.Scan(&idx.Name, &idx.IsUnique, &idx.IsPrimary, &idx.Definition, &idx.Columns); err != nil {
+		if err := rows.Scan(&idx.Name, &idx.IsUnique, &idx.IsPrimary, &idx.IsConstraint, &idx.Definition, &idx.Columns); err != nil {
 			return nil, err
 		}
 		indexes = append(indexes, idx)

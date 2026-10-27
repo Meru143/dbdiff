@@ -86,7 +86,18 @@ func (e *DiffEngine) compareTables() types.DiffList {
 				Object: types.ObjectTable,
 				Name:   name,
 			})
-			// A new table's foreign keys are added after every new table exists.
+			// A new table's indexes and foreign keys are added after every new table exists.
+			for i := range sourceTable.Indexes {
+				if idx := &sourceTable.Indexes[i]; !ownedByConstraint(idx) {
+					differences = append(differences, types.Diff{
+						Type:      types.DiffAdd,
+						Object:    types.ObjectIndex,
+						Name:      idx.Name,
+						TableName: name,
+						Index:     idx,
+					})
+				}
+			}
 			for _, fk := range sourceTable.ForeignKeys {
 				differences = append(differences, types.Diff{
 					Type:      types.DiffAdd,
@@ -373,12 +384,14 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 	targetIndexes := make(map[string]*types.Index)
 
 	for i := range sourceTable.Indexes {
-		idx := &sourceTable.Indexes[i]
-		sourceIndexes[idx.Name] = idx
+		if idx := &sourceTable.Indexes[i]; !ownedByConstraint(idx) {
+			sourceIndexes[idx.Name] = idx
+		}
 	}
 	for i := range targetTable.Indexes {
-		idx := &targetTable.Indexes[i]
-		targetIndexes[idx.Name] = idx
+		if idx := &targetTable.Indexes[i]; !ownedByConstraint(idx) {
+			targetIndexes[idx.Name] = idx
+		}
 	}
 
 	// New indexes
@@ -394,7 +407,8 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 		} else {
 			// Index definition change
 			targetIdx := targetIndexes[name]
-			if idx.Definition != targetIdx.Definition || !stringSlicesEqual(idx.Columns, targetIdx.Columns) {
+			if idx.Definition != targetIdx.Definition || idx.IsUnique != targetIdx.IsUnique ||
+				!stringSlicesEqual(idx.Columns, targetIdx.Columns) {
 				differences = append(differences, types.Diff{
 					Type:      types.DiffAlter,
 					Object:    types.ObjectIndex,
@@ -421,6 +435,13 @@ func compareIndexes(sourceTable, targetTable *types.Table) types.DiffList {
 		}
 	}
 	return differences
+}
+
+// ownedByConstraint reports an index that backs a primary key or unique constraint. It is
+// compared, created and dropped through the constraint: as an index of its own, its DDL
+// would collide with the constraint's.
+func ownedByConstraint(idx *types.Index) bool {
+	return idx.IsPrimary || idx.IsConstraint
 }
 
 func stringSlicesEqual(a, b []string) bool {
@@ -458,6 +479,20 @@ func compareConstraints(sourceTable, targetTable *types.Table) types.DiffList {
 				Name:      name,
 				TableName: sourceTable.Name,
 			})
+		} else if srcCons.Definition != "" && tgtCons.Definition != "" {
+			// Both servers spell the whole constraint out: a changed CHECK expression or
+			// UNIQUE column list shows here.
+			if srcCons.Definition != tgtCons.Definition {
+				differences = append(differences, types.Diff{
+					Type:        types.DiffAlter,
+					Object:      types.ObjectConstraint,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    tgtCons.Definition,
+					NewValue:    srcCons.Definition,
+					Description: "Constraint definition changed",
+				})
+			}
 		} else {
 			// Check for column changes in PRIMARY KEY
 			if srcCons.Type == "PRIMARY KEY" && tgtCons.Type == "PRIMARY KEY" {

@@ -175,20 +175,26 @@ func fullType(dataType string, length, precision, scale, timePrecision sql.NullI
 	return dataType
 }
 
-// getIndexes returns indexes for a table
+// getIndexes reads every index but the primary key's, with its CREATE INDEX statement: key
+// order, descending keys, INCLUDE columns, the filter and CLUSTERED. Indexes behind a UNIQUE
+// constraint are marked, since the constraint owns them.
 func getIndexes(ctx context.Context, dbConn *sql.DB, schema, tableName string) ([]types.Index, error) {
-	query := `SELECT 
+	query := `SELECT
 			i.name AS INDEX_NAME,
 			i.is_unique,
-			i.is_primary_key,
-			c.name AS COLUMN_NAME
+			i.is_unique_constraint,
+			i.type_desc,
+			i.filter_definition,
+			c.name AS COLUMN_NAME,
+			ic.is_descending_key,
+			ic.is_included_column
 		FROM sys.indexes i
 		JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
 		JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
 		JOIN sys.tables t ON i.object_id = t.object_id
 		JOIN sys.schemas s ON t.schema_id = s.schema_id
-		WHERE s.name = @p1 AND t.name = @p2 AND i.name IS NOT NULL
-		ORDER BY i.name, ic.key_ordinal`
+		WHERE s.name = @p1 AND t.name = @p2 AND i.name IS NOT NULL AND i.is_primary_key = 0
+		ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id`
 
 	rows, err := dbConn.QueryContext(ctx, query, schema, tableName)
 	if err != nil {
@@ -197,35 +203,63 @@ func getIndexes(ctx context.Context, dbConn *sql.DB, schema, tableName string) (
 	defer rows.Close()
 
 	idxMap := make(map[string]*types.Index)
+	keys := make(map[string][]string)
+	included := make(map[string][]string)
+	kinds := make(map[string]string)
+	filters := make(map[string]string)
 	var orderedNames []string
 
 	for rows.Next() {
-		var name, colName string
-		var isUnique, isPrimary bool
+		var name, kind, colName string
+		var filter sql.NullString
+		var isUnique, isConstraint, descending, include bool
 
-		if err := rows.Scan(&name, &isUnique, &isPrimary, &colName); err != nil {
+		if err := rows.Scan(&name, &isUnique, &isConstraint, &kind, &filter, &colName, &descending, &include); err != nil {
 			return nil, err
 		}
 
-		if idx, exists := idxMap[name]; exists {
-			idx.Columns = append(idx.Columns, colName)
-		} else {
-			idxMap[name] = &types.Index{
-				Name:      name,
-				IsUnique:  isUnique,
-				IsPrimary: isPrimary,
-				Columns:   []string{colName},
-			}
+		idx, exists := idxMap[name]
+		if !exists {
+			idx = &types.Index{Name: name, IsUnique: isUnique, IsConstraint: isConstraint}
+			idxMap[name] = idx
+			kinds[name] = kind
+			filters[name] = filter.String
 			orderedNames = append(orderedNames, name)
 		}
+		if include {
+			included[name] = append(included[name], colName)
+			continue
+		}
+		idx.Columns = append(idx.Columns, colName)
+		if descending {
+			colName += " DESC"
+		}
+		keys[name] = append(keys[name], colName)
 	}
 
 	var indexes []types.Index
 	for _, name := range orderedNames {
 		idx := idxMap[name]
-		if !idx.IsPrimary {
-			indexes = append(indexes, *idx)
+		// ponytail: XML, spatial and columnstore indexes keep only their columns.
+		if kinds[name] == "CLUSTERED" || kinds[name] == "NONCLUSTERED" {
+			var def strings.Builder
+			def.WriteString("CREATE ")
+			if idx.IsUnique {
+				def.WriteString("UNIQUE ")
+			}
+			if kinds[name] == "CLUSTERED" {
+				def.WriteString("CLUSTERED ")
+			}
+			fmt.Fprintf(&def, "INDEX %s ON %s.%s (%s)", name, schema, tableName, strings.Join(keys[name], ", "))
+			if len(included[name]) > 0 {
+				fmt.Fprintf(&def, " INCLUDE (%s)", strings.Join(included[name], ", "))
+			}
+			if filters[name] != "" {
+				def.WriteString(" WHERE " + filters[name])
+			}
+			idx.Definition = def.String()
 		}
+		indexes = append(indexes, *idx)
 	}
 	return indexes, rows.Err()
 }

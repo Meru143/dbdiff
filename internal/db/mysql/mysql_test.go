@@ -199,9 +199,12 @@ func TestIntrospectMocked(t *testing.T) {
 		WillReturnRows(colRows)
 
 	// Mock getIndexes
-	idxRows := sqlmock.NewRows([]string{"INDEX_NAME", "is_unique", "is_primary", "COLUMN_NAME"}).
-		AddRow("idx_email", false, false, "email")
-	mock.ExpectQuery(`SELECT INDEX_NAME, NON_UNIQUE \= 0 AS is_unique, INDEX_NAME \= 'PRIMARY' AS is_primary, COLUMN_NAME`).
+	idxRows := sqlmock.NewRows([]string{"INDEX_NAME", "is_unique", "INDEX_TYPE", "COLUMN_NAME", "SUB_PART", "COLLATION", "EXPRESSION"}).
+		AddRow("ft_bio", false, "FULLTEXT", "bio", nil, nil, nil).
+		AddRow("idx_fn", false, "BTREE", nil, nil, "A", "lower(`status`)").
+		AddRow("uq_email", true, "BTREE", "email", 50, "A", nil).
+		AddRow("uq_email", true, "BTREE", "status", nil, "D", nil)
+	mock.ExpectQuery(`SELECT INDEX_NAME, NON_UNIQUE \= 0 AS is_unique, INDEX_TYPE, COLUMN_NAME, SUB_PART`).
 		WithArgs(schemaName, "users").
 		WillReturnRows(idxRows)
 
@@ -259,6 +262,18 @@ func TestIntrospectMocked(t *testing.T) {
 	}
 	if !reflect.DeepEqual(schema.Tables[0].Columns, wantColumns) {
 		t.Errorf("columns:\n got %+v\nwant %+v", schema.Tables[0].Columns, wantColumns)
+	}
+
+	// Indexes carry their CREATE INDEX statement: prefix lengths, descending and functional
+	// parts and FULLTEXT survive a recreate.
+	wantIndexes := []types.Index{
+		{Name: "ft_bio", Columns: []string{"bio"}, Definition: "CREATE FULLTEXT INDEX ft_bio ON users (bio)"},
+		{Name: "idx_fn", Columns: []string{"(lower(`status`))"}, Definition: "CREATE INDEX idx_fn ON users ((lower(`status`)))"},
+		{Name: "uq_email", Columns: []string{"email", "status"}, IsUnique: true,
+			Definition: "CREATE UNIQUE INDEX uq_email ON users (email(50), status DESC)"},
+	}
+	if !reflect.DeepEqual(schema.Tables[0].Indexes, wantIndexes) {
+		t.Errorf("indexes:\n got %+v\nwant %+v", schema.Tables[0].Indexes, wantIndexes)
 	}
 
 	wantConstraints := []types.Constraint{
