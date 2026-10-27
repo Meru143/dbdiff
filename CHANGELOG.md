@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- Migration statements run in dependency order instead of the order the diffs were found in: foreign keys, constraints and indexes are dropped before the columns and tables they cover (SQL Server refuses to drop or alter an indexed column, and MySQL drops a column's index with it); sequences and types exist before the tables that use them; new tables are created before the foreign keys between them, which are now added separately; a recreated index, constraint or foreign key is dropped before its columns change and added back after; and a statement several diffs need runs once
 - `migrate`, `interactive` and `compare` write SQL in the target database's dialect; they used to emit PostgreSQL SQL for MySQL and SQL Server, and qualified names with the connection URL when one was set
 - Migrations use each dialect's lock timeout (`lock_timeout`, `lock_wait_timeout`, `SET LOCK_TIMEOUT`) and transaction statements (SQL Server: `SET XACT_ABORT ON` and `BEGIN TRANSACTION`); `apply` and `rollback` wrap files the same way, and on MySQL can run a multi-statement file
 - CREATE TABLE, ADD COLUMN, constraints, foreign keys, sequences and enum types are written from the source schema's definitions instead of `CREATE TABLE t ();`, a `text` column or a bare `ADD CONSTRAINT name`; a change without a definition becomes a comment instead of a guess, and a sequence's start change is `START WITH n` (it was `ALTER SEQUENCE s n`)

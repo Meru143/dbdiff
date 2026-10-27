@@ -86,6 +86,15 @@ func (e *DiffEngine) compareTables() types.DiffList {
 				Object: types.ObjectTable,
 				Name:   name,
 			})
+			// A new table's foreign keys are added after every new table exists.
+			for _, fk := range sourceTable.ForeignKeys {
+				differences = append(differences, types.Diff{
+					Type:      types.DiffAdd,
+					Object:    types.ObjectForeignKey,
+					Name:      fk.Name,
+					TableName: name,
+				})
+			}
 		} else {
 			// Table exists in both - compare columns, indexes, constraints
 			targetTable := targetTables[name]

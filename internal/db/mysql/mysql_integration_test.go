@@ -156,9 +156,11 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 }
 
 // mysqlSource and mysqlTarget differ by a new table with an auto-increment key, a check
-// constraint and defaults; a column that gains NOT NULL (MODIFY COLUMN must keep its
-// varchar(100)), one that widens to bigint, one added with a default and one dropped; and a
-// dropped table.
+// constraint and defaults; another whose foreign key points at an existing table; a column
+// that gains NOT NULL (MODIFY COLUMN must keep its varchar(100)) under an index whose columns
+// change, one that widens to bigint, one added with a default; an indexed column dropped
+// (MySQL drops the index with it, so DROP INDEX must come first); a column, its foreign key
+// and the table it points at dropped; and a dropped table.
 const mysqlSource = `
 	CREATE TABLE teams (
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -173,14 +175,26 @@ const mysqlSource = `
 		name varchar(100) NOT NULL,
 		age bigint,
 		nickname varchar(50) DEFAULT 'none'
+	);
+	CREATE INDEX idx_users_name ON users (name, email);
+	CREATE TABLE posts (
+		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+		user_id int NOT NULL,
+		title varchar(200) NOT NULL,
+		CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 	);`
 
 const mysqlTarget = `
+	CREATE TABLE legacy_teams (id int PRIMARY KEY);
 	CREATE TABLE users (
 		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 		email varchar(255) NOT NULL,
 		name varchar(100),
 		age int,
-		legacy varchar(10) DEFAULT 'x'
+		legacy varchar(10) DEFAULT 'x',
+		legacy_team_id int,
+		CONSTRAINT fk_users_legacy_team FOREIGN KEY (legacy_team_id) REFERENCES legacy_teams (id)
 	);
+	CREATE INDEX idx_users_name ON users (name);
+	CREATE INDEX idx_users_legacy ON users (legacy);
 	CREATE TABLE audit (id int PRIMARY KEY);`
