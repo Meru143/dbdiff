@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/meru143/dbdiff/internal/output"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -13,7 +14,7 @@ func TestInitialModel(t *testing.T) {
 		{Type: types.DiffAdd, Object: types.ObjectColumn, Name: "email", TableName: "users"},
 	}
 
-	m := InitialModel(diffs)
+	m := InitialModel(diffs, output.FormatOptions{Format: "sql"})
 
 	if len(m.diffs) != 2 {
 		t.Errorf("Expected 2 diffs, got %d", len(m.diffs))
@@ -36,7 +37,7 @@ func TestModelSelectionToggle(t *testing.T) {
 		{Type: types.DiffAdd, Object: types.ObjectColumn, Name: "email", TableName: "users"},
 	}
 
-	m := InitialModel(diffs)
+	m := InitialModel(diffs, output.FormatOptions{Format: "sql"})
 
 	// Simulate pressing space on the first item
 	m.cursor = 0

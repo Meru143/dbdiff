@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/meru143/dbdiff/internal/config"
 	"github.com/meru143/dbdiff/internal/db"
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
@@ -82,6 +83,10 @@ var MigrateCmd = &cobra.Command{
 		}
 		defer targetDriver.Close()
 
+		if err := sameEngine(sourceDriver, targetDriver); err != nil {
+			return err
+		}
+
 		sourceSchema, err := sourceDriver.Introspect(ctx, cfg.Schema, cfg.IgnorePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to introspect source: %w", err)
@@ -92,7 +97,7 @@ var MigrateCmd = &cobra.Command{
 			return fmt.Errorf("failed to introspect target: %w", err)
 		}
 
-		differences := diff.NewDiffEngine(sourceSchema, targetSchema, sourceDriver.NormalizeType).Compare()
+		differences := diff.NewDiffEngine(sourceSchema, targetSchema, typeNormalizer(sourceDriver, targetDriver)).Compare()
 
 		if len(differences) == 0 {
 			logging.Info("No differences found!")
@@ -129,11 +134,7 @@ var MigrateCmd = &cobra.Command{
 			}
 		}
 
-		formatterOpts := output.FormatOptions{
-			Format:       "sql",
-			IsExecutable: cfg.Executable,
-		}
-		formatter := output.NewFormatterWithOptions(formatterOpts)
+		formatter := output.NewFormatterWithOptions(sqlOptions(cfg, targetDriver, sourceSchema))
 		migrationSQL, err := formatter.FormatMigration(differences, cfg.Transaction)
 		if err != nil {
 			return fmt.Errorf("failed to generate migration: %w", err)
@@ -189,6 +190,39 @@ var MigrateCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// sqlOptions configures SQL output for the target database: its dialect, the schema the
+// statements qualify names with, and the source schema, whose definitions CREATE and ADD
+// statements reuse.
+func sqlOptions(cfg *config.Config, target db.Driver, sourceSchema *types.Schema) output.FormatOptions {
+	return output.FormatOptions{
+		Format:       "sql",
+		IsExecutable: cfg.Executable,
+		Dialect:      target.Dialect(),
+		Schema:       cfg.Schema,
+		SourceSchema: sourceSchema,
+	}
+}
+
+// sameEngine refuses a migration between two database engines: its statements reuse the
+// source's column types, defaults and index definitions, which only the same engine takes.
+func sameEngine(source, target db.Driver) error {
+	if source.Dialect() != target.Dialect() {
+		return fmt.Errorf("source is %s and target is %s: a migration needs both databases on the same engine",
+			source.Name(), target.Name())
+	}
+	return nil
+}
+
+// typeNormalizer maps type names to common ones when the two databases run different
+// engines. Within one engine types compare exactly: the normalizers fold int and bigint
+// (and varchar and nvarchar) together, which would hide those changes from a migration.
+func typeNormalizer(source, target db.Driver) func(string) string {
+	if source.Dialect() == target.Dialect() {
+		return nil
+	}
+	return source.NormalizeType
 }
 
 func init() {

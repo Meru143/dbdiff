@@ -56,6 +56,10 @@ var InteractiveCmd = &cobra.Command{
 		}
 		defer targetDriver.Close()
 
+		if err := sameEngine(sourceDriver, targetDriver); err != nil {
+			return err
+		}
+
 		fmt.Println("Introspecting schemas... Please wait.")
 		sourceSchema, err := sourceDriver.Introspect(ctx, cfg.Schema, cfg.IgnorePatterns)
 		if err != nil {
@@ -67,15 +71,19 @@ var InteractiveCmd = &cobra.Command{
 			return fmt.Errorf("failed to introspect target: %w", err)
 		}
 
-		differences := diff.NewDiffEngine(sourceSchema, targetSchema, sourceDriver.NormalizeType).Compare()
+		differences := diff.NewDiffEngine(sourceSchema, targetSchema, typeNormalizer(sourceDriver, targetDriver)).Compare()
 
 		if len(differences) == 0 {
 			logging.Info("Both schemas are perfectly equivalent! No differences found.")
 			return nil
 		}
 
+		opts := sqlOptions(cfg, targetDriver, sourceSchema)
+		preview := opts
+		preview.IsExecutable = false
+
 		// Initialize Bubble Tea Interactive CLI TUI
-		m := tui.InitialModel(differences)
+		m := tui.InitialModel(differences, preview)
 		p := tea.NewProgram(&m, tea.WithAltScreen())
 
 		_, modelErr := p.Run()
@@ -96,11 +104,7 @@ var InteractiveCmd = &cobra.Command{
 		}
 
 		// Proceed to format SQL output from actively filtered diffs
-		formatterOpts := output.FormatOptions{
-			Format:       "sql",
-			IsExecutable: cfg.Executable,
-		}
-		formatter := output.NewFormatterWithOptions(formatterOpts)
+		formatter := output.NewFormatterWithOptions(opts)
 		migrationSQL, formatErr := formatter.FormatMigration(finalDiffs, cfg.Transaction)
 		if formatErr != nil {
 			return fmt.Errorf("failed to generate selective migration text: %w", formatErr)

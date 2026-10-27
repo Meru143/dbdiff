@@ -117,7 +117,7 @@ ignore_patterns:
 | --target | -t | Target database URL | |
 | --output | -o | Output file path | stdout |
 | --format | | Output format: sql, table, json | sql |
-| --schema | | Database schema | public |
+| --schema | | Database schema (MySQL: the connection's database, SQL Server: `dbo`, unless set) | public |
 | --dry-run | | Dry-run mode (don't write) | true |
 | --force | -f | Skip confirmation prompt | false |
 | --timeout | | Query timeout | 30s |
@@ -130,6 +130,8 @@ ignore_patterns:
 | --verbose | -v | Verbose output | |
 | --debug | | Debug output | |
 | --config | -c | Config file path | |
+
+`dbdiff migrate` writes SQL for the target's engine, so source and target must run the same one. Column types, defaults, constraints and foreign keys come from the source database's own definitions. With `--transaction` (the default) the migration runs in one transaction: `BEGIN`/`COMMIT` on PostgreSQL, `SET XACT_ABORT ON` with `BEGIN TRANSACTION`/`COMMIT TRANSACTION` on SQL Server, and `START TRANSACTION`/`COMMIT` on MySQL, where every DDL statement commits implicitly, so a migration that fails partway keeps the statements before the failure. `--executable` writes a `psql` script, so it is PostgreSQL-only.
 
 With `--transaction=false`, PostgreSQL index changes use `CREATE INDEX CONCURRENTLY` and `DROP INDEX CONCURRENTLY`, so they don't block writes. PostgreSQL can't run those inside a transaction, so apply that migration with `psql -f migration.sql`: `dbdiff apply` sends the whole file as one batch, which PostgreSQL runs as a single transaction.
 

@@ -113,16 +113,17 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 	assert.Contains(t, colNames, "available")
 	assert.Contains(t, colNames, "created_at")
 
-	// Verify normalization via DiffEngine logic (or just direct NormalizeType)
+	// Types keep their length and precision, which DDL needs; the normalizer maps names only.
 	for _, c := range productsTable.Columns {
 		if c.Name == "id" {
 			assert.Equal(t, "integer", driver.NormalizeType(c.DataType))
+			assert.Equal(t, "AUTO_INCREMENT", c.Extra)
 		}
 		if c.Name == "name" {
-			assert.Equal(t, "varchar", driver.NormalizeType(c.DataType))
+			assert.Equal(t, "varchar(100)", c.DataType)
 		}
 		if c.Name == "price" {
-			assert.Equal(t, "numeric", driver.NormalizeType(c.DataType))
+			assert.Equal(t, "decimal(10,2)", c.DataType)
 		}
 	}
 
@@ -139,4 +140,47 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 
 	// Generated index DDL runs on the server and recreates the index exactly
 	testhelper.RoundTripIndex(ctx, t, driver, "testdb", "products", "idx_products_name")
+
+	// 7. The migration dbdiff generates from one database to another runs there and
+	// leaves no differences. Only root may create the two databases.
+	root := func(name string) db.Driver {
+		url := fmt.Sprintf("mysql://root:rootpassword@tcp(%s:%s)/%s?parseTime=true", host, port.Port(), name)
+		d, err := db.NewDriver(url)
+		require.NoError(t, err)
+		require.NoError(t, d.Connect(ctx, url, "disable", 20*time.Second))
+		t.Cleanup(d.Close)
+		return d
+	}
+	require.NoError(t, root("testdb").Exec(ctx, "CREATE DATABASE src; CREATE DATABASE tgt"))
+	testhelper.RequireMigrationRoundTrip(ctx, t, root("src"), root("tgt"), mysqlSource, mysqlTarget)
 }
+
+// mysqlSource and mysqlTarget differ by a new table with an auto-increment key, a check
+// constraint and defaults; a column that gains NOT NULL (MODIFY COLUMN must keep its
+// varchar(100)), one that widens to bigint, one added with a default and one dropped; and a
+// dropped table.
+const mysqlSource = `
+	CREATE TABLE teams (
+		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+		name varchar(100) NOT NULL,
+		status varchar(20) DEFAULT 'active',
+		created_at timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		CONSTRAINT chk_teams_status CHECK (status <> '')
+	);
+	CREATE TABLE users (
+		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+		email varchar(255) NOT NULL,
+		name varchar(100) NOT NULL,
+		age bigint,
+		nickname varchar(50) DEFAULT 'none'
+	);`
+
+const mysqlTarget = `
+	CREATE TABLE users (
+		id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+		email varchar(255) NOT NULL,
+		name varchar(100),
+		age int,
+		legacy varchar(10) DEFAULT 'x'
+	);
+	CREATE TABLE audit (id int PRIMARY KEY);`

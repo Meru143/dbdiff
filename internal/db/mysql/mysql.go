@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	gomysql "github.com/go-sql-driver/mysql"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -35,10 +35,14 @@ func (d *Driver) Connect(ctx context.Context, connStr string, sslMode string, ti
 		// A full parser might be better here, but let's assume valid go-sql-driver DSN for now if they strip it
 	}
 
-	// For simplicity, we assume the user provides a complete valid DSN, or we parse it.
-	// We might need to ensure multiStatements=true is set for migrations
+	cfg, err := gomysql.ParseDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("invalid mysql connection string: %w", err)
+	}
+	// A migration file holds many statements, and apply runs it in one Exec.
+	cfg.MultiStatements = true
 
-	conn, err := sql.Open("mysql", dsn)
+	conn, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return fmt.Errorf("failed to open mysql connection: %w", err)
 	}
@@ -100,13 +104,9 @@ func (d *Driver) NormalizeType(dataType string) string {
 
 // Introspect performs full schema introspection for MySQL
 func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
-	if schema == "" {
-		// Query the current database name
-		var dbName string
-		if err := d.db.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&dbName); err != nil {
-			return nil, fmt.Errorf("failed to determine current database: %w", err)
-		}
-		schema = dbName
+	schema, err := d.databaseName(ctx, schema)
+	if err != nil {
+		return nil, err
 	}
 
 	result := &types.Schema{}
@@ -153,4 +153,21 @@ func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns [
 	result.Views = views
 
 	return result, nil
+}
+
+// databaseName resolves the schema to read. MySQL's schemas are its databases, and the
+// CLI's default schema, public, is PostgreSQL's: both it and "" mean the connection's own
+// database.
+func (d *Driver) databaseName(ctx context.Context, schema string) (string, error) {
+	if schema != "" && schema != "public" {
+		return schema, nil
+	}
+	var name sql.NullString
+	if err := d.db.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name); err != nil {
+		return "", fmt.Errorf("failed to determine current database: %w", err)
+	}
+	if !name.Valid {
+		return "", fmt.Errorf("the connection string names no database: add one or pass --schema")
+	}
+	return name.String, nil
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/go-connections/nat"
 	"github.com/meru143/dbdiff/internal/db"
 	_ "github.com/meru143/dbdiff/internal/db/mssql"
 	testhelper "github.com/meru143/dbdiff/internal/testhelper"
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"github.com/docker/go-connections/nat"
 )
 
 func TestMSSQLIntrospectionIntegration(t *testing.T) {
@@ -123,17 +123,17 @@ func TestMSSQLIntrospectionIntegration(t *testing.T) {
 	assert.Contains(t, colNames, "is_active")
 	assert.Contains(t, colNames, "hired_at")
 
-	// Verify normalization
+	// Types keep their length and precision, which DDL needs; the normalizer maps names only.
 	for _, c := range employeesTable.Columns {
-		normalized := driverWithDB.NormalizeType(c.DataType)
 		if c.Name == "id" {
-			assert.Equal(t, "integer", normalized)
+			assert.Equal(t, "integer", driverWithDB.NormalizeType(c.DataType))
+			assert.Equal(t, "IDENTITY(1,1)", c.Extra)
 		}
 		if c.Name == "name" {
-			assert.Equal(t, "varchar", normalized)
+			assert.Equal(t, "nvarchar(100)", c.DataType)
 		}
 		if c.Name == "salary" {
-			assert.Equal(t, "numeric", normalized)
+			assert.Equal(t, "decimal(18,2)", c.DataType)
 		}
 	}
 
@@ -150,4 +150,48 @@ func TestMSSQLIntrospectionIntegration(t *testing.T) {
 
 	// Generated index DDL runs on the server and recreates the index exactly
 	testhelper.RoundTripIndex(ctx, t, driverWithDB, "dbo", "employees", "idx_employees_name")
+
+	// 7. The migration dbdiff generates from one database to another runs there and
+	// leaves no differences.
+	require.NoError(t, driver.Exec(ctx, "CREATE DATABASE src; CREATE DATABASE tgt"))
+	connect := func(name string) db.Driver {
+		url := fmt.Sprintf("sqlserver://sa:StrongPassword123!@%s:%s?database=%s&encrypt=disable", host, port.Port(), name)
+		d, err := db.NewDriver(url)
+		require.NoError(t, err)
+		require.NoError(t, d.Connect(ctx, url, "disable", 15*time.Second))
+		t.Cleanup(d.Close)
+		return d
+	}
+	testhelper.RequireMigrationRoundTrip(ctx, t, connect("src"), connect("tgt"), mssqlSource, mssqlTarget)
 }
+
+// mssqlSource and mssqlTarget differ by a new table with an identity key, a check constraint
+// and defaults; a column that gains NOT NULL, one that widens to bigint, one added with a
+// default and one dropped while it still has a DEFAULT constraint; and a dropped table.
+// ponytail: keys are named; SQL Server names unnamed ones PK__users__<random>, which differs
+// between databases.
+const mssqlSource = `
+	CREATE TABLE teams (
+		id int IDENTITY(1,1) CONSTRAINT pk_teams PRIMARY KEY,
+		name nvarchar(100) NOT NULL,
+		status nvarchar(20) DEFAULT 'active',
+		created_at datetime2(3) DEFAULT SYSUTCDATETIME(),
+		CONSTRAINT chk_teams_status CHECK (status <> '')
+	);
+	CREATE TABLE users (
+		id int IDENTITY(1,1) CONSTRAINT pk_users PRIMARY KEY,
+		email nvarchar(255) NOT NULL,
+		name nvarchar(100) NOT NULL,
+		age bigint,
+		nickname nvarchar(50) DEFAULT 'none'
+	);`
+
+const mssqlTarget = `
+	CREATE TABLE users (
+		id int IDENTITY(1,1) CONSTRAINT pk_users PRIMARY KEY,
+		email nvarchar(255) NOT NULL,
+		name nvarchar(100),
+		age int,
+		legacy nvarchar(10) DEFAULT 'x'
+	);
+	CREATE TABLE audit (id int CONSTRAINT pk_audit PRIMARY KEY);`

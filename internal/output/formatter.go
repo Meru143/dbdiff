@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/meru143/dbdiff/internal/db"
 	dbdiff "github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/pkg/types"
 )
@@ -17,16 +16,22 @@ type FormatOptions struct {
 	Format       string
 	PrettyPrint  bool
 	IncludeMeta  bool
-	SourceDB     string
-	TargetDB     string
+	SourceDB     string // shown in the output's metadata
+	TargetDB     string // shown in the output's metadata
 	UseColors    bool
 	IsExecutable bool // Add Executable output property
+
+	// SQL output. Dialect is the target database's (postgresql, mysql, sqlserver; empty
+	// means postgresql), Schema qualifies the statements' object names, and SourceSchema
+	// supplies the definitions CREATE and ADD statements need.
+	Dialect      string
+	Schema       string
+	SourceSchema *types.Schema
 }
 
 // Formatter handles output formatting
 type Formatter struct {
-	options      FormatOptions
-	sourceSchema *types.Schema
+	options FormatOptions
 }
 
 // NewFormatter creates a new formatter
@@ -38,27 +43,13 @@ func NewFormatter(format string) *Formatter {
 			IncludeMeta: true,
 			UseColors:   isTTY(),
 		},
-		sourceSchema: nil,
 	}
 }
 
 // NewFormatterWithOptions creates a formatter with custom options
 func NewFormatterWithOptions(opts FormatOptions) *Formatter {
 	opts.UseColors = opts.UseColors && isTTY()
-	return &Formatter{options: opts, sourceSchema: nil}
-}
-
-// NewFormatterWithSchema creates a formatter with source schema for full SQL generation
-func NewFormatterWithSchema(format string, sourceSchema *types.Schema) *Formatter {
-	return &Formatter{
-		options: FormatOptions{
-			Format:      format,
-			PrettyPrint: true,
-			IncludeMeta: true,
-			UseColors:   isTTY(),
-		},
-		sourceSchema: sourceSchema,
-	}
+	return &Formatter{options: opts}
 }
 
 // Format formats diffs based on configured format
@@ -66,7 +57,7 @@ func (f *Formatter) Format(diffs types.DiffList) (string, error) {
 	switch f.options.Format {
 	case "sql":
 		if f.options.IsExecutable {
-			return f.formatExecutable(diffs), nil
+			return f.FormatMigration(diffs, true)
 		}
 		return f.formatSQL(diffs, false), nil
 	case "table":
@@ -78,25 +69,25 @@ func (f *Formatter) Format(diffs types.DiffList) (string, error) {
 	}
 }
 
-// FormatMigration formats diffs as migration SQL
+// FormatMigration formats diffs as migration SQL, wrapped in the dialect's transaction
+// statements when transaction is set.
 func (f *Formatter) FormatMigration(diffs types.DiffList, transaction bool) (string, error) {
-	var sql string
-
 	if f.options.IsExecutable {
-		// Output the generated string without SQL BEGINs, since Bash will handle it natively
-		sql = f.formatExecutable(diffs)
-		return sql, nil
+		if f.options.Dialect != "" && f.options.Dialect != "postgresql" {
+			return "", fmt.Errorf("--executable writes a psql script, which only works with PostgreSQL; the target is %s", f.options.Dialect)
+		}
+		return f.formatExecutable(diffs), nil
 	}
 
-	sql = f.formatSQL(diffs, transaction)
+	sql := f.formatSQL(diffs, transaction)
 	if transaction {
-		sql = "BEGIN;\n\n" + sql + "\n\nCOMMIT;"
+		sql = dbdiff.WrapTransaction(f.options.Dialect, sql)
 	}
 	return sql, nil
 }
 
-// formatSQL generates formatted SQL with comments and basic indentation.
-// inTransaction reports whether the caller wraps the result in BEGIN/COMMIT.
+// formatSQL generates the migration statements, in dependency order, under a metadata header.
+// inTransaction reports whether the caller wraps the result in a transaction.
 func (f *Formatter) formatSQL(diffs types.DiffList, inTransaction bool) string {
 	var sb strings.Builder
 
@@ -113,11 +104,13 @@ func (f *Formatter) formatSQL(diffs types.DiffList, inTransaction bool) string {
 		sb.WriteString("\n")
 	}
 
-	for _, diff := range diffs {
-		sb.WriteString(f.formatDiffComment(&diff))
-		sb.WriteString(f.formatDiffSQL(&diff, inTransaction))
-		sb.WriteString("\n")
-	}
+	// The generator's own transaction wrapper is off since the caller handles that, and with
+	// it PostgreSQL's CONCURRENTLY, which cannot run inside a transaction block.
+	generator := dbdiff.NewSQLGeneratorWithSchema(diffs, f.options.Schema, f.options.SourceSchema, f.options.Dialect)
+	generator.SetTransaction(false)
+	generator.SetConcurrently(!inTransaction)
+	sb.WriteString(generator.Generate())
+	sb.WriteString("\n")
 
 	return sb.String()
 }
@@ -161,103 +154,6 @@ func (f *Formatter) formatExecutable(diffs types.DiffList) string {
 	sb.WriteString("echo \"Migrations completed successfully!\"\n")
 
 	return sb.String()
-}
-
-func (f *Formatter) formatDiffComment(diff *types.Diff) string {
-	var sb strings.Builder
-
-	switch diff.Object {
-	case types.ObjectTable:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Create table: %s\n", diff.Name))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop table: %s\n", diff.Name))
-		case types.DiffRename:
-			sb.WriteString(fmt.Sprintf("-- Rename table: %s -> %s\n", diff.OldValue, diff.NewValue))
-		}
-	case types.ObjectColumn:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Add column: %s to %s\n", diff.Name, diff.TableName))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop column: %s from %s\n", diff.Name, diff.TableName))
-		case types.DiffAlter:
-			sb.WriteString(fmt.Sprintf("-- Alter column: %s.%s\n", diff.TableName, diff.Name))
-		}
-	case types.ObjectIndex:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Create index: %s\n", diff.Name))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop index: %s\n", diff.Name))
-		case types.DiffAlter:
-			sb.WriteString(fmt.Sprintf("-- Alter index: %s\n", diff.Name))
-		}
-	case types.ObjectConstraint:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Add constraint: %s\n", diff.Name))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop constraint: %s\n", diff.Name))
-		case types.DiffAlter:
-			sb.WriteString(fmt.Sprintf("-- Alter constraint: %s\n", diff.Name))
-		}
-	case types.ObjectForeignKey:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Add foreign key: %s\n", diff.Name))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop foreign key: %s\n", diff.Name))
-		case types.DiffAlter:
-			sb.WriteString(fmt.Sprintf("-- Alter foreign key: %s\n", diff.Name))
-		}
-	case types.ObjectSequence:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Create sequence: %s\n", diff.Name))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop sequence: %s\n", diff.Name))
-		case types.DiffAlter:
-			sb.WriteString(fmt.Sprintf("-- Alter sequence: %s\n", diff.Name))
-		}
-	case types.ObjectType:
-		switch diff.Type {
-		case types.DiffAdd:
-			sb.WriteString(fmt.Sprintf("-- Create type: %s\n", diff.Name))
-		case types.DiffDrop:
-			sb.WriteString(fmt.Sprintf("-- Drop type: %s\n", diff.Name))
-		}
-	}
-
-	// Add old/new values as comments
-	if diff.Description != "" {
-		sb.WriteString(fmt.Sprintf("-- %s\n", diff.Description))
-	}
-	if diff.OldValue != "" {
-		sb.WriteString(fmt.Sprintf("-- Old: %s\n", diff.OldValue))
-	}
-	if diff.NewValue != "" {
-		sb.WriteString(fmt.Sprintf("-- New: %s\n", diff.NewValue))
-	}
-
-	return sb.String()
-}
-
-func (f *Formatter) formatDiffSQL(diff *types.Diff, inTransaction bool) string {
-	// Use SQLGenerator for proper SQL generation
-	// Disable transaction wrapper since FormatMigration handles that, and with it
-	// PostgreSQL's CONCURRENTLY, which cannot run inside a transaction block
-	dialect := db.DetectDialect(f.options.SourceDB)
-	var generator *dbdiff.SQLGenerator
-	if f.sourceSchema != nil {
-		generator = dbdiff.NewSQLGeneratorWithSchema(types.DiffList{*diff}, f.options.SourceDB, f.sourceSchema, dialect)
-	} else {
-		generator = dbdiff.NewSQLGenerator(types.DiffList{*diff}, f.options.SourceDB, dialect)
-	}
-	generator.SetTransaction(false)
-	generator.SetConcurrently(!inTransaction)
-	return generator.Generate()
 }
 
 // formatTable creates ASCII table output

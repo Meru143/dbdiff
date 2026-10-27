@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -14,7 +15,10 @@ var DefaultIgnorePatterns = []string{"_created_at", "_updated_at", "_modified_at
 
 // ListTables returns table names in the given schema
 func (d *Driver) ListTables(ctx context.Context, schema string, ignorePatterns []string) ([]string, error) {
-	// In MySQL, the schema is often just the currently selected DB
+	schema, err := d.databaseName(ctx, schema)
+	if err != nil {
+		return nil, err
+	}
 	query := "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'"
 	rows, err := d.db.QueryContext(ctx, query, schema)
 	if err != nil {
@@ -91,13 +95,15 @@ func (d *Driver) RemoveMigration(ctx context.Context, version string) error {
 // --- Query Helpers ---
 
 func getColumns(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.Column, error) {
+	// COLUMN_TYPE keeps lengths and attributes (varchar(255), int unsigned) that DATA_TYPE drops.
 	query := `
 		SELECT 
 			c.COLUMN_NAME, 
-			c.DATA_TYPE, 
+			c.COLUMN_TYPE, 
 			c.COLUMN_DEFAULT, 
 			c.IS_NULLABLE,
-			CASE WHEN k.COLUMN_NAME IS NOT NULL THEN true ELSE false END as is_primary_key
+			CASE WHEN k.COLUMN_NAME IS NOT NULL THEN true ELSE false END as is_primary_key,
+			c.EXTRA
 		FROM information_schema.COLUMNS c
 		LEFT JOIN information_schema.KEY_COLUMN_USAGE k 
 			ON c.TABLE_SCHEMA = k.TABLE_SCHEMA 
@@ -115,21 +121,49 @@ func getColumns(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 	var columns []types.Column
 	for rows.Next() {
 		var col types.Column
-		var nullable string
+		var nullable, extra string
 		// Default can be nil in MySQL, so use sql.NullString
 		var defaultVal sql.NullString
 
-		if err := rows.Scan(&col.Name, &col.DataType, &defaultVal, &nullable, &col.IsPrimaryKey); err != nil {
+		if err := rows.Scan(&col.Name, &col.DataType, &defaultVal, &nullable, &col.IsPrimaryKey, &extra); err != nil {
 			return nil, err
 		}
 		col.IsNullable = nullable == "YES"
 		if defaultVal.Valid {
-			dv := defaultVal.String
+			dv := defaultExpr(defaultVal.String, extra)
 			col.DefaultValue = &dv
 		}
+		col.Extra = columnExtra(extra)
 		columns = append(columns, col)
 	}
 	return columns, rows.Err()
+}
+
+// defaultExpr turns COLUMN_DEFAULT, which MySQL reports unquoted, into the SQL a column
+// definition takes: a quoted literal, or an expression for DEFAULT_GENERATED defaults.
+func defaultExpr(value, extra string) string {
+	if !strings.Contains(extra, "DEFAULT_GENERATED") {
+		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	}
+	if strings.HasPrefix(strings.ToUpper(value), "CURRENT_TIMESTAMP") {
+		return value
+	}
+	return "(" + value + ")"
+}
+
+// columnExtra keeps the parts of EXTRA that belong in a column definition.
+// ponytail: generated columns (VIRTUAL/STORED GENERATED) need their expression; they are
+// not reproduced.
+func columnExtra(extra string) string {
+	var parts []string
+	lower := strings.ToLower(extra)
+	if strings.Contains(lower, "auto_increment") {
+		parts = append(parts, "AUTO_INCREMENT")
+	}
+	if i := strings.Index(lower, "on update "); i >= 0 {
+		parts = append(parts, "ON UPDATE "+extra[i+len("on update "):])
+	}
+	return strings.Join(parts, " ")
 }
 
 func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.Index, error) {
@@ -185,14 +219,22 @@ func getIndexes(ctx context.Context, dbConn *sql.DB, schemaName, tableName strin
 }
 
 func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.Constraint, error) {
+	// CHECK constraints have no key columns, so KEY_COLUMN_USAGE is a LEFT JOIN. Constraint
+	// names are only unique per table (every primary key is called PRIMARY), so the join
+	// matches on the table too.
 	query := `
 		SELECT 
 			tc.CONSTRAINT_NAME, 
 			tc.CONSTRAINT_TYPE,
-			kcu.COLUMN_NAME
+			kcu.COLUMN_NAME,
+			cc.CHECK_CLAUSE
 		FROM information_schema.TABLE_CONSTRAINTS tc
-		JOIN information_schema.KEY_COLUMN_USAGE kcu
+		LEFT JOIN information_schema.KEY_COLUMN_USAGE kcu
 			ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+			AND tc.TABLE_NAME = kcu.TABLE_NAME
+		LEFT JOIN information_schema.CHECK_CONSTRAINTS cc
+			ON tc.CONSTRAINT_TYPE = 'CHECK' AND cc.CONSTRAINT_SCHEMA = tc.TABLE_SCHEMA
+			AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
 		WHERE tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE', 'CHECK')
 		ORDER BY tc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`
 
@@ -206,30 +248,41 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schemaName, tableName s
 	var orderedNames []string
 
 	for rows.Next() {
-		var name, cType, colName string
+		var name, cType string
+		var colName, check sql.NullString
 
-		if err := rows.Scan(&name, &cType, &colName); err != nil {
+		if err := rows.Scan(&name, &cType, &colName, &check); err != nil {
 			return nil, err
 		}
 
-		if cons, exists := consMap[name]; exists {
-			cons.Columns = append(cons.Columns, colName)
-		} else {
-			consMap[name] = &types.Constraint{
-				Name:    name,
-				Type:    cType,
-				Columns: []string{colName},
+		cons, exists := consMap[name]
+		if !exists {
+			cons = &types.Constraint{Name: name, Type: cType}
+			if check.Valid {
+				// CHECK_CLAUSE escapes quotes and backslashes as if it were a string literal:
+				// (`status` <> _utf8mb4\'\').
+				cons.Definition = "CHECK " + checkClauseUnescaper.Replace(check.String)
 			}
+			consMap[name] = cons
 			orderedNames = append(orderedNames, name)
+		}
+		if colName.Valid {
+			cons.Columns = append(cons.Columns, colName.String)
 		}
 	}
 
 	var constraints []types.Constraint
 	for _, name := range orderedNames {
-		constraints = append(constraints, *consMap[name])
+		cons := consMap[name]
+		if cons.Definition == "" {
+			cons.Definition = fmt.Sprintf("%s (%s)", cons.Type, strings.Join(cons.Columns, ", "))
+		}
+		constraints = append(constraints, *cons)
 	}
 	return constraints, rows.Err()
 }
+
+var checkClauseUnescaper = strings.NewReplacer(`\\`, `\`, `\'`, `'`)
 
 func getForeignKeys(ctx context.Context, dbConn *sql.DB, schemaName, tableName string) ([]types.ForeignKey, error) {
 	query := `

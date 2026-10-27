@@ -2,10 +2,12 @@ package mssql
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/meru143/dbdiff/pkg/types"
 )
 
 func TestConnect(t *testing.T) {
@@ -195,9 +197,13 @@ func TestIntrospectMocked(t *testing.T) {
 
 	// Mock getColumns
 	colRows := sqlmock.NewRows([]string{
-		"COLUMN_NAME", "DATA_TYPE", "COLUMN_DEFAULT", "IS_NULLABLE", "is_primary_key",
-	}).AddRow("id", "int", nil, "NO", 1).
-		AddRow("email", "nvarchar", nil, "YES", 0)
+		"COLUMN_NAME", "DATA_TYPE", "CHARACTER_MAXIMUM_LENGTH", "NUMERIC_PRECISION", "NUMERIC_SCALE",
+		"DATETIME_PRECISION", "COLUMN_DEFAULT", "IS_NULLABLE", "is_primary_key", "identity",
+	}).AddRow("id", "int", nil, 10, 0, nil, nil, "NO", 1, "IDENTITY(1,1)").
+		AddRow("email", "nvarchar", 255, nil, nil, nil, nil, "YES", 0, "").
+		AddRow("body", "varbinary", -1, nil, nil, nil, nil, "YES", 0, "").
+		AddRow("price", "decimal", nil, 18, 2, nil, "((0))", "NO", 0, "").
+		AddRow("seen_at", "datetime2", nil, nil, nil, 3, "(getdate())", "YES", 0, "")
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(schema, "users").
 		WillReturnRows(colRows)
@@ -210,8 +216,9 @@ func TestIntrospectMocked(t *testing.T) {
 		WillReturnRows(idxRows)
 
 	// Mock getConstraints
-	cstRows := sqlmock.NewRows([]string{"CONSTRAINT_NAME", "CONSTRAINT_TYPE", "COLUMN_NAME"}).
-		AddRow("PK_users", "PRIMARY KEY", "id")
+	cstRows := sqlmock.NewRows([]string{"CONSTRAINT_NAME", "CONSTRAINT_TYPE", "COLUMN_NAME", "definition"}).
+		AddRow("PK_users", "PRIMARY KEY", "id", nil).
+		AddRow("chk_price", "CHECK", nil, "([price]>=(0))")
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(schema, "users").
 		WillReturnRows(cstRows)
@@ -242,8 +249,24 @@ func TestIntrospectMocked(t *testing.T) {
 	if result.Tables[0].Name != "users" {
 		t.Errorf("expected table 'users', got '%s'", result.Tables[0].Name)
 	}
-	if len(result.Tables[0].Columns) != 2 {
-		t.Errorf("expected 2 columns, got %d", len(result.Tables[0].Columns))
+	// Columns keep their length, precision and identity; constraints carry their definition.
+	str := func(s string) *string { return &s }
+	wantColumns := []types.Column{
+		{Name: "id", DataType: "int", IsPrimaryKey: true, Extra: "IDENTITY(1,1)"},
+		{Name: "email", DataType: "nvarchar(255)", IsNullable: true},
+		{Name: "body", DataType: "varbinary(max)", IsNullable: true},
+		{Name: "price", DataType: "decimal(18,2)", DefaultValue: str("((0))")},
+		{Name: "seen_at", DataType: "datetime2(3)", DefaultValue: str("(getdate())"), IsNullable: true},
+	}
+	if !reflect.DeepEqual(result.Tables[0].Columns, wantColumns) {
+		t.Errorf("columns:\n got %+v\nwant %+v", result.Tables[0].Columns, wantColumns)
+	}
+	wantConstraints := []types.Constraint{
+		{Name: "PK_users", Type: "PRIMARY KEY", Columns: []string{"id"}, Definition: "PRIMARY KEY (id)"},
+		{Name: "chk_price", Type: "CHECK", Definition: "CHECK ([price]>=(0))"},
+	}
+	if !reflect.DeepEqual(result.Tables[0].Constraints, wantConstraints) {
+		t.Errorf("constraints:\n got %+v\nwant %+v", result.Tables[0].Constraints, wantConstraints)
 	}
 }
 

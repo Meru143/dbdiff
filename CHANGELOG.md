@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- `migrate`, `interactive` and `compare` write SQL in the target database's dialect; they used to emit PostgreSQL SQL for MySQL and SQL Server, and qualified names with the connection URL when one was set
+- Migrations use each dialect's lock timeout (`lock_timeout`, `lock_wait_timeout`, `SET LOCK_TIMEOUT`) and transaction statements (SQL Server: `SET XACT_ABORT ON` and `BEGIN TRANSACTION`); `apply` and `rollback` wrap files the same way, and on MySQL can run a multi-statement file
+- CREATE TABLE, ADD COLUMN, constraints, foreign keys, sequences and enum types are written from the source schema's definitions instead of `CREATE TABLE t ();`, a `text` column or a bare `ADD CONSTRAINT name`; a change without a definition becomes a comment instead of a guess, and a sequence's start change is `START WITH n` (it was `ALTER SEQUENCE s n`)
+- Introspection keeps full column types (`varchar(255)`, `decimal(10,2)`), identity and auto-increment, and constraint definitions; PostgreSQL no longer reports its OID-named not-null pseudo-constraints or foreign keys as constraints, nor identity columns' internal sequences, and MySQL no longer mixes other tables' primary key columns into a table's
+- MySQL nullability and default changes are a full `MODIFY COLUMN` that keeps the column's type, default and `AUTO_INCREMENT` (it used to fall back to `VARCHAR(255)`); SQL Server column changes restate the type and nullability, drop and restore a column's DEFAULT constraint around type changes and column drops, use `ADD` instead of `ADD COLUMN`, and drop tables without `CASCADE`
+- PostgreSQL default changes use `SET DEFAULT`/`DROP DEFAULT` (they were emitted as a type change), and a column order change is reported as a comment instead of an invalid `ALTER COLUMN`
+- MySQL and SQL Server read their own default schema when `--schema` is left at `public`, and within one engine column types compare exactly, so `int` to `bigint` is no longer hidden by the type normalizer
+- `migrate` and `interactive` refuse source and target on different engines, and `--executable` refuses non-PostgreSQL targets, instead of writing SQL the target can't run
 - Index migrations: `CREATE INDEX` now has the index name, columns and uniqueness (PostgreSQL reuses the server's own index definition), `DROP INDEX` uses each dialect's syntax (`DROP INDEX … ON table` for MySQL and SQL Server), and PostgreSQL's `CONCURRENTLY` is only used when the migration isn't wrapped in a transaction
 
 ## [1.1.0] - 2026-03-11

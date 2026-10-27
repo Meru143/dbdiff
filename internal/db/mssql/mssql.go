@@ -103,9 +103,7 @@ func (d *Driver) NormalizeType(dataType string) string {
 
 // Introspect performs full schema introspection for SQL Server
 func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
-	if schema == "" {
-		schema = "dbo"
-	}
+	schema = schemaName(schema)
 
 	result := &types.Schema{}
 
@@ -151,4 +149,12 @@ func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns [
 	result.Views = views
 
 	return result, nil
+}
+
+// schemaName maps "" and the CLI's default schema, PostgreSQL's public, to SQL Server's dbo.
+func schemaName(schema string) string {
+	if schema == "" || schema == "public" {
+		return "dbo"
+	}
+	return schema
 }
