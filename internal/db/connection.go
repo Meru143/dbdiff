@@ -108,7 +108,7 @@ func applySSLConfig(config *pgxpool.Config, sslMode string) error {
 func (db *DB) GetPoolStats() map[string]int {
 	stats := make(map[string]int)
 	if db.Pool != nil {
-		poolStat := db.Pool.Stat()
+		poolStat := db.Stat()
 		stats["TotalConns"] = int(poolStat.TotalConns())
 		stats["AcquiredConns"] = int(poolStat.AcquiredConns())
 		stats["IdleConns"] = int(poolStat.IdleConns())
