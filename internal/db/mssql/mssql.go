@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	dbdsn "github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/pkg/types"
 	_ "github.com/microsoft/go-mssqldb"
 )
@@ -29,7 +30,13 @@ func (d *Driver) Connect(ctx context.Context, connStr string, sslMode string, ti
 	// Parse and ensure connection timeout
 	u, err := url.Parse(dsn)
 	if err != nil {
-		return fmt.Errorf("failed to parse sqlserver connection string: %w", err)
+		// net/url's error quotes the whole URL, password included, and its reason can quote
+		// part of the password (an invalid escape, or a "port" cut from it). The redacted
+		// URL fails only if the rest of it does, and its error holds no password.
+		if _, rerr := url.Parse(dbdsn.Redact(connStr)); rerr != nil {
+			return fmt.Errorf("failed to parse sqlserver connection string: %w", rerr)
+		}
+		return fmt.Errorf("failed to parse sqlserver connection string %q: percent-encode the special characters in its user name and password", dbdsn.Redact(connStr))
 	}
 
 	q := u.Query()

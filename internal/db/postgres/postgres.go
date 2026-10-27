@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -77,7 +78,14 @@ func (d *Driver) Connect(ctx context.Context, connStr, sslMode string, timeout t
 func connectOnce(ctx context.Context, connStr, sslMode string, timeout time.Duration) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+		// pgx hides the password in the URL it quotes, but its reason can quote part of it:
+		// in a malformed URL the password spills into the host or the path, and pgx quotes
+		// an invalid escape there. The redacted URL fails only if the rest of it does, and
+		// its error holds no password.
+		if _, rerr := pgxpool.ParseConfig(dsn.Redact(connStr)); rerr != nil {
+			return nil, fmt.Errorf("failed to parse connection string: %w", rerr)
+		}
+		return nil, fmt.Errorf("failed to parse connection string %q: percent-encode the special characters in its user name and password", dsn.Redact(connStr))
 	}
 
 	if sslMode == "disable" {

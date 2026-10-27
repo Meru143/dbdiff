@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/meru143/dbdiff/cmd"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -88,7 +89,7 @@ func init() {
 		if cfg := viper.GetString("config"); cfg != "" {
 			viper.SetConfigFile(cfg)
 			if err := viper.ReadInConfig(); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to read config file: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Warning: Failed to read config file: %v\n", dsn.Redact(err.Error()))
 			}
 		}
 
@@ -129,6 +130,9 @@ var rootCmd = &cobra.Command{
 	Use:     "dbdiff",
 	Short:   "Compare PostgreSQL, MySQL and SQL Server schemas and generate migration SQL",
 	Version: fmt.Sprintf("%s (commit: %s, date: %s)", version, commit, buildDate),
+	// main prints errors, with passwords hidden: cobra's own message would quote a
+	// connection string given where it expects a command or a flag value.
+	SilenceErrors: true,
 }
 
 func main() {
@@ -190,7 +194,7 @@ func main() {
 	})
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", dsn.Redact(err.Error()))
 		os.Exit(1)
 	}
 }

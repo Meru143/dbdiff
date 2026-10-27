@@ -108,3 +108,15 @@ func TestMigrationHeader(t *testing.T) {
 		}
 	}
 }
+
+// Migration files get committed and reviewed: the header names source and target by user
+// and host, not by password.
+func TestMigrationHeaderHidesPasswords(t *testing.T) {
+	got := migrationHeader("DBDiff Migration", "postgres://app:s3cret@db1.example.com/shop",
+		"postgres://app:p%40ss@db2.example.com/shop?sslmode=require", "postgresql", "public")
+	want := "-- DBDiff Migration\n-- Source: postgres://app:***@db1.example.com/shop\n" +
+		"-- Target: postgres://app:***@db2.example.com/shop?sslmode=require\n-- Schema: public\n\n"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

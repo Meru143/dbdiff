@@ -37,7 +37,9 @@ func NewDriver(connStr string) (Driver, error) {
 		return withoutMigrationsTable{mssql.New()}, nil
 
 	default:
-		return nil, fmt.Errorf("unsupported database scheme or missing prefix in connection string: %s", connStr)
+		// The string itself stays out of the message: it may hold a password, and without a
+		// scheme there is no telling where.
+		return nil, fmt.Errorf("unsupported database URL: it must start with postgres://, postgresql://, mysql://, mysql+tcp:// or sqlserver://")
 	}
 }
 

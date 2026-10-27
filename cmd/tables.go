@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/meru143/dbdiff/internal/db"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +27,7 @@ var TablesCmd = &cobra.Command{
 			return fmt.Errorf("database URL is required")
 		}
 
-		logging.Info(fmt.Sprintf("Connecting to: %s", database))
+		logging.Info(fmt.Sprintf("Connecting to: %s", dsn.Redact(database)))
 
 		ctx := context.Background()
 		driver, err := db.NewDriver(database)

@@ -3,6 +3,7 @@ package mssql
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,26 @@ func TestConnect(t *testing.T) {
 	err := d.Connect(ctx, "invalid-url", "disable", 1*time.Second)
 	if err == nil {
 		t.Error("Expected error connecting to invalid URL")
+	}
+}
+
+// net/url's error for a URL it can't parse quotes the URL, and can quote part of the
+// password; Connect's error holds neither.
+func TestConnectParseErrorHidesPassword(t *testing.T) {
+	for _, url := range []string{
+		"sqlserver://sa:Sec/ret@localhost?database=app",   // url: invalid port ":Sec" after host
+		"sqlserver://sa:Sec%zzret@localhost?database=app", // url: invalid URL escape "%zz"
+		"sqlserver://sa:Sec ret@localhost?database=app",   // url: invalid userinfo
+	} {
+		err := New().Connect(context.Background(), url, "disable", time.Second)
+		if err == nil || strings.Contains(err.Error(), "Sec") || strings.Contains(err.Error(), "ret@") ||
+			!strings.Contains(err.Error(), "sqlserver://sa:***@localhost?database=app") {
+			t.Errorf("%s: expected an error naming the URL without its password, got %v", url, err)
+		}
+	}
+	err := New().Connect(context.Background(), "sqlserver://sa:secret@local host?database=app", "disable", time.Second)
+	if err == nil || strings.Contains(err.Error(), "secret") || !strings.Contains(err.Error(), "invalid character") {
+		t.Errorf("a host error should keep its reason, not the password, got %v", err)
 	}
 }
 

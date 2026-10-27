@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/meru143/dbdiff/internal/db"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/meru143/dbdiff/internal/output"
@@ -31,7 +32,7 @@ var DiffCmd = &cobra.Command{
 			return fmt.Errorf("source and target database URLs are required")
 		}
 
-		logging.Info(fmt.Sprintf("Comparing: %s -> %s", source, target))
+		logging.Info(fmt.Sprintf("Comparing: %s -> %s", dsn.Redact(source), dsn.Redact(target)))
 
 		ctx := context.Background()
 

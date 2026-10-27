@@ -6,6 +6,7 @@ import (
 
 	"github.com/meru143/dbdiff/internal/config"
 	"github.com/meru143/dbdiff/internal/db"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/meru143/dbdiff/internal/output"
@@ -32,7 +33,7 @@ var CompareCmd = &cobra.Command{
 			return fmt.Errorf("source and target database URLs are required")
 		}
 
-		logging.Info(fmt.Sprintf("Comparing schemas: %s -> %s", source, target))
+		logging.Info(fmt.Sprintf("Comparing schemas: %s -> %s", dsn.Redact(source), dsn.Redact(target)))
 
 		ctx := context.Background()
 

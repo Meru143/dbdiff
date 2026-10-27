@@ -1,6 +1,7 @@
 package output
 
 import (
+	"strings"
 	"testing"
 
 	dbdiff "github.com/meru143/dbdiff/internal/diff"
@@ -203,5 +204,22 @@ func TestFormatMigration_ExecutableIsPostgresOnly(t *testing.T) {
 	formatter := NewFormatterWithOptions(FormatOptions{Format: "sql", IsExecutable: true, Dialect: "postgresql"})
 	if script, err := formatter.FormatMigration(diffs, true); err != nil || !contains(script, "psql") {
 		t.Errorf("expected a psql script, got %v:\n%s", err, script)
+	}
+}
+
+// The source and target in the SQL and JSON metadata keep their user and host, not their
+// password.
+func TestMetadataHidesPasswords(t *testing.T) {
+	diffs := types.DiffList{{Type: types.DiffDrop, Object: types.ObjectTable, Name: "audit"}}
+	for _, format := range []string{"sql", "json"} {
+		out, err := NewFormatterWithOptions(FormatOptions{Format: format, IncludeMeta: true,
+			SourceDB: "postgres://app:s3cret@db.example.com/src", TargetDB: "mysql://root:s3cret@tcp(db:3306)/tgt"}).Format(diffs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(out, "s3cret") || !strings.Contains(out, "postgres://app:***@db.example.com/src") ||
+			!strings.Contains(out, "mysql://root:***@tcp(db:3306)/tgt") {
+			t.Errorf("%s: expected both URLs with their password hidden in:\n%s", format, out)
+		}
 	}
 }
