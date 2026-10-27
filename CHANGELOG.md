@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `compare`, `diff`, `migrate` and `interactive` print "No differences found." on stderr when the schemas match. It was an info log, which only `-v` shows, so without it they printed nothing at all. `compare --format json` still prints its result on stdout, with `"diffs": []` (it was `null`)
 - Logs go to stderr instead of stdout, where they landed in the SQL or JSON on stdout: `dbdiff migrate src tgt > migration.sql` wrote a migration ending in a JSON log line, which `apply` could not run. And `migrate` no longer logs "Dry-run mode: migration not applied" on every run: it only writes migrations, and never applies one
 - Migration files end with a newline after their final `COMMIT;`
+- `interactive` writes the migration Enter confirms. It answered every confirmation with "Migration Cancelled." and wrote nothing, since it read the TUI's starting state, which Enter never changes, instead of the state the TUI ended with
 
 ## [1.1.2] - 2026-10-28
 
