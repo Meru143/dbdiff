@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-27
+
 ### Fixed
 - PostgreSQL type changes drop the column's old default first, if it has one, and restore the source's after, since the old one may not cast to the new type (an identity column has none); MySQL string defaults double their backslashes; functions are dropped before the types their signatures use; and MySQL index definitions name the database when `--schema` picks one
 - `dbdiff --help` opens with a description naming PostgreSQL, MySQL and SQL Server: the root command still said "PostgreSQL schema comparison and migration tool", and the help template left every command's description out; `--timeout` shows its real default, 30s, instead of 30ns, and `--schema` says what MySQL and SQL Server read by default
