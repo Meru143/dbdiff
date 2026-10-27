@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/meru143/dbdiff/cmd"
 	"github.com/spf13/cobra"
@@ -39,7 +40,9 @@ For more information, visit: https://github.com/meru143/dbdiff{{end}}
 `
 
 // customHelpTemplate adds custom help template
-var customHelpTemplate = `{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
+var customHelpTemplate = `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
+
+{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
 
 Report bugs at: https://github.com/meru143/dbdiff/issues
 `
@@ -124,7 +127,7 @@ func isatty(fd uintptr) bool {
 
 var rootCmd = &cobra.Command{
 	Use:     "dbdiff",
-	Short:   "PostgreSQL schema comparison and migration tool",
+	Short:   "Compare PostgreSQL, MySQL and SQL Server schemas and generate migration SQL",
 	Version: fmt.Sprintf("%s (commit: %s, date: %s)", version, commit, buildDate),
 }
 
@@ -138,8 +141,8 @@ func main() {
 	rootCmd.PersistentFlags().BoolP("force", "f", false, "Skip confirmation prompt")
 	rootCmd.PersistentFlags().StringP("config", "c", "", "Config file path")
 	rootCmd.PersistentFlags().StringSlice("ignore-patterns", nil, "Columns to ignore")
-	rootCmd.PersistentFlags().String("schema", "public", "Schema to compare")
-	rootCmd.PersistentFlags().Duration("timeout", 30, "Query timeout")
+	rootCmd.PersistentFlags().String("schema", "public", "Schema to compare (MySQL: the connection's database, SQL Server: dbo, unless set)")
+	rootCmd.PersistentFlags().Duration("timeout", 30*time.Second, "Query timeout")
 	rootCmd.PersistentFlags().Bool("transaction", true, "Wrap in transaction")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().Bool("debug", false, "Debug mode")

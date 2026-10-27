@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- `dbdiff --help` opens with a description naming PostgreSQL, MySQL and SQL Server: the root command still said "PostgreSQL schema comparison and migration tool", and the help template left every command's description out; `--timeout` shows its real default, 30s, instead of 30ns, and `--schema` says what MySQL and SQL Server read by default
 - Indexes: a uniqueness-only change is detected; an index that backs a primary key or unique constraint is compared and migrated through its constraint, so adding a UNIQUE constraint no longer also emits a colliding `CREATE UNIQUE INDEX` (MySQL unique keys are compared as indexes); and new tables get their indexes
 - MySQL and SQL Server indexes keep their full definition (MySQL prefix lengths, descending and functional key parts, FULLTEXT and SPATIAL; SQL Server descending keys, `INCLUDE` columns, filters and `CLUSTERED`), so changes to them are detected and a recreated index matches the original; SQL Server no longer mixes `INCLUDE` columns into the key, and a table with a MySQL functional or PostgreSQL expression index no longer fails introspection
 - Constraints whose definitions both servers report are compared by them, so a changed CHECK expression or UNIQUE column list shows
