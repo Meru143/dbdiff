@@ -140,7 +140,7 @@ var MigrateCmd = &cobra.Command{
 			return fmt.Errorf("failed to generate migration: %w", err)
 		}
 
-		header := fmt.Sprintf("-- DBDiff Migration\n-- Source: %s\n-- Target: %s\n-- Schema: %s\n\n", source, target, cfg.Schema)
+		header := migrationHeader("DBDiff Migration", source, target, targetDriver.Dialect(), cfg.Schema)
 
 		var fullSQL string
 		if cfg.Executable {
@@ -203,6 +203,26 @@ func sqlOptions(cfg *config.Config, target db.Driver, sourceSchema *types.Schema
 		Schema:       cfg.Schema,
 		SourceSchema: sourceSchema,
 	}
+}
+
+// migrationHeader opens a migration file with its source and target and the schema both
+// were read from. --schema's default, public, is PostgreSQL's: SQL Server reads dbo, and
+// MySQL each connection's own database, which the URLs already name, so that line is left
+// out.
+func migrationHeader(title, source, target, dialect, schema string) string {
+	if schema == "" || schema == "public" {
+		switch dialect {
+		case "sqlserver":
+			schema = "dbo"
+		case "mysql":
+			schema = ""
+		}
+	}
+	header := fmt.Sprintf("-- %s\n-- Source: %s\n-- Target: %s\n", title, source, target)
+	if schema != "" {
+		header += fmt.Sprintf("-- Schema: %s\n", schema)
+	}
+	return header + "\n"
 }
 
 // sameEngine refuses a migration between two database engines: its statements reuse the

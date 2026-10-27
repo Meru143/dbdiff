@@ -110,7 +110,7 @@ var InteractiveCmd = &cobra.Command{
 			return fmt.Errorf("failed to generate selective migration text: %w", formatErr)
 		}
 
-		header := fmt.Sprintf("-- DBDiff Interactive Migration\n-- Source: %s\n-- Target: %s\n-- Schema: %s\n\n", source, target, cfg.Schema)
+		header := migrationHeader("DBDiff Interactive Migration", source, target, targetDriver.Dialect(), cfg.Schema)
 
 		var fullSQL string
 		if cfg.Executable {
