@@ -211,6 +211,9 @@ func (f *Formatter) formatTable(diffs types.DiffList) string {
 
 // formatJSON creates JSON output
 func (f *Formatter) formatJSON(diffs types.DiffList) string {
+	if diffs == nil {
+		diffs = types.DiffList{} // [], not null, when nothing differs
+	}
 	var output interface{}
 
 	if f.options.IncludeMeta {
@@ -253,6 +256,10 @@ func WriteFile(path string, content string) error {
 		}
 	}
 
+	// A text file ends with a newline; a migration used to end with "COMMIT;".
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}

@@ -74,7 +74,7 @@ var InteractiveCmd = &cobra.Command{
 		differences := diff.NewDiffEngine(sourceSchema, targetSchema, typeNormalizer(sourceDriver, targetDriver)).Compare()
 
 		if len(differences) == 0 {
-			logging.Info("Both schemas are perfectly equivalent! No differences found.")
+			noDifferences(cmd)
 			return nil
 		}
 

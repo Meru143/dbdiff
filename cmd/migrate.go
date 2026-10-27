@@ -101,7 +101,7 @@ var MigrateCmd = &cobra.Command{
 		differences := diff.NewDiffEngine(sourceSchema, targetSchema, typeNormalizer(sourceDriver, targetDriver)).Compare()
 
 		if len(differences) == 0 {
-			logging.Info("No differences found!")
+			noDifferences(cmd)
 			return nil
 		}
 
@@ -183,10 +183,6 @@ var MigrateCmd = &cobra.Command{
 				return fmt.Errorf("failed to write migration: %w", err)
 			}
 			logging.Info(fmt.Sprintf("Migration written to: %s", cfg.Output))
-		}
-
-		if cfg.DryRun {
-			logging.Warn("Dry-run mode: migration not applied")
 		}
 
 		return nil

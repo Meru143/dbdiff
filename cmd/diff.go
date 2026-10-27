@@ -69,7 +69,7 @@ var DiffCmd = &cobra.Command{
 		differences := diff.NewDiffEngine(sourceSchema, targetSchema, typeNormalizer(sourceDriver, targetDriver)).Compare()
 
 		if len(differences) == 0 {
-			logging.Info("No differences found!")
+			noDifferences(cmd)
 			return nil
 		}
 
