@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-28
+
 ### Fixed
 - Schema comparisons leave out `_dbdiff_migrations`, the table `dbdiff apply` records applied migrations in, with its grants and triggers, whatever the case of its name: once a migration had been applied, `compare`, `diff`, `migrate` and `interactive` reported the table as a difference, and the next migration dropped it along with the migration history
 - The header of `migrate` and `interactive` migrations names the schema actually read: `dbo` on SQL Server when `--schema` is left at its default, and on MySQL no schema line, since each side then reads its connection's own database, named in the URLs. Both used to print `-- Schema: public`
