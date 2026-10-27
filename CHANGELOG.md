@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
-- Schema comparisons leave out `_dbdiff_migrations`, the table `dbdiff apply` records applied migrations in, and its grants: once a migration had been applied, `compare`, `diff`, `migrate` and `interactive` reported the table as a difference, and the next migration dropped it along with the migration history
+- Schema comparisons leave out `_dbdiff_migrations`, the table `dbdiff apply` records applied migrations in, with its grants and triggers, whatever the case of its name: once a migration had been applied, `compare`, `diff`, `migrate` and `interactive` reported the table as a difference, and the next migration dropped it along with the migration history
 
 ## [1.1.1] - 2026-10-27
 
