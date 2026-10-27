@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - Schema comparisons leave out `_dbdiff_migrations`, the table `dbdiff apply` records applied migrations in, with its grants and triggers, whatever the case of its name: once a migration had been applied, `compare`, `diff`, `migrate` and `interactive` reported the table as a difference, and the next migration dropped it along with the migration history
 
+### Security
+- pgx is upgraded from v5.8.0 to v5.11.0. v5.8.0 has three vulnerabilities, fixed in v5.9.0 and v5.9.2: GO-2026-4771, GO-2026-4772 and GO-2026-5004 (SQL injection via placeholder confusion with dollar-quoted strings)
+- Release binaries are built with Go 1.26.10, from the committed tree. The v1.1.1 release ran `go mod tidy` before building, which rewrote `go.mod`: its binaries were built with Go 1.26.0, which has standard-library vulnerabilities fixed in later patch releases, and `go version -m` reports them as `v1.1.1+dirty`. `go.mod` is now tidy (CI checks it) and its `toolchain go1.26.10` directive sets the Go that CI and releases build with
+
 ## [1.1.1] - 2026-10-27
 
 ### Fixed

@@ -1,38 +1,46 @@
+version: "2"
 run:
-  timeout: 5m
-  tests: true
   modules-download-mode: readonly
-
-linters-settings:
-  govet:
-    check-type-assertions: true
-  golint:
-    min-confidence: 0
-  gocyclo:
-    min-complexity: 15
-  goconst:
-    min-len: 2
-    min-occurrences: 3
-
+  tests: true
+output:
+  formats:
+    text:
+      path: stdout
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
     - errcheck
-    - gosimple
     - govet
     - ineffassign
-    - staticcheck
-    - typecheck
+    - staticcheck # includes gosimple in v2; typecheck is no longer a linter and always runs
     - unused
-
-issues:
-  exclude-rules:
-    - path: _test.go
-      linters:
-        - gocyclo
-        - errcheck
-
-output:
-  formats:
-    - format: colored-line-number
+  settings:
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocyclo:
+      min-complexity: 15
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+          - gocyclo
+        path: _test.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

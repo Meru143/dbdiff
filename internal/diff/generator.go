@@ -355,18 +355,18 @@ func (g *SQLGenerator) constraintDefinition(cons types.Constraint) string {
 // foreignKeyDefinition returns a foreign key clause for CREATE TABLE or ADD.
 func (g *SQLGenerator) foreignKeyDefinition(fk types.ForeignKey) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s%s (%s)",
+	fmt.Fprintf(&sb, "CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s%s (%s)",
 		fk.Name,
 		strings.Join(fk.Columns, ", "),
 		schemaPrefix(g.schemaName),
 		fk.RefTable,
-		strings.Join(fk.RefColumns, ", ")))
+		strings.Join(fk.RefColumns, ", "))
 
 	if fk.OnDelete != "" && fk.OnDelete != "NO ACTION" {
-		sb.WriteString(fmt.Sprintf(" ON DELETE %s", fk.OnDelete))
+		fmt.Fprintf(&sb, " ON DELETE %s", fk.OnDelete)
 	}
 	if fk.OnUpdate != "" && fk.OnUpdate != "NO ACTION" {
-		sb.WriteString(fmt.Sprintf(" ON UPDATE %s", fk.OnUpdate))
+		fmt.Fprintf(&sb, " ON UPDATE %s", fk.OnUpdate)
 	}
 
 	return sb.String()
