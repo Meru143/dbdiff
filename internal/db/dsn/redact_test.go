@@ -53,6 +53,8 @@ func TestRedact(t *testing.T) {
 			"sqlserver://host?odbc=uid=sa;pwd=***;database=app"},
 		{"value in quotes", "sqlserver://host?odbc=uid=sa;pwd='a;b''c';database=app",
 			"sqlserver://host?odbc=uid=sa;pwd=***;database=app"},
+		{"text after the closing brace", "sqlserver://host?odbc=pwd={a;b}s3cret;database=app",
+			"sqlserver://host?odbc=pwd=***;database=app"},
 		{"userinfo and parameter", "sqlserver://sa:s3cret@host?database=app&password=s3cret",
 			"sqlserver://sa:***@host?database=app&password=***"},
 
@@ -82,4 +84,35 @@ func TestRedact(t *testing.T) {
 			t.Errorf("%s: secret left in %q", tt.name, got)
 		}
 	}
+}
+
+// Any password in a URL's userinfo is hidden whole, whatever it holds (go test -fuzz
+// FuzzRedactPassword explores beyond these seeds).
+func FuzzRedactPassword(f *testing.F) {
+	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}"} {
+		f.Add("app", p)
+	}
+	f.Fuzz(func(t *testing.T, user, pass string) {
+		if pass == "" || strings.Trim(user, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._@-") != "" {
+			t.Skip()
+		}
+		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db"} {
+			got := Redact(strings.Replace(form, "%s", user+":"+pass, 1))
+			if want := strings.Replace(form, "%s", user+":***", 1); got != want {
+				t.Errorf("password %q: got %q, want %q", pass, got, want)
+			}
+		}
+	})
+}
+
+// Redacting again changes nothing, whatever the text (seeds: inputs fuzzing found).
+func FuzzRedactIdempotent(f *testing.F) {
+	for _, s := range []string{"pwd={}0", "pwd=0 &:0@", `x "a:b@c" y`, "`p://a:b@c`"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		if r := Redact(s); Redact(r) != r {
+			t.Errorf("Redact(%q) = %q, and again %q", s, r, Redact(r))
+		}
+	})
 }
