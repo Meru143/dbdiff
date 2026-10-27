@@ -33,16 +33,3 @@ func NewDriver(connStr string) (Driver, error) {
 		return nil, fmt.Errorf("unsupported database scheme or missing prefix in connection string: %s", connStr)
 	}
 }
-
-// DetectDialect returns the dialect name from a connection string
-func DetectDialect(connStr string) string {
-	lower := strings.ToLower(connStr)
-	switch {
-	case strings.HasPrefix(lower, "mysql://"), strings.HasPrefix(lower, "mysql+tcp://"):
-		return "mysql"
-	case strings.HasPrefix(lower, "sqlserver://"):
-		return "sqlserver"
-	default:
-		return "postgresql"
-	}
-}

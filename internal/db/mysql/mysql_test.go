@@ -2,11 +2,13 @@ package mysql
 
 import (
 	"context"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/meru143/dbdiff/pkg/types"
 )
 
 func TestConnect(t *testing.T) {
@@ -185,11 +187,14 @@ func TestIntrospectMocked(t *testing.T) {
 
 	// Mock getColumns
 	colRows := sqlmock.NewRows([]string{
-		"COLUMN_NAME", "DATA_TYPE", "COLUMN_DEFAULT", "IS_NULLABLE", "is_primary_key",
-	}).AddRow("id", "int", nil, "NO", 1).
-		AddRow("email", "varchar", nil, "YES", 0)
+		"COLUMN_NAME", "COLUMN_TYPE", "COLUMN_DEFAULT", "IS_NULLABLE", "is_primary_key", "EXTRA",
+	}).AddRow("id", "int", nil, "NO", 1, "auto_increment").
+		AddRow("email", "varchar(255)", nil, "YES", 0, "").
+		AddRow("status", "varchar(20)", "it's", "NO", 0, "").
+		AddRow("created_at", "timestamp", "CURRENT_TIMESTAMP", "YES", 0, "DEFAULT_GENERATED on update CURRENT_TIMESTAMP").
+		AddRow("uid", "varchar(36)", "uuid()", "YES", 0, "DEFAULT_GENERATED")
 
-	mock.ExpectQuery(`SELECT c\.COLUMN_NAME, c\.DATA_TYPE`).
+	mock.ExpectQuery(`SELECT c\.COLUMN_NAME, c\.COLUMN_TYPE`).
 		WithArgs(schemaName, "users").
 		WillReturnRows(colRows)
 
@@ -201,8 +206,9 @@ func TestIntrospectMocked(t *testing.T) {
 		WillReturnRows(idxRows)
 
 	// Mock getConstraints
-	cstRows := sqlmock.NewRows([]string{"CONSTRAINT_NAME", "CONSTRAINT_TYPE", "COLUMN_NAME"}).
-		AddRow("chk_age", "CHECK", "age")
+	cstRows := sqlmock.NewRows([]string{"CONSTRAINT_NAME", "CONSTRAINT_TYPE", "COLUMN_NAME", "CHECK_CLAUSE"}).
+		AddRow("PRIMARY", "PRIMARY KEY", "id", nil).
+		AddRow("chk_age", "CHECK", nil, "((`age` > 0) and (`status` <> _utf8mb4\\'it\\\\\\'s\\'))")
 	mock.ExpectQuery(`SELECT tc\.CONSTRAINT_NAME, tc\.CONSTRAINT_TYPE, kcu\.COLUMN_NAME`).
 		WithArgs(schemaName, "users").
 		WillReturnRows(cstRows)
@@ -237,12 +243,30 @@ func TestIntrospectMocked(t *testing.T) {
 		t.Errorf("Expected table name 'users', got '%s'", schema.Tables[0].Name)
 	}
 
-	if len(schema.Tables[0].Columns) != 2 {
-		t.Fatalf("Expected 2 columns, got %d", len(schema.Tables[0].Columns))
+	if len(schema.Tables[0].Columns) != 5 {
+		t.Fatalf("Expected 5 columns, got %d", len(schema.Tables[0].Columns))
 	}
 
-	if schema.Tables[0].Columns[0].Name != "id" {
-		t.Errorf("Expected first column to be 'id', got '%s'", schema.Tables[0].Columns[0].Name)
+	// Columns keep their full type, extras and a default ready for a column definition.
+	str := func(s string) *string { return &s }
+	wantColumns := []types.Column{
+		{Name: "id", DataType: "int", IsPrimaryKey: true, Extra: "AUTO_INCREMENT"},
+		{Name: "email", DataType: "varchar(255)", IsNullable: true},
+		{Name: "status", DataType: "varchar(20)", DefaultValue: str("'it''s'")},
+		{Name: "created_at", DataType: "timestamp", DefaultValue: str("CURRENT_TIMESTAMP"), IsNullable: true,
+			Extra: "ON UPDATE CURRENT_TIMESTAMP"},
+		{Name: "uid", DataType: "varchar(36)", DefaultValue: str("(uuid())"), IsNullable: true},
+	}
+	if !reflect.DeepEqual(schema.Tables[0].Columns, wantColumns) {
+		t.Errorf("columns:\n got %+v\nwant %+v", schema.Tables[0].Columns, wantColumns)
+	}
+
+	wantConstraints := []types.Constraint{
+		{Name: "PRIMARY", Type: "PRIMARY KEY", Columns: []string{"id"}, Definition: "PRIMARY KEY (id)"},
+		{Name: "chk_age", Type: "CHECK", Definition: "CHECK ((`age` > 0) and (`status` <> _utf8mb4'it\\'s'))"},
+	}
+	if !reflect.DeepEqual(schema.Tables[0].Constraints, wantConstraints) {
+		t.Errorf("constraints:\n got %+v\nwant %+v", schema.Tables[0].Constraints, wantConstraints)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -78,8 +78,8 @@ var RollbackCmd = &cobra.Command{
 		logging.Info(fmt.Sprintf("Reverting migration: %s", version))
 
 		sqlCmd := string(content)
-		if cfg.Transaction && !strings.Contains(strings.ToUpper(sqlCmd), "BEGIN;") {
-			sqlCmd = "BEGIN;\n" + sqlCmd + "\nCOMMIT;"
+		if cfg.Transaction {
+			sqlCmd = inTransaction(driver.Dialect(), sqlCmd)
 		}
 
 		if err := driver.Exec(ctx, sqlCmd); err != nil {

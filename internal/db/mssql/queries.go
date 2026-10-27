@@ -3,7 +3,9 @@ package mssql
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/meru143/dbdiff/pkg/types"
 )
@@ -20,7 +22,7 @@ func (d *Driver) ListTables(ctx context.Context, schema string, ignorePatterns [
 	query := `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
 		WHERE TABLE_SCHEMA = @p1 AND TABLE_TYPE = 'BASE TABLE' 
 		ORDER BY TABLE_NAME`
-	rows, err := d.db.QueryContext(ctx, query, schema)
+	rows, err := d.db.QueryContext(ctx, query, schemaName(schema))
 	if err != nil {
 		return nil, err
 	}
@@ -96,12 +98,19 @@ func (d *Driver) RemoveMigration(ctx context.Context, version string) error {
 
 // getColumns returns columns for a table
 func getColumns(ctx context.Context, dbConn *sql.DB, schema, tableName string) ([]types.Column, error) {
-	query := `SELECT 
+	query := `SELECT
 			c.COLUMN_NAME,
 			c.DATA_TYPE,
+			c.CHARACTER_MAXIMUM_LENGTH,
+			c.NUMERIC_PRECISION,
+			c.NUMERIC_SCALE,
+			c.DATETIME_PRECISION,
 			c.COLUMN_DEFAULT,
 			c.IS_NULLABLE,
-			CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as is_primary_key
+			CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as is_primary_key,
+			CASE WHEN ic.column_id IS NOT NULL
+				THEN 'IDENTITY(' + CAST(ic.seed_value AS varchar(40)) + ',' + CAST(ic.increment_value AS varchar(40)) + ')'
+				ELSE '' END
 		FROM INFORMATION_SCHEMA.COLUMNS c
 		LEFT JOIN (
 			SELECT ku.COLUMN_NAME
@@ -110,6 +119,8 @@ func getColumns(ctx context.Context, dbConn *sql.DB, schema, tableName string) (
 				ON tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
 			WHERE tc.TABLE_SCHEMA = @p1 AND tc.TABLE_NAME = @p2 AND tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
 		) pk ON c.COLUMN_NAME = pk.COLUMN_NAME
+		LEFT JOIN sys.identity_columns ic
+			ON ic.object_id = OBJECT_ID(QUOTENAME(c.TABLE_SCHEMA) + '.' + QUOTENAME(c.TABLE_NAME)) AND ic.name = c.COLUMN_NAME
 		WHERE c.TABLE_SCHEMA = @p1 AND c.TABLE_NAME = @p2
 		ORDER BY c.ORDINAL_POSITION`
 
@@ -124,10 +135,13 @@ func getColumns(ctx context.Context, dbConn *sql.DB, schema, tableName string) (
 		var col types.Column
 		var nullable string
 		var defaultVal sql.NullString
+		var length, precision, scale, timePrecision sql.NullInt64
 
-		if err := rows.Scan(&col.Name, &col.DataType, &defaultVal, &nullable, &col.IsPrimaryKey); err != nil {
+		if err := rows.Scan(&col.Name, &col.DataType, &length, &precision, &scale, &timePrecision,
+			&defaultVal, &nullable, &col.IsPrimaryKey, &col.Extra); err != nil {
 			return nil, err
 		}
+		col.DataType = fullType(col.DataType, length, precision, scale, timePrecision)
 		col.IsNullable = nullable == "YES"
 		if defaultVal.Valid {
 			dv := defaultVal.String
@@ -136,6 +150,29 @@ func getColumns(ctx context.Context, dbConn *sql.DB, schema, tableName string) (
 		columns = append(columns, col)
 	}
 	return columns, rows.Err()
+}
+
+// fullType adds the length, precision or scale INFORMATION_SCHEMA reports separately:
+// nvarchar(100), varbinary(max), decimal(18,2), datetime2(3).
+func fullType(dataType string, length, precision, scale, timePrecision sql.NullInt64) string {
+	switch dataType {
+	case "char", "varchar", "nchar", "nvarchar", "binary", "varbinary":
+		if length.Int64 == -1 {
+			return dataType + "(max)"
+		}
+		if length.Valid {
+			return fmt.Sprintf("%s(%d)", dataType, length.Int64)
+		}
+	case "decimal", "numeric":
+		if precision.Valid {
+			return fmt.Sprintf("%s(%d,%d)", dataType, precision.Int64, scale.Int64)
+		}
+	case "datetime2", "datetimeoffset", "time":
+		if timePrecision.Valid {
+			return fmt.Sprintf("%s(%d)", dataType, timePrecision.Int64)
+		}
+	}
+	return dataType
 }
 
 // getIndexes returns indexes for a table
@@ -195,13 +232,17 @@ func getIndexes(ctx context.Context, dbConn *sql.DB, schema, tableName string) (
 
 // getConstraints returns constraints for a table
 func getConstraints(ctx context.Context, dbConn *sql.DB, schema, tableName string) ([]types.Constraint, error) {
-	query := `SELECT 
+	// CHECK constraints have no key columns, so KEY_COLUMN_USAGE is a LEFT JOIN.
+	query := `SELECT
 			tc.CONSTRAINT_NAME,
 			tc.CONSTRAINT_TYPE,
-			kcu.COLUMN_NAME
+			kcu.COLUMN_NAME,
+			cc.definition
 		FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-		JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+		LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
 			ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+		LEFT JOIN sys.check_constraints cc
+			ON tc.CONSTRAINT_TYPE = 'CHECK' AND cc.name = tc.CONSTRAINT_NAME AND cc.schema_id = SCHEMA_ID(tc.TABLE_SCHEMA)
 		WHERE tc.TABLE_SCHEMA = @p1 AND tc.TABLE_NAME = @p2
 			AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE', 'CHECK')
 		ORDER BY tc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`
@@ -216,26 +257,33 @@ func getConstraints(ctx context.Context, dbConn *sql.DB, schema, tableName strin
 	var orderedNames []string
 
 	for rows.Next() {
-		var name, cType, colName string
-		if err := rows.Scan(&name, &cType, &colName); err != nil {
+		var name, cType string
+		var colName, check sql.NullString
+		if err := rows.Scan(&name, &cType, &colName, &check); err != nil {
 			return nil, err
 		}
 
-		if cons, exists := consMap[name]; exists {
-			cons.Columns = append(cons.Columns, colName)
-		} else {
-			consMap[name] = &types.Constraint{
-				Name:    name,
-				Type:    cType,
-				Columns: []string{colName},
+		cons, exists := consMap[name]
+		if !exists {
+			cons = &types.Constraint{Name: name, Type: cType}
+			if check.Valid {
+				cons.Definition = "CHECK " + check.String
 			}
+			consMap[name] = cons
 			orderedNames = append(orderedNames, name)
+		}
+		if colName.Valid {
+			cons.Columns = append(cons.Columns, colName.String)
 		}
 	}
 
 	var constraints []types.Constraint
 	for _, name := range orderedNames {
-		constraints = append(constraints, *consMap[name])
+		cons := consMap[name]
+		if cons.Definition == "" {
+			cons.Definition = fmt.Sprintf("%s (%s)", cons.Type, strings.Join(cons.Columns, ", "))
+		}
+		constraints = append(constraints, *cons)
 	}
 	return constraints, rows.Err()
 }
@@ -247,8 +295,8 @@ func getForeignKeys(ctx context.Context, dbConn *sql.DB, schema, tableName strin
 			c.name AS COLUMN_NAME,
 			OBJECT_NAME(fk.referenced_object_id) AS REFERENCED_TABLE,
 			rc.name AS REFERENCED_COLUMN,
-			fk.update_referential_action_desc,
-			fk.delete_referential_action_desc
+			REPLACE(fk.update_referential_action_desc, '_', ' '),
+			REPLACE(fk.delete_referential_action_desc, '_', ' ')
 		FROM sys.foreign_keys fk
 		JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
 		JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_column_id = c.column_id

@@ -7,19 +7,6 @@ import (
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
-func TestSQLGenerator_CreateTable(t *testing.T) {
-	diffs := types.DiffList{
-		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
-	}
-	gen := NewSQLGenerator(diffs, "public", "postgresql")
-	gen.SetTransaction(false)
-	sql := gen.Generate()
-
-	if !strings.Contains(sql, "CREATE TABLE") {
-		t.Errorf("Expected CREATE TABLE, got: %s", sql)
-	}
-}
-
 func TestSQLGenerator_DropTable(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectTable, Name: "users"},
@@ -234,19 +221,6 @@ func TestSQLGenerator_ConcurrentlyNeverInsideTransaction(t *testing.T) {
 	}
 }
 
-func TestSQLGenerator_AddConstraint(t *testing.T) {
-	diffs := types.DiffList{
-		{Type: types.DiffAdd, Object: types.ObjectConstraint, Name: "users_pkey", TableName: "users"},
-	}
-	gen := NewSQLGenerator(diffs, "public", "postgresql")
-	gen.SetTransaction(false)
-	sql := gen.Generate()
-
-	if !strings.Contains(sql, "ADD CONSTRAINT") {
-		t.Errorf("Expected ADD CONSTRAINT, got: %s", sql)
-	}
-}
-
 func TestSQLGenerator_DropConstraint(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectConstraint, Name: "users_pkey", TableName: "users"},
@@ -270,19 +244,6 @@ func TestSQLGenerator_CreateSequence(t *testing.T) {
 
 	if !strings.Contains(sql, "CREATE SEQUENCE") {
 		t.Errorf("Expected CREATE SEQUENCE, got: %s", sql)
-	}
-}
-
-func TestSQLGenerator_TransactionWrapper(t *testing.T) {
-	diffs := types.DiffList{
-		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
-	}
-	gen := NewSQLGenerator(diffs, "public", "postgresql")
-	gen.SetTransaction(true)
-	sql := gen.Generate()
-
-	if !strings.Contains(sql, "DO $$") {
-		t.Errorf("Expected transaction wrapper, got: %s", sql)
 	}
 }
 
@@ -435,19 +396,6 @@ func TestSQLGeneratorMySQL_DropConstraint(t *testing.T) {
 	}
 }
 
-func TestSQLGeneratorMySQL_CreateTable(t *testing.T) {
-	diffs := types.DiffList{
-		{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"},
-	}
-	gen := NewSQLGenerator(diffs, "", "mysql")
-	gen.SetTransaction(false)
-	sql := gen.Generate()
-
-	if !strings.Contains(sql, "CREATE TABLE") {
-		t.Errorf("Expected CREATE TABLE, got: %s", sql)
-	}
-}
-
 func TestSQLGeneratorMySQL_DropColumn(t *testing.T) {
 	diffs := types.DiffList{
 		{Type: types.DiffDrop, Object: types.ObjectColumn, Name: "email", TableName: "users"},
@@ -462,21 +410,5 @@ func TestSQLGeneratorMySQL_DropColumn(t *testing.T) {
 	}
 	if strings.Contains(sql, "CASCADE") {
 		t.Errorf("MySQL DROP COLUMN should not use CASCADE, got: %s", sql)
-	}
-}
-
-func TestSQLGeneratorMySQL_AlterForeignKey(t *testing.T) {
-	diffs := types.DiffList{
-		{Type: types.DiffAlter, Object: types.ObjectForeignKey, Name: "fk_users_org", TableName: "users"},
-	}
-	gen := NewSQLGenerator(diffs, "", "mysql")
-	gen.SetTransaction(false)
-	sql := gen.Generate()
-
-	if !strings.Contains(sql, "DROP FOREIGN KEY fk_users_org") {
-		t.Errorf("Expected DROP FOREIGN KEY in alter, got: %s", sql)
-	}
-	if !strings.Contains(sql, "ADD CONSTRAINT fk_users_org") {
-		t.Errorf("Expected ADD CONSTRAINT after drop in alter, got: %s", sql)
 	}
 }

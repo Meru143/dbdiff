@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/meru143/dbdiff/internal/db"
+	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -88,8 +89,8 @@ var ApplyCmd = &cobra.Command{
 
 		// If transaction is desired and not manually managed in SQL
 		sqlCmd := string(content)
-		if cfg.Transaction && !strings.Contains(strings.ToUpper(sqlCmd), "BEGIN;") {
-			sqlCmd = "BEGIN;\n" + sqlCmd + "\nCOMMIT;"
+		if cfg.Transaction {
+			sqlCmd = inTransaction(driver.Dialect(), sqlCmd)
 		}
 
 		if err := driver.Exec(ctx, sqlCmd); err != nil {
@@ -104,4 +105,16 @@ var ApplyCmd = &cobra.Command{
 		logging.Info(fmt.Sprintf("Migration %s successfully recorded.", version))
 		return nil
 	},
+}
+
+// inTransaction wraps a migration in the target's transaction statements, unless it
+// already manages its own.
+func inTransaction(dialect, sql string) string {
+	upper := strings.ToUpper(sql)
+	for _, begin := range []string{"BEGIN;", "BEGIN TRAN", "START TRANSACTION"} {
+		if strings.Contains(upper, begin) {
+			return sql
+		}
+	}
+	return diff.WrapTransaction(dialect, sql)
 }

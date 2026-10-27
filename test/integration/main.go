@@ -109,7 +109,7 @@ func runIntegrationTest(cfg DBTestConfig) {
 	}
 	defer sourceDriver.Close()
 
-	sourceSchema, err := sourceDriver.Introspect(ctx, getDefaultSchema(cfg.Dialect), nil)
+	sourceSchema, err := sourceDriver.Introspect(ctx, defaultSchema, nil)
 	if err != nil {
 		fmt.Printf("❌ Failed to introspect source: %v\n", err)
 		os.Exit(1)
@@ -130,7 +130,7 @@ func runIntegrationTest(cfg DBTestConfig) {
 	}
 	defer targetDriver.Close()
 
-	targetSchema, err := targetDriver.Introspect(ctx, getDefaultSchema(cfg.Dialect), nil)
+	targetSchema, err := targetDriver.Introspect(ctx, defaultSchema, nil)
 	if err != nil {
 		fmt.Printf("❌ Failed to introspect target: %v\n", err)
 		os.Exit(1)
@@ -144,21 +144,27 @@ func runIntegrationTest(cfg DBTestConfig) {
 
 	// Test 6: Generate migration SQL
 	fmt.Println("\n--- Test 6: Generate migration SQL ---")
-	formatterOpts := output.FormatOptions{
-		Format:   "sql",
-		SourceDB: cfg.SourceURL,
-	}
-	formatter := output.NewFormatterWithOptions(formatterOpts)
+	formatter := output.NewFormatterWithOptions(output.FormatOptions{
+		Format:       "sql",
+		Dialect:      cfg.Dialect,
+		Schema:       defaultSchema,
+		SourceSchema: sourceSchema,
+		SourceDB:     cfg.SourceURL,
+	})
 	migrationSQL, err := formatter.FormatMigration(differences, true)
 	if err != nil {
 		fmt.Printf("❌ Failed to generate migration: %v\n", err)
 		os.Exit(1)
 	}
-	if strings.Contains(migrationSQL, "TABLE") || strings.Contains(migrationSQL, "table") {
-		fmt.Println("✅ Migration SQL generated")
-	} else {
-		fmt.Println("⚠️  Migration SQL may be incomplete")
+	// The migration is in the target's dialect, creates tables with their columns, and never
+	// uses a connection URL as a schema name.
+	begin := map[string]string{"postgresql": "BEGIN;", "mysql": "START TRANSACTION;"}[cfg.Dialect]
+	if !strings.Contains(migrationSQL, begin) || !strings.Contains(migrationSQL, "CREATE TABLE posts (\n  id ") ||
+		strings.Contains(migrationSQL, "://") {
+		fmt.Printf("❌ Unexpected migration SQL:\n%s\n", migrationSQL)
+		os.Exit(1)
 	}
+	fmt.Println("✅ Migration SQL generated")
 
 	// Test 7: Table format output
 	fmt.Println("\n--- Test 7: Table format output ---")
@@ -222,12 +228,8 @@ func runIntegrationTest(cfg DBTestConfig) {
 	fmt.Println("✅ Migration tracking validated")
 }
 
-func getDefaultSchema(dialect string) string {
-	if dialect == "mysql" {
-		return "sourcedb" // mysql schema is DB name
-	}
-	return "public"
-}
+// defaultSchema is the CLI's default schema; MySQL maps it to each connection's own database.
+const defaultSchema = "public"
 
 func waitForDB(url string, maxAttempts int) bool {
 	for i := 0; i < maxAttempts; i++ {

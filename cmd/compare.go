@@ -75,7 +75,9 @@ var CompareCmd = &cobra.Command{
 
 		logging.Info(fmt.Sprintf("Found %d differences", len(differences)))
 
-		formatter := output.NewFormatter(cfg.Format)
+		opts := sqlOptions(cfg, targetDriver, sourceSchema)
+		opts.Format, opts.PrettyPrint, opts.IncludeMeta, opts.UseColors = cfg.Format, true, true, true
+		formatter := output.NewFormatterWithOptions(opts)
 		outputStr, err := formatter.Format(differences)
 		if err != nil {
 			return fmt.Errorf("failed to format output: %w", err)

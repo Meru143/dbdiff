@@ -65,7 +65,7 @@ var DiffCmd = &cobra.Command{
 			return fmt.Errorf("failed to introspect target: %w", err)
 		}
 
-		differences := diff.NewDiffEngine(sourceSchema, targetSchema, sourceDriver.NormalizeType).Compare()
+		differences := diff.NewDiffEngine(sourceSchema, targetSchema, typeNormalizer(sourceDriver, targetDriver)).Compare()
 
 		if len(differences) == 0 {
 			logging.Info("No differences found!")

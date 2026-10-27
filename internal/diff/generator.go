@@ -14,28 +14,19 @@ type SQLGenerator struct {
 	sourceSchema *types.Schema
 	schemaName   string
 	dialect      string
-	lockTimeout  string
 	concurrently bool
 	transaction  bool
+	variables    int // T-SQL variables declared so far, for unique names
 }
 
 // NewSQLGenerator creates a new SQL generator
 func NewSQLGenerator(diffs types.DiffList, schemaName string, dialect string) *SQLGenerator {
-	if dialect == "" {
-		dialect = "postgresql" // default
-	}
-	return &SQLGenerator{
-		diffs:        diffs,
-		sourceSchema: nil,
-		schemaName:   schemaName,
-		dialect:      dialect,
-		lockTimeout:  "10s",
-		concurrently: true,
-		transaction:  true,
-	}
+	return NewSQLGeneratorWithSchema(diffs, schemaName, nil, dialect)
 }
 
-// NewSQLGeneratorWithSchema creates a new SQL generator with source schema for full SQL generation
+// NewSQLGeneratorWithSchema creates a new SQL generator with source schema for full SQL generation.
+// The source schema supplies the definitions (column types, defaults, constraints, foreign keys)
+// that CREATE and ADD statements need; without it they fall back to a comment.
 func NewSQLGeneratorWithSchema(diffs types.DiffList, schemaName string, sourceSchema *types.Schema, dialect string) *SQLGenerator {
 	if dialect == "" {
 		dialect = "postgresql" // default
@@ -45,7 +36,6 @@ func NewSQLGeneratorWithSchema(diffs types.DiffList, schemaName string, sourceSc
 		sourceSchema: sourceSchema,
 		schemaName:   schemaName,
 		dialect:      dialect,
-		lockTimeout:  "10s",
 		concurrently: true,
 		transaction:  true,
 	}
@@ -66,11 +56,6 @@ func (g *SQLGenerator) SetConcurrently(concurrently bool) {
 func (g *SQLGenerator) Generate() string {
 	var sql []string
 
-	// Add lock timeout at the start
-	if g.lockTimeout != "" {
-		sql = append(sql, fmt.Sprintf("SET lock_timeout = '%s';", g.lockTimeout))
-	}
-
 	// Sort diffs: CREATE TABLE first, then ALTER, then DROP (real topological sort)
 	sorted := g.topologicalSort()
 
@@ -78,32 +63,86 @@ func (g *SQLGenerator) Generate() string {
 	for _, diff := range sorted {
 		stmt := g.generateStatement(&diff)
 		if stmt != "" {
-			sql = append(sql, stmt)
+			sql = append(sql, withDetails(&diff, stmt))
 		}
 	}
+	if len(sql) == 0 {
+		return ""
+	}
+	sql = append([]string{g.lockTimeoutSQL()}, sql...)
 
-	// Wrap in transaction if requested (PostgreSQL uses DO logic, MySQL has limited transaction DDL support)
-	if g.transaction && len(sql) > 0 {
-		if g.dialect == "mysql" {
-			// Basic transaction for MySQL, though DDL implicitly commits in MySQL
-			transactionalSQL := []string{"START TRANSACTION;"}
-			transactionalSQL = append(transactionalSQL, sql...)
-			transactionalSQL = append(transactionalSQL, "COMMIT;")
-			return strings.Join(transactionalSQL, "\n")
-		} else {
-			transactionalSQL := []string{"DO $$"}
-			transactionalSQL = append(transactionalSQL, "BEGIN")
-			transactionalSQL = append(transactionalSQL, sql...)
-			transactionalSQL = append(transactionalSQL, "EXCEPTION WHEN OTHERS THEN")
-			transactionalSQL = append(transactionalSQL, "  RAISE NOTICE 'Migration failed: %', SQLERRM;")
-			transactionalSQL = append(transactionalSQL, "  ROLLBACK;")
-			transactionalSQL = append(transactionalSQL, "  RAISE;")
-			transactionalSQL = append(transactionalSQL, "END $$;")
-			return strings.Join(transactionalSQL, "\n")
+	if !g.transaction {
+		return strings.Join(sql, "\n\n")
+	}
+	if g.dialect != "postgresql" {
+		return WrapTransaction(g.dialect, strings.Join(sql, "\n\n"))
+	}
+	transactionalSQL := []string{"DO $$"}
+	transactionalSQL = append(transactionalSQL, "BEGIN")
+	transactionalSQL = append(transactionalSQL, sql...)
+	transactionalSQL = append(transactionalSQL, "EXCEPTION WHEN OTHERS THEN")
+	transactionalSQL = append(transactionalSQL, "  RAISE NOTICE 'Migration failed: %', SQLERRM;")
+	transactionalSQL = append(transactionalSQL, "  ROLLBACK;")
+	transactionalSQL = append(transactionalSQL, "  RAISE;")
+	transactionalSQL = append(transactionalSQL, "END $$;")
+	return strings.Join(transactionalSQL, "\n")
+}
+
+// WrapTransaction wraps migration SQL in the dialect's transaction statements.
+func WrapTransaction(dialect, sql string) string {
+	sql = strings.TrimRight(sql, "\n")
+	switch dialect {
+	case "mysql":
+		return "-- MySQL commits each DDL statement implicitly: if a statement fails, the ones before it stay applied.\n" +
+			"START TRANSACTION;\n\n" + sql + "\n\nCOMMIT;"
+	case "sqlserver":
+		// Without XACT_ABORT, SQL Server keeps going after a failed statement and COMMIT keeps the rest.
+		return "SET XACT_ABORT ON;\nBEGIN TRANSACTION;\n\n" + sql + "\n\nCOMMIT TRANSACTION;"
+	default:
+		return "BEGIN;\n\n" + sql + "\n\nCOMMIT;"
+	}
+}
+
+// lockTimeoutSQL makes DDL give up after 10 seconds instead of queueing behind long
+// transactions, and blocking every query that queues behind it in turn.
+func (g *SQLGenerator) lockTimeoutSQL() string {
+	switch g.dialect {
+	case "mysql":
+		return "SET SESSION lock_wait_timeout = 10;"
+	case "sqlserver":
+		return "SET LOCK_TIMEOUT 10000;"
+	default:
+		return "SET lock_timeout = '10s';"
+	}
+}
+
+// withDetails adds what changed (the diff's description and old and new values) as comments
+// under the statement's first line. Definitions of views, functions and triggers are left
+// out: the statement itself carries the new one.
+func withDetails(diff *types.Diff, stmt string) string {
+	var details []string
+	if diff.Description != "" {
+		details = append(details, diff.Description)
+	}
+	switch diff.Object {
+	case types.ObjectView, types.ObjectMaterializedView, types.ObjectFunction, types.ObjectTrigger:
+	default:
+		if diff.Type == types.DiffAlter && diff.OldValue != "" {
+			details = append(details, "Old: "+diff.OldValue)
+		}
+		if diff.Type == types.DiffAlter && diff.NewValue != "" {
+			details = append(details, "New: "+diff.NewValue)
 		}
 	}
-
-	return strings.Join(sql, "\n")
+	if len(details) == 0 {
+		return stmt
+	}
+	first, rest, _ := strings.Cut(stmt, "\n")
+	comment := "-- " + strings.ReplaceAll(strings.Join(details, "\n"), "\n", "\n-- ")
+	if rest == "" {
+		return first + "\n" + comment
+	}
+	return first + "\n" + comment + "\n" + rest
 }
 
 func (g *SQLGenerator) topologicalSort() types.DiffList {
@@ -218,21 +257,16 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 	schema := schemaPrefix(g.schemaName)
 	switch diff.Type {
 	case types.DiffAdd:
-		// Try to get full table definition from source schema
-		if g.sourceSchema != nil {
-			for _, table := range g.sourceSchema.Tables {
-				if table.Name == diff.Name {
-					return g.generateFullCreateTable(&table, schema)
-				}
-			}
+		if table := g.sourceTable(diff.Name); table != nil {
+			return g.generateFullCreateTable(table, schema)
 		}
-		// Fallback if no source schema
-		return fmt.Sprintf("-- Create table: %s\nCREATE TABLE IF NOT EXISTS %s%s ();", diff.Name, schema, diff.Name)
+		return fmt.Sprintf("-- Create table: %s\n-- %s", diff.Name, noDefinition)
 	case types.DiffDrop:
-		if g.dialect == "mysql" {
+		if g.dialect == "postgresql" {
 			return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
 		}
-		return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s CASCADE;", diff.Name, schema, diff.Name)
+		// MySQL ignores CASCADE here and SQL Server rejects it.
+		return fmt.Sprintf("-- Drop table: %s\nDROP TABLE IF EXISTS %s%s;", diff.Name, schema, diff.Name)
 	case types.DiffRename:
 		if g.dialect == "mysql" {
 			return fmt.Sprintf("-- Rename table: %s -> %s\nRENAME TABLE %s%s TO %s%s;",
@@ -245,85 +279,72 @@ func (g *SQLGenerator) generateTableDiff(diff *types.Diff) string {
 	}
 }
 
+// noDefinition marks a change the generator can't write because the diff has no source
+// schema to take the definition from. Emitting a guess (a column typed text, a constraint
+// with no body) would either fail or silently change the schema.
+const noDefinition = "definition not available, write this change by hand"
+
 // generateFullCreateTable generates a complete CREATE TABLE statement with columns and constraints
 func (g *SQLGenerator) generateFullCreateTable(table *types.Table, schema string) string {
 	var parts []string
-
-	// Generate column definitions
-	var colDefs []string
 	for _, col := range table.Columns {
-		colDef := g.generateColumnDefinition(col)
-		colDefs = append(colDefs, colDef)
+		parts = append(parts, g.columnDefinition(col))
 	}
-
-	// Generate table-level constraints (UNIQUE, CHECK)
 	for _, cons := range table.Constraints {
-		if cons.Type == "UNIQUE" || cons.Type == "CHECK" {
-			colDefs = append(colDefs, g.generateConstraintDefinition(cons, table.Name))
+		if def := g.constraintDefinition(cons); def != "" {
+			parts = append(parts, def)
 		}
 	}
-
-	if len(colDefs) > 0 {
-		parts = append(parts, strings.Join(colDefs, ",\n  "))
-	}
-
-	// Generate primary key
-	for _, cons := range table.Constraints {
-		if cons.Type == "PRIMARY KEY" {
-			parts = append(parts, fmt.Sprintf("  PRIMARY KEY (%s)", strings.Join(cons.Columns, ", ")))
-		}
-	}
-
-	// Generate foreign keys
 	for _, fk := range table.ForeignKeys {
-		parts = append(parts, g.generateForeignKeyDefinition(fk))
+		parts = append(parts, g.foreignKeyDefinition(fk))
 	}
-
-	// Build the CREATE TABLE statement
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("-- Create table: %s\n", table.Name))
-	sb.WriteString(fmt.Sprintf("CREATE TABLE %s%s (\n  %s\n);", schema, table.Name, strings.Join(parts, ",\n  ")))
-
-	return sb.String()
+	return fmt.Sprintf("-- Create table: %s\nCREATE TABLE %s%s (\n  %s\n);",
+		table.Name, schema, table.Name, strings.Join(parts, ",\n  "))
 }
 
-// generateColumnDefinition generates a column definition
-func (g *SQLGenerator) generateColumnDefinition(col types.Column) string {
+// columnDefinition spells out a column as CREATE TABLE, ADD COLUMN and MySQL's MODIFY COLUMN
+// take it: name, full type, default, the dialect's extras (identity, auto-increment) and
+// nullability, which SQL Server and MySQL would otherwise reset.
+func (g *SQLGenerator) columnDefinition(col types.Column) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("%s %s", col.Name, col.DataType))
-
-	// Add default value
+	sb.WriteString(col.Name + " " + col.DataType)
 	if col.DefaultValue != nil && *col.DefaultValue != "" {
-		sb.WriteString(fmt.Sprintf(" DEFAULT %s", *col.DefaultValue))
+		sb.WriteString(" DEFAULT " + *col.DefaultValue)
 	}
-
-	// Add null constraint
-	if !col.IsNullable {
+	if col.Extra != "" {
+		sb.WriteString(" " + col.Extra)
+	}
+	if col.IsNullable {
+		sb.WriteString(" NULL")
+	} else {
 		sb.WriteString(" NOT NULL")
 	}
-
 	return sb.String()
 }
 
-// generateConstraintDefinition generates a table-level constraint definition
-func (g *SQLGenerator) generateConstraintDefinition(cons types.Constraint, tableName string) string {
-	switch cons.Type {
-	case "UNIQUE":
-		return fmt.Sprintf("UNIQUE (%s)", strings.Join(cons.Columns, ", "))
-	case "CHECK":
-		// Check constraints need a definition - use placeholder if not available
-		return fmt.Sprintf("CONSTRAINT %s CHECK (%s)", cons.Name, strings.Join(cons.Columns, " AND "))
-	default:
-		return fmt.Sprintf("CONSTRAINT %s", cons.Name)
+// constraintDefinition returns a table constraint clause, e.g. CONSTRAINT uq_email UNIQUE (email),
+// or "" for a CHECK whose expression was not introspected.
+func (g *SQLGenerator) constraintDefinition(cons types.Constraint) string {
+	def := cons.Definition
+	if def == "" {
+		if cons.Type != "PRIMARY KEY" && cons.Type != "UNIQUE" {
+			return ""
+		}
+		def = fmt.Sprintf("%s (%s)", cons.Type, strings.Join(cons.Columns, ", "))
 	}
+	if g.dialect == "mysql" && cons.Type == "PRIMARY KEY" {
+		return def // MySQL calls every primary key PRIMARY and takes no name for it
+	}
+	return fmt.Sprintf("CONSTRAINT %s %s", cons.Name, def)
 }
 
-// generateForeignKeyDefinition generates a foreign key constraint
-func (g *SQLGenerator) generateForeignKeyDefinition(fk types.ForeignKey) string {
+// foreignKeyDefinition returns a foreign key clause for CREATE TABLE or ADD.
+func (g *SQLGenerator) foreignKeyDefinition(fk types.ForeignKey) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s(%s)",
+	sb.WriteString(fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s%s (%s)",
 		fk.Name,
 		strings.Join(fk.Columns, ", "),
+		schemaPrefix(g.schemaName),
 		fk.RefTable,
 		strings.Join(fk.RefColumns, ", ")))
 
@@ -338,70 +359,192 @@ func (g *SQLGenerator) generateForeignKeyDefinition(fk types.ForeignKey) string 
 }
 
 func (g *SQLGenerator) generateColumnDiff(diff *types.Diff) string {
-	schema := schemaPrefix(g.schemaName)
+	table := schemaPrefix(g.schemaName) + diff.TableName
 	switch diff.Type {
 	case types.DiffAdd:
-		// NewValue contains the data type from comparison
-		dataType := diff.NewValue
-		if dataType == "" {
-			dataType = "text" // fallback
+		head := fmt.Sprintf("-- Add column: %s to %s\n", diff.Name, diff.TableName)
+		var def string
+		if col := g.sourceColumn(diff.TableName, diff.Name); col != nil {
+			def = g.columnDefinition(*col)
+		} else if diff.NewValue != "" {
+			def = diff.Name + " " + diff.NewValue
+		} else {
+			return head + "-- " + noDefinition
 		}
-		return fmt.Sprintf("-- Add column: %s to %s\nALTER TABLE %s%s ADD COLUMN %s %s;",
-			diff.Name, diff.TableName, schema, diff.TableName, diff.Name, dataType)
+		add := "ADD COLUMN"
+		if g.dialect == "sqlserver" {
+			add = "ADD" // T-SQL has no COLUMN keyword here
+		}
+		return fmt.Sprintf("%sALTER TABLE %s %s %s;", head, table, add, def)
 	case types.DiffDrop:
-		if g.dialect == "mysql" || g.dialect == "sqlserver" {
-			return fmt.Sprintf("-- Drop column: %s from %s\nALTER TABLE %s%s DROP COLUMN %s;",
-				diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
+		head := fmt.Sprintf("-- Drop column: %s from %s\n", diff.Name, diff.TableName)
+		switch g.dialect {
+		case "mysql":
+			return fmt.Sprintf("%sALTER TABLE %s DROP COLUMN %s;", head, table, diff.Name)
+		case "sqlserver":
+			// SQL Server refuses to drop a column that still has a DEFAULT constraint.
+			return fmt.Sprintf("%s%s\nALTER TABLE %s DROP COLUMN %s;", head, g.dropDefaultSQL(table, diff.Name), table, diff.Name)
+		default:
+			return fmt.Sprintf("%sALTER TABLE %s DROP COLUMN IF EXISTS %s CASCADE;", head, table, diff.Name)
 		}
-		return fmt.Sprintf("-- Drop column: %s from %s\nALTER TABLE %s%s DROP COLUMN IF EXISTS %s CASCADE;",
-			diff.Name, diff.TableName, schema, diff.TableName, diff.Name)
 	case types.DiffAlter:
-		if diff.OldValue != "" && diff.NewValue != "" {
-			// Check if it's a type change or nullable change
-			if diff.OldValue == "NULL" || diff.OldValue == "NOT NULL" {
-				// Nullable change
-				if g.dialect == "mysql" {
-					// In MySQL, you alter column by modifying it with its full type.
-					// Attempt to find the column definition from source schema
-					colType := "VARCHAR(255)" // Default fallback
-					if g.sourceSchema != nil {
-						for _, t := range g.sourceSchema.Tables {
-							if t.Name == diff.TableName {
-								for _, c := range t.Columns {
-									if c.Name == diff.Name {
-										colType = c.DataType
-										break
-									}
-								}
-							}
-						}
-					}
-					return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s MODIFY COLUMN %s %s %s;",
-						diff.TableName, diff.Name, schema, diff.TableName, diff.Name, colType, diff.NewValue)
-				}
-				nullable := "DROP NOT NULL"
-				if diff.NewValue == "NOT NULL" {
-					nullable = "SET NOT NULL"
-				}
-				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s %s;",
-					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, nullable)
-			}
-			// Type change
-			if g.dialect == "mysql" {
-				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s MODIFY COLUMN %s %s;",
-					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
-			}
-			if g.dialect == "sqlserver" {
-				return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s %s;",
-					diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue)
-			}
-			return fmt.Sprintf("-- Alter column: %s.%s\nALTER TABLE %s%s ALTER COLUMN %s TYPE %s USING (%s::%s);",
-				diff.TableName, diff.Name, schema, diff.TableName, diff.Name, diff.NewValue, diff.Name, diff.NewValue)
-		}
-		return ""
+		return g.alterColumnSQL(diff, table)
 	default:
 		return ""
 	}
+}
+
+// Column ALTER diffs say which attribute changed in their description.
+const (
+	columnTypeChanged     = "Type changed"
+	columnNullableChanged = "Nullability changed"
+	columnDefaultChanged  = "Default changed"
+	columnOrderChanged    = "Column order changed"
+)
+
+// columnChange tells which attribute a column ALTER diff changes. Diffs built without a
+// description (JSON written by older versions, hand-made diffs) are read from their values.
+func columnChange(diff *types.Diff) string {
+	switch diff.Description {
+	case columnTypeChanged, columnNullableChanged, columnDefaultChanged, columnOrderChanged:
+		return diff.Description
+	}
+	if diff.Name == "__column_order__" {
+		return columnOrderChanged
+	}
+	if diff.OldValue == "NULL" || diff.OldValue == "NOT NULL" {
+		return columnNullableChanged
+	}
+	return columnTypeChanged
+}
+
+func (g *SQLGenerator) alterColumnSQL(diff *types.Diff, table string) string {
+	head := fmt.Sprintf("-- Alter column: %s.%s\n", diff.TableName, diff.Name)
+	change := columnChange(diff)
+	if change == columnOrderChanged {
+		return fmt.Sprintf("-- Column order of %s differs; this migration does not reorder columns", diff.TableName)
+	}
+	if change == columnTypeChanged && diff.NewValue == "" {
+		return ""
+	}
+	col := g.sourceColumn(diff.TableName, diff.Name)
+
+	switch g.dialect {
+	case "mysql":
+		// MODIFY COLUMN replaces the whole definition: anything it leaves out (NOT NULL, the
+		// default, AUTO_INCREMENT) is dropped, so it needs the source column.
+		if col != nil {
+			return fmt.Sprintf("%sALTER TABLE %s MODIFY COLUMN %s;", head, table, g.columnDefinition(*col))
+		}
+		if change == columnTypeChanged {
+			return fmt.Sprintf("%sALTER TABLE %s MODIFY COLUMN %s %s;", head, table, diff.Name, diff.NewValue)
+		}
+		return head + "-- " + noDefinition
+	case "sqlserver":
+		if change == columnDefaultChanged {
+			stmt := head + g.dropDefaultSQL(table, diff.Name)
+			if diff.NewValue != "" {
+				stmt += fmt.Sprintf("\nALTER TABLE %s ADD DEFAULT %s FOR %s;", table, diff.NewValue, diff.Name)
+			}
+			return stmt
+		}
+		if col == nil {
+			if change == columnTypeChanged {
+				return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s %s;", head, table, diff.Name, diff.NewValue)
+			}
+			return head + "-- " + noDefinition
+		}
+		// ALTER COLUMN resets the column to NULL unless told otherwise, and a type change
+		// fails while a DEFAULT constraint depends on the column.
+		null := "NULL"
+		if !col.IsNullable {
+			null = "NOT NULL"
+		}
+		alter := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s %s;", table, col.Name, col.DataType, null)
+		if change != columnTypeChanged {
+			return head + alter
+		}
+		stmt := head + g.dropDefaultSQL(table, col.Name) + "\n" + alter
+		if col.DefaultValue != nil && *col.DefaultValue != "" {
+			stmt += fmt.Sprintf("\nALTER TABLE %s ADD DEFAULT %s FOR %s;", table, *col.DefaultValue, col.Name)
+		}
+		return stmt
+	default:
+		switch change {
+		case columnNullableChanged:
+			nullable := "DROP NOT NULL"
+			if diff.NewValue == "NOT NULL" {
+				nullable = "SET NOT NULL"
+			}
+			return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s %s;", head, table, diff.Name, nullable)
+		case columnDefaultChanged:
+			if diff.NewValue == "" {
+				return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;", head, table, diff.Name)
+			}
+			return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;", head, table, diff.Name, diff.NewValue)
+		default:
+			return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s TYPE %s USING (%s::%s);",
+				head, table, diff.Name, diff.NewValue, diff.Name, diff.NewValue)
+		}
+	}
+}
+
+// dropDefaultSQL drops a SQL Server column's DEFAULT constraint. The server names it
+// (DF__users__statu__3B75D760), so the name is looked up when the migration runs; a column
+// without a default leaves the variable NULL, and EXEC of NULL does nothing.
+func (g *SQLGenerator) dropDefaultSQL(table, column string) string {
+	g.variables++
+	v := fmt.Sprintf("@drop_default_%d", g.variables)
+	return fmt.Sprintf("DECLARE %[1]s nvarchar(max) = (SELECT N'ALTER TABLE %[2]s DROP CONSTRAINT ' + QUOTENAME(name)"+
+		" FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID(N'%[2]s')"+
+		" AND parent_column_id = COLUMNPROPERTY(OBJECT_ID(N'%[2]s'), N'%[3]s', 'ColumnId'));\nEXEC (%[1]s);",
+		v, table, column)
+}
+
+// sourceTable finds a table of the source (desired) schema.
+func (g *SQLGenerator) sourceTable(name string) *types.Table {
+	if g.sourceSchema == nil {
+		return nil
+	}
+	for i := range g.sourceSchema.Tables {
+		if g.sourceSchema.Tables[i].Name == name {
+			return &g.sourceSchema.Tables[i]
+		}
+	}
+	return nil
+}
+
+func (g *SQLGenerator) sourceColumn(table, name string) *types.Column {
+	if t := g.sourceTable(table); t != nil {
+		for i := range t.Columns {
+			if t.Columns[i].Name == name {
+				return &t.Columns[i]
+			}
+		}
+	}
+	return nil
+}
+
+func (g *SQLGenerator) sourceConstraint(table, name string) *types.Constraint {
+	if t := g.sourceTable(table); t != nil {
+		for i := range t.Constraints {
+			if t.Constraints[i].Name == name {
+				return &t.Constraints[i]
+			}
+		}
+	}
+	return nil
+}
+
+func (g *SQLGenerator) sourceForeignKey(table, name string) *types.ForeignKey {
+	if t := g.sourceTable(table); t != nil {
+		for i := range t.ForeignKeys {
+			if t.ForeignKeys[i].Name == name {
+				return &t.ForeignKeys[i]
+			}
+		}
+	}
+	return nil
 }
 
 func (g *SQLGenerator) generateIndexDiff(diff *types.Diff) string {
@@ -480,57 +623,73 @@ func (g *SQLGenerator) concurrentlyClause() string {
 }
 
 func (g *SQLGenerator) generateConstraintDiff(diff *types.Diff) string {
-	schema := schemaPrefix(g.schemaName)
+	table := schemaPrefix(g.schemaName) + diff.TableName
+	var add string
+	if cons := g.sourceConstraint(diff.TableName, diff.Name); cons != nil {
+		if def := g.constraintDefinition(*cons); def != "" {
+			add = fmt.Sprintf("ALTER TABLE %s ADD %s;", table, def)
+		}
+	}
 	switch diff.Type {
 	case types.DiffAdd:
-		// Note: Full constraint would need constraint type and definition
-		return fmt.Sprintf("-- Add constraint: %s\nALTER TABLE %s%s ADD CONSTRAINT %s;",
-			diff.Name, schema, diff.TableName, diff.Name)
+		if add == "" {
+			return fmt.Sprintf("-- Add constraint: %s\n-- %s", diff.Name, noDefinition)
+		}
+		return fmt.Sprintf("-- Add constraint: %s\n%s", diff.Name, add)
 	case types.DiffDrop:
-		if g.dialect == "mysql" || g.dialect == "sqlserver" {
-			return fmt.Sprintf("-- Drop constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;",
-				diff.Name, schema, diff.TableName, diff.Name)
-		}
-		return fmt.Sprintf("-- Drop constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;",
-			diff.Name, schema, diff.TableName, diff.Name)
+		return fmt.Sprintf("-- Drop constraint: %s\n%s", diff.Name, g.dropConstraintSQL(table, diff.Name))
 	case types.DiffAlter:
-		// Drop and recreate
-		if g.dialect == "mysql" {
-			return fmt.Sprintf("-- Alter constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
-				diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
+		// Never drop a constraint we can't add back.
+		if add == "" {
+			return fmt.Sprintf("-- Alter constraint: %s\n-- %s", diff.Name, noDefinition)
 		}
-		return fmt.Sprintf("-- Alter constraint: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
-			diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
+		return fmt.Sprintf("-- Alter constraint: %s\n%s\n%s", diff.Name, g.dropConstraintSQL(table, diff.Name), add)
 	default:
 		return ""
 	}
 }
 
+func (g *SQLGenerator) dropConstraintSQL(table, name string) string {
+	switch g.dialect {
+	case "mysql":
+		if name == "PRIMARY" {
+			return fmt.Sprintf("ALTER TABLE %s DROP PRIMARY KEY;", table)
+		}
+		return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s;", table, name)
+	case "sqlserver":
+		return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s;", table, name)
+	default:
+		return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s;", table, name)
+	}
+}
+
 func (g *SQLGenerator) generateForeignKeyDiff(diff *types.Diff) string {
-	schema := schemaPrefix(g.schemaName)
+	table := schemaPrefix(g.schemaName) + diff.TableName
+	var add string
+	if fk := g.sourceForeignKey(diff.TableName, diff.Name); fk != nil {
+		add = fmt.Sprintf("ALTER TABLE %s ADD %s;", table, g.foreignKeyDefinition(*fk))
+	}
+	drop := fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s;", table, diff.Name)
+	switch g.dialect {
+	case "mysql":
+		drop = fmt.Sprintf("ALTER TABLE %s DROP FOREIGN KEY %s;", table, diff.Name)
+	case "sqlserver":
+		drop = fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s;", table, diff.Name)
+	}
 	switch diff.Type {
 	case types.DiffAdd:
-		return fmt.Sprintf("-- Add foreign key: %s\nALTER TABLE %s%s ADD CONSTRAINT %s;",
-			diff.Name, schema, diff.TableName, diff.Name)
+		if add == "" {
+			return fmt.Sprintf("-- Add foreign key: %s\n-- %s", diff.Name, noDefinition)
+		}
+		return fmt.Sprintf("-- Add foreign key: %s\n%s", diff.Name, add)
 	case types.DiffDrop:
-		if g.dialect == "mysql" {
-			return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP FOREIGN KEY %s;",
-				diff.Name, schema, diff.TableName, diff.Name)
-		}
-		if g.dialect == "sqlserver" {
-			return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT %s;",
-				diff.Name, schema, diff.TableName, diff.Name)
-		}
-		return fmt.Sprintf("-- Drop foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;",
-			diff.Name, schema, diff.TableName, diff.Name)
+		return fmt.Sprintf("-- Drop foreign key: %s\n%s", diff.Name, drop)
 	case types.DiffAlter:
-		// For FK changes, drop and recreate
-		if g.dialect == "mysql" {
-			return fmt.Sprintf("-- Alter foreign key: %s\nALTER TABLE %s%s DROP FOREIGN KEY %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
-				diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
+		// Never drop a foreign key we can't add back.
+		if add == "" {
+			return fmt.Sprintf("-- Alter foreign key: %s\n-- %s", diff.Name, noDefinition)
 		}
-		return fmt.Sprintf("-- Alter foreign key: %s\nALTER TABLE %s%s DROP CONSTRAINT IF EXISTS %s;"+"\n"+"ALTER TABLE %s%s ADD CONSTRAINT %s;",
-			diff.Name, schema, diff.TableName, diff.Name, schema, diff.TableName, diff.Name)
+		return fmt.Sprintf("-- Alter foreign key: %s\n%s\n%s", diff.Name, drop, add)
 	default:
 		return ""
 	}
@@ -540,6 +699,20 @@ func (g *SQLGenerator) generateSequenceDiff(diff *types.Diff) string {
 	schema := schemaPrefix(g.schemaName)
 	switch diff.Type {
 	case types.DiffAdd:
+		// CREATE SEQUENCE alone makes a bigint sequence; a serial column's is capped at
+		// 2147483647, so the source's bounds are spelled out.
+		if g.sourceSchema != nil {
+			for _, seq := range g.sourceSchema.Sequences {
+				if seq.Name == diff.Name {
+					cycle := ""
+					if seq.Cycle {
+						cycle = " CYCLE"
+					}
+					return fmt.Sprintf("-- Create sequence: %s\nCREATE SEQUENCE %s%s INCREMENT BY %d MINVALUE %d MAXVALUE %d START WITH %d CACHE %d%s;",
+						diff.Name, schema, diff.Name, seq.Increment, seq.MinValue, seq.MaxValue, seq.Start, seq.Cache, cycle)
+				}
+			}
+		}
 		return fmt.Sprintf("-- Create sequence: %s\nCREATE SEQUENCE %s%s;",
 			diff.Name, schema, diff.Name)
 	case types.DiffDrop:
@@ -560,8 +733,20 @@ func (g *SQLGenerator) generateTypeDiff(diff *types.Diff) string {
 	schema := schemaPrefix(g.schemaName)
 	switch diff.Type {
 	case types.DiffAdd:
-		return fmt.Sprintf("-- Create type: %s\nCREATE TYPE %s%s;",
-			diff.Name, schema, diff.Name)
+		if g.sourceSchema != nil {
+			for _, t := range g.sourceSchema.Types {
+				if t.Name == diff.Name && t.Kind == "enum" {
+					labels := make([]string, len(t.Values))
+					for i, v := range t.Values {
+						labels[i] = "'" + strings.ReplaceAll(v, "'", "''") + "'"
+					}
+					return fmt.Sprintf("-- Create type: %s\nCREATE TYPE %s%s AS ENUM (%s);",
+						diff.Name, schema, diff.Name, strings.Join(labels, ", "))
+				}
+			}
+		}
+		// Composite types are not introspected beyond their name.
+		return fmt.Sprintf("-- Create type: %s\n-- %s", diff.Name, noDefinition)
 	case types.DiffDrop:
 		return fmt.Sprintf("-- Drop type: %s\nDROP TYPE IF EXISTS %s%s;",
 			diff.Name, schema, diff.Name)

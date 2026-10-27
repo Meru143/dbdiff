@@ -58,8 +58,9 @@ type Model struct {
 	IsConfirmed bool
 }
 
-// InitialModel configures the starting TUI state
-func InitialModel(diffs types.DiffList) Model {
+// InitialModel configures the starting TUI state. opts configures the SQL preview, which
+// should match the migration the selection turns into.
+func InitialModel(diffs types.DiffList, opts output.FormatOptions) Model {
 	// Pre-select all diffs by default
 	selected := make(map[int]struct{})
 	for i := range diffs {
@@ -69,7 +70,7 @@ func InitialModel(diffs types.DiffList) Model {
 	return Model{
 		diffs:     diffs,
 		selected:  selected,
-		formatter: output.NewFormatter("sql"),
+		formatter: output.NewFormatterWithOptions(opts),
 	}
 }
 

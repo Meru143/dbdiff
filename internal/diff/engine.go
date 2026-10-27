@@ -140,8 +140,8 @@ func (e *DiffEngine) compareSequences() types.DiffList {
 					Type:     types.DiffAlter,
 					Object:   types.ObjectSequence,
 					Name:     name,
-					OldValue: fmt.Sprintf("%d", targetSeq.Start),
-					NewValue: fmt.Sprintf("%d", sourceSeq.Start),
+					OldValue: fmt.Sprintf("START WITH %d", targetSeq.Start),
+					NewValue: fmt.Sprintf("START WITH %d", sourceSeq.Start),
 				})
 			}
 			if sourceSeq.Increment != targetSeq.Increment {
@@ -258,7 +258,7 @@ func (e *DiffEngine) compareColumns(sourceTable, targetTable *types.Table) types
 			TableName:   sourceTable.Name,
 			OldValue:    strings.Join(targetColOrder, ", "),
 			NewValue:    strings.Join(sourceColOrder, ", "),
-			Description: "Column order changed",
+			Description: columnOrderChanged,
 		})
 	}
 
@@ -267,23 +267,25 @@ func (e *DiffEngine) compareColumns(sourceTable, targetTable *types.Table) types
 			// Type change
 			if e.normalizeFunc(sourceCol.DataType) != e.normalizeFunc(targetCol.DataType) {
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectColumn,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  targetCol.DataType,
-					NewValue:  sourceCol.DataType,
+					Type:        types.DiffAlter,
+					Object:      types.ObjectColumn,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    targetCol.DataType,
+					NewValue:    sourceCol.DataType,
+					Description: columnTypeChanged,
 				})
 			}
 			// Nullable change
 			if sourceCol.IsNullable != targetCol.IsNullable {
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectColumn,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  nullableToString(targetCol.IsNullable),
-					NewValue:  nullableToString(sourceCol.IsNullable),
+					Type:        types.DiffAlter,
+					Object:      types.ObjectColumn,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    nullableToString(targetCol.IsNullable),
+					NewValue:    nullableToString(sourceCol.IsNullable),
+					Description: columnNullableChanged,
 				})
 			}
 			// Default value change
@@ -298,12 +300,13 @@ func (e *DiffEngine) compareColumns(sourceTable, targetTable *types.Table) types
 					newVal = *sourceCol.DefaultValue
 				}
 				differences = append(differences, types.Diff{
-					Type:      types.DiffAlter,
-					Object:    types.ObjectColumn,
-					Name:      name,
-					TableName: sourceTable.Name,
-					OldValue:  oldVal,
-					NewValue:  newVal,
+					Type:        types.DiffAlter,
+					Object:      types.ObjectColumn,
+					Name:        name,
+					TableName:   sourceTable.Name,
+					OldValue:    oldVal,
+					NewValue:    newVal,
+					Description: columnDefaultChanged,
 				})
 			}
 		} else {

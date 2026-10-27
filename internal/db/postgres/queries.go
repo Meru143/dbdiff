@@ -34,14 +34,19 @@ func getTables(ctx context.Context, pool *pgxpool.Pool, schemaName string, ignor
 }
 
 func getColumns(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName string) ([]types.Column, error) {
+	// format_type keeps lengths and precision (character varying(255)), which
+	// information_schema's data_type drops.
 	query := `
 		SELECT 
 			c.column_name, 
-			c.data_type, 
+			format_type(a.atttypid, a.atttypmod), 
 			c.column_default, 
 			c.is_nullable,
-			CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key
+			CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key,
+			CASE WHEN c.is_identity = 'YES' THEN 'GENERATED ' || c.identity_generation || ' AS IDENTITY' ELSE '' END
 		FROM information_schema.columns c
+		JOIN pg_attribute a
+			ON a.attrelid = format('%I.%I', c.table_schema, c.table_name)::regclass AND a.attname = c.column_name
 		LEFT JOIN (
 			SELECT ku.column_name
 			FROM information_schema.table_constraints tc
@@ -62,7 +67,7 @@ func getColumns(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName s
 	for rows.Next() {
 		var col types.Column
 		var nullable string
-		if err := rows.Scan(&col.Name, &col.DataType, &col.DefaultValue, &nullable, &col.IsPrimaryKey); err != nil {
+		if err := rows.Scan(&col.Name, &col.DataType, &col.DefaultValue, &nullable, &col.IsPrimaryKey, &col.Extra); err != nil {
 			return nil, err
 		}
 		col.IsNullable = nullable == "YES"
@@ -104,8 +109,25 @@ func getIndexes(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName s
 	return indexes, rows.Err()
 }
 
+// getConstraints reads primary key, unique, check and exclusion constraints from pg_constraint.
+// information_schema.table_constraints would also list foreign keys, which are compared
+// separately, and not-null "constraints" named after table OIDs, which differ between databases.
 func getConstraints(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName string) ([]types.Constraint, error) {
-	query := `SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_schema = $1 AND table_name = $2`
+	query := `
+		SELECT
+			con.conname,
+			CASE con.contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'u' THEN 'UNIQUE' WHEN 'c' THEN 'CHECK' ELSE 'EXCLUDE' END,
+			COALESCE((
+				SELECT array_agg(a.attname ORDER BY k.ord)
+				FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+				JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+			), ARRAY[]::name[]),
+			pg_get_constraintdef(con.oid)
+		FROM pg_constraint con
+		JOIN pg_class t ON t.oid = con.conrelid
+		JOIN pg_namespace n ON n.oid = t.relnamespace
+		WHERE n.nspname = $1 AND t.relname = $2 AND con.contype IN ('p', 'u', 'c', 'x')
+		ORDER BY con.conname`
 	rows, err := pool.Query(ctx, query, schemaName, tableName)
 	if err != nil {
 		return nil, err
@@ -115,36 +137,12 @@ func getConstraints(ctx context.Context, pool *pgxpool.Pool, schemaName, tableNa
 	var constraints []types.Constraint
 	for rows.Next() {
 		var cons types.Constraint
-		if err := rows.Scan(&cons.Name, &cons.Type); err != nil {
+		if err := rows.Scan(&cons.Name, &cons.Type, &cons.Columns, &cons.Definition); err != nil {
 			return nil, err
 		}
-		cols, err := getConstraintColumns(ctx, pool, schemaName, tableName, cons.Name)
-		if err != nil {
-			return nil, err
-		}
-		cons.Columns = cols
 		constraints = append(constraints, cons)
 	}
 	return constraints, rows.Err()
-}
-
-func getConstraintColumns(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName, constraintName string) ([]string, error) {
-	query := `SELECT column_name FROM information_schema.key_column_usage WHERE table_schema = $1 AND table_name = $2 AND constraint_name = $3 ORDER BY ordinal_position`
-	rows, err := pool.Query(ctx, query, schemaName, tableName, constraintName)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var columns []string
-	for rows.Next() {
-		var col string
-		if err := rows.Scan(&col); err != nil {
-			return nil, err
-		}
-		columns = append(columns, col)
-	}
-	return columns, rows.Err()
 }
 
 func getForeignKeys(ctx context.Context, pool *pgxpool.Pool, schemaName, tableName string) ([]types.ForeignKey, error) {
@@ -191,7 +189,15 @@ func getForeignKeys(ctx context.Context, pool *pgxpool.Pool, schemaName, tableNa
 }
 
 func getSequences(ctx context.Context, pool *pgxpool.Pool, schemaName string) ([]types.Sequence, error) {
-	query := `SELECT sequencename, start_value, min_value, max_value, increment_by, cache_size, cycle FROM pg_sequences WHERE schemaname = $1`
+	// Identity columns own an internal sequence that comes and goes with the column, so it
+	// is left out; a serial column's sequence is a separate object and stays in.
+	query := `SELECT s.sequencename, s.start_value, s.min_value, s.max_value, s.increment_by, s.cache_size, s.cycle
+		FROM pg_sequences s
+		WHERE s.schemaname = $1 AND NOT EXISTS (
+			SELECT 1 FROM pg_depend d
+			WHERE d.classid = 'pg_class'::regclass
+				AND d.objid = format('%I.%I', s.schemaname, s.sequencename)::regclass
+				AND d.deptype = 'i')`
 	rows, err := pool.Query(ctx, query, schemaName)
 	if err != nil {
 		return nil, err

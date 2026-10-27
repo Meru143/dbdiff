@@ -140,3 +140,68 @@ func TestFormatMigration_IndexConcurrentlyOnlyOutsideTransaction(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && (s[:len(substr)] == substr || contains(s[1:], substr)))
 }
+
+// The CLI path: the formatter writes the target's dialect, qualifies names with the schema
+// (never with the connection URL), and takes definitions from the source schema.
+func TestFormatMigration_TargetDialect(t *testing.T) {
+	name := "name"
+	source := &types.Schema{Tables: []types.Table{{Name: "users", Columns: []types.Column{
+		{Name: "id", DataType: "int"},
+		{Name: name, DataType: "varchar(100)"},
+	}}}}
+	target := &types.Schema{Tables: []types.Table{{Name: "users", Columns: []types.Column{
+		{Name: "id", DataType: "int"},
+		{Name: name, DataType: "varchar(100)", IsNullable: true},
+	}}}}
+	diffs := dbdiff.Compare(source, target)
+
+	tests := []struct {
+		dialect, schema string
+		want            []string
+		notWant         []string
+	}{
+		{dialect: "postgresql", schema: "app",
+			want:    []string{"BEGIN;", "SET lock_timeout = '10s';", "ALTER TABLE app.users ALTER COLUMN name SET NOT NULL;", "COMMIT;"},
+			notWant: []string{"postgres://"}},
+		{dialect: "mysql", schema: "public",
+			want:    []string{"START TRANSACTION;", "SET SESSION lock_wait_timeout = 10;", "ALTER TABLE users MODIFY COLUMN name varchar(100) NOT NULL;", "COMMIT;"},
+			notWant: []string{"BEGIN;", "VARCHAR(255)", "lock_timeout =", "postgres://"}},
+		{dialect: "sqlserver", schema: "dbo",
+			want:    []string{"SET XACT_ABORT ON;\nBEGIN TRANSACTION;", "SET LOCK_TIMEOUT 10000;", "ALTER TABLE dbo.users ALTER COLUMN name varchar(100) NOT NULL;", "COMMIT TRANSACTION;"},
+			notWant: []string{"BEGIN;", "COMMIT;", "DO $$", "lock_timeout =", "postgres://"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.dialect, func(t *testing.T) {
+			formatter := NewFormatterWithOptions(FormatOptions{Format: "sql", Dialect: tt.dialect, Schema: tt.schema,
+				SourceSchema: source, SourceDB: "postgres://user:pass@localhost:5432/db"})
+			result, err := formatter.FormatMigration(diffs, true)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			for _, w := range tt.want {
+				if !contains(result, w) {
+					t.Errorf("Expected %q in:\n%s", w, result)
+				}
+			}
+			for _, w := range tt.notWant {
+				if contains(result, w) {
+					t.Errorf("Unexpected %q in:\n%s", w, result)
+				}
+			}
+		})
+	}
+}
+
+func TestFormatMigration_ExecutableIsPostgresOnly(t *testing.T) {
+	diffs := types.DiffList{{Type: types.DiffDrop, Object: types.ObjectTable, Name: "audit"}}
+	for _, dialect := range []string{"mysql", "sqlserver"} {
+		formatter := NewFormatterWithOptions(FormatOptions{Format: "sql", IsExecutable: true, Dialect: dialect})
+		if _, err := formatter.FormatMigration(diffs, true); err == nil {
+			t.Errorf("%s: expected an error for a psql script", dialect)
+		}
+	}
+	formatter := NewFormatterWithOptions(FormatOptions{Format: "sql", IsExecutable: true, Dialect: "postgresql"})
+	if script, err := formatter.FormatMigration(diffs, true); err != nil || !contains(script, "psql") {
+		t.Errorf("expected a psql script, got %v:\n%s", err, script)
+	}
+}
