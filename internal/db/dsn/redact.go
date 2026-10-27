@@ -54,14 +54,15 @@ func Redact(s string) string {
 
 // redactOne hides the secrets of one connection string: the password between the first
 // ':' after the scheme and the last '@', and the value of each password-like parameter.
-// Without a scheme, t may be a user:pass@host DSN, unless the part before the ':' has a
-// space: then t is prose, like a driver's error.
+// Without a scheme, t may be a user:pass@host DSN, unless the part before the ':' holds a
+// space, '=', ';' or '&', which no user name in one does: then t is prose, like a driver's
+// error, or settings.
 func redactOne(t string) string {
 	n := schemeLen(t)
 	head, rest := t[:n], t[n:]
 	if at := strings.LastIndexByte(rest, '@'); at > 0 {
 		if colon := strings.IndexByte(rest[:at], ':'); colon >= 0 && colon+1 < at &&
-			(n > 0 || !strings.ContainsAny(rest[:colon], " \t\r\n")) {
+			(n > 0 || !strings.ContainsAny(rest[:colon], " \t\r\n=;&")) {
 			rest = rest[:colon+1] + mask + rest[at:]
 		}
 	}
@@ -86,33 +87,30 @@ func redactParams(t string) string {
 	}
 }
 
-// valueLen is the length of the parameter value v starts with: up to the next '&' or ';',
-// or for a value in braces or quotes (password={a;b}), up to the closing brace or quote,
-// which a doubled one escapes.
+// valueLen is the length of the parameter value v starts with: up to the next '&' or ';'
+// outside braces or quotes (password={a;b}), where a doubled closing brace or quote stands
+// for itself.
 func valueLen(v string) int {
-	var closer byte
-	if v != "" {
-		switch v[0] {
-		case '{':
+	start := 0
+	if v != "" && (v[0] == '{' || v[0] == '"' || v[0] == '\'') {
+		closer := v[0]
+		if closer == '{' {
 			closer = '}'
-		case '"', '\'':
-			closer = v[0]
 		}
-	}
-	if closer == 0 {
-		if i := strings.IndexAny(v, "&;"); i >= 0 {
-			return i
-		}
-		return len(v)
-	}
-	for i := 1; i < len(v); i++ {
-		if v[i] == closer {
-			if i+1 < len(v) && v[i+1] == closer {
-				i++
-				continue
+		start = len(v) // never closed: all of v
+		for i := 1; i < len(v); i++ {
+			if v[i] == closer {
+				if i+1 < len(v) && v[i+1] == closer {
+					i++
+					continue
+				}
+				start = i + 1
+				break
 			}
-			return i + 1
 		}
+	}
+	if i := strings.IndexAny(v[start:], "&;"); i >= 0 {
+		return start + i
 	}
 	return len(v)
 }
