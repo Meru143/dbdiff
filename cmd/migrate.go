@@ -9,6 +9,7 @@ import (
 
 	"github.com/meru143/dbdiff/internal/config"
 	"github.com/meru143/dbdiff/internal/db"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/meru143/dbdiff/internal/output"
@@ -59,7 +60,7 @@ var MigrateCmd = &cobra.Command{
 			cfg.Output = "migration.sql"
 		}
 
-		logging.Info(fmt.Sprintf("Generating migration: %s -> %s", source, target))
+		logging.Info(fmt.Sprintf("Generating migration: %s -> %s", dsn.Redact(source), dsn.Redact(target)))
 
 		ctx := context.Background()
 
@@ -205,10 +206,10 @@ func sqlOptions(cfg *config.Config, target db.Driver, sourceSchema *types.Schema
 	}
 }
 
-// migrationHeader opens a migration file with its source and target and the schema both
-// were read from. --schema's default, public, is PostgreSQL's: SQL Server reads dbo, and
-// MySQL each connection's own database, which the URLs already name, so that line is left
-// out.
+// migrationHeader opens a migration file with its source and target, passwords hidden since
+// the file gets committed and reviewed, and the schema both were read from. --schema's
+// default, public, is PostgreSQL's: SQL Server reads dbo, and MySQL each connection's own
+// database, which the URLs already name, so that line is left out.
 func migrationHeader(title, source, target, dialect, schema string) string {
 	if schema == "" || schema == "public" {
 		switch dialect {
@@ -218,7 +219,7 @@ func migrationHeader(title, source, target, dialect, schema string) string {
 			schema = ""
 		}
 	}
-	header := fmt.Sprintf("-- %s\n-- Source: %s\n-- Target: %s\n", title, source, target)
+	header := fmt.Sprintf("-- %s\n-- Source: %s\n-- Target: %s\n", title, dsn.Redact(source), dsn.Redact(target))
 	if schema != "" {
 		header += fmt.Sprintf("-- Schema: %s\n", schema)
 	}

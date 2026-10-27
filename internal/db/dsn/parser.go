@@ -36,7 +36,9 @@ func Parse(connStr string) (*Config, error) {
 	case strings.HasPrefix(lower, "sqlserver://"):
 		return parseSQLServer(connStr)
 	default:
-		return nil, fmt.Errorf("unsupported connection string format: %s", connStr)
+		// Not quoted: the string may hold a password, and without a scheme there is no
+		// telling where.
+		return nil, fmt.Errorf("unsupported connection string format")
 	}
 }
 
@@ -57,7 +59,7 @@ func (c *Config) ToNativeDSN() string {
 func parsePostgres(connStr string) (*Config, error) {
 	u, err := url.Parse(connStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid postgres URL: %w", err)
+		return nil, fmt.Errorf("invalid postgres URL %q", Redact(connStr)) // not net/url's error, which quotes the password
 	}
 
 	cfg := &Config{
@@ -103,7 +105,7 @@ func parseMySQL(connStr string) (*Config, error) {
 	// Standard URL format: mysql://user:pass@host:port/dbname
 	u, err := url.Parse(raw)
 	if err != nil {
-		return nil, fmt.Errorf("invalid mysql URL: %w", err)
+		return nil, fmt.Errorf("invalid mysql URL %q", Redact(connStr)) // not net/url's error, which quotes the password
 	}
 
 	cfg := &Config{
@@ -197,7 +199,7 @@ func parseMySQLTCP(raw string) (*Config, error) {
 func parseSQLServer(connStr string) (*Config, error) {
 	u, err := url.Parse(connStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid sqlserver URL: %w", err)
+		return nil, fmt.Errorf("invalid sqlserver URL %q", Redact(connStr)) // not net/url's error, which quotes the password
 	}
 
 	cfg := &Config{
