@@ -587,19 +587,23 @@ func (g *SQLGenerator) generateIndexDiff(diff *types.Diff) string {
 	}
 }
 
-// createIndexSQL returns CREATE INDEX for the index the diff carries, or "" without one.
-// PostgreSQL reuses the server's own definition (pg_get_indexdef), which keeps the access
-// method, predicate and ordering; MySQL and SQL Server are rebuilt from the column list.
+// createIndexSQL returns CREATE INDEX for the index the diff carries, or "" without one. It
+// reuses the server's own definition, which keeps what the column list loses (PostgreSQL's
+// access method and predicate, MySQL's prefix lengths and FULLTEXT, SQL Server's INCLUDE and
+// filter), and builds one from the columns otherwise.
 func (g *SQLGenerator) createIndexSQL(diff *types.Diff) string {
 	idx := diff.Index
 	if idx == nil {
 		return ""
 	}
-	postgres := g.dialect != "mysql" && g.dialect != "sqlserver"
-	if postgres && idx.Definition != "" {
+	postgres := g.dialect == "postgresql"
+	if idx.Definition != "" {
 		def := strings.TrimRight(idx.Definition, " \t\r\n;")
-		// pg_get_indexdef reads CREATE [UNIQUE] INDEX name ON ..., so the first "INDEX " is the keyword.
-		return strings.Replace(def, "INDEX ", "INDEX "+g.concurrentlyClause(), 1) + ";"
+		if postgres {
+			// pg_get_indexdef reads CREATE [UNIQUE] INDEX name ON ..., so the first "INDEX " is the keyword.
+			def = strings.Replace(def, "INDEX ", "INDEX "+g.concurrentlyClause(), 1)
+		}
+		return def + ";"
 	}
 	if len(idx.Columns) == 0 {
 		return ""

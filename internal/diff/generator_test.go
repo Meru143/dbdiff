@@ -70,6 +70,11 @@ func TestSQLGenerator_IndexDDL(t *testing.T) {
 	// PostgreSQL introspection keeps primary key indexes; MySQL and SQL Server filter them out.
 	pkey := &types.Index{Name: "users_pkey", Columns: []string{"id"}, IsUnique: true, IsPrimary: true,
 		Definition: "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"}
+	// What the MySQL and SQL Server drivers build: what the columns alone would lose.
+	myPrefix := &types.Index{Name: "uq_users_email", Columns: []string{"email", "name"}, IsUnique: true,
+		Definition: "CREATE UNIQUE INDEX uq_users_email ON users (email(50), name DESC)"}
+	msCovering := &types.Index{Name: "idx_users_email", Columns: []string{"email"},
+		Definition: "CREATE INDEX idx_users_email ON dbo.users (email) INCLUDE (name) WHERE ([deleted_at] IS NULL)"}
 
 	index := func(typ types.DiffType, idx *types.Index) types.Diff {
 		return types.Diff{Type: typ, Object: types.ObjectIndex, Name: idx.Name, TableName: "users", Index: idx}
@@ -138,9 +143,9 @@ func TestSQLGenerator_IndexDDL(t *testing.T) {
 			want: "-- Create index: idx_users_email\nCREATE INDEX idx_users_email ON users (email);",
 		},
 		{
-			name: "mysql/create unique ignores a PostgreSQL definition", dialect: "mysql",
-			diff: index(types.DiffAdd, pgUnique),
-			want: "-- Create index: uq_users_email\nCREATE UNIQUE INDEX uq_users_email ON users (email);",
+			name: "mysql/create from server definition keeps prefix lengths and order", dialect: "mysql",
+			diff: index(types.DiffAdd, myPrefix),
+			want: "-- Create index: uq_users_email\nCREATE UNIQUE INDEX uq_users_email ON users (email(50), name DESC);",
 		},
 		{
 			name: "mysql/drop names the table", dialect: "mysql",
@@ -165,11 +170,11 @@ func TestSQLGenerator_IndexDDL(t *testing.T) {
 			want: "-- Drop index: idx_users_email\nDROP INDEX idx_users_email ON dbo.users;",
 		},
 		{
-			name: "sqlserver/recreate", dialect: "sqlserver", schema: "dbo", transaction: true,
-			diff: index(types.DiffAlter, partial),
+			name: "sqlserver/recreate from server definition keeps INCLUDE and the filter", dialect: "sqlserver", schema: "dbo",
+			transaction: true, diff: index(types.DiffAlter, msCovering),
 			want: "-- Recreate index: idx_users_email\n" +
 				"DROP INDEX idx_users_email ON dbo.users;\n" +
-				"CREATE INDEX idx_users_email ON dbo.users (email);",
+				"CREATE INDEX idx_users_email ON dbo.users (email) INCLUDE (name) WHERE ([deleted_at] IS NULL);",
 		},
 		{
 			name: "postgresql/primary key index is left to its constraint", dialect: "postgresql", schema: "public",

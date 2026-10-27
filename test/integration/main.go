@@ -13,6 +13,7 @@ import (
 	"github.com/meru143/dbdiff/internal/db"
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/output"
+	testhelper "github.com/meru143/dbdiff/internal/testhelper"
 )
 
 type DBTestConfig struct {
@@ -142,29 +143,16 @@ func runIntegrationTest(cfg DBTestConfig) {
 	differences := diff.Compare(sourceSchema, targetSchema)
 	fmt.Printf("✅ Found %d differences\n", len(differences))
 
-	// Test 6: Generate migration SQL
-	fmt.Println("\n--- Test 6: Generate migration SQL ---")
-	formatter := output.NewFormatterWithOptions(output.FormatOptions{
-		Format:       "sql",
-		Dialect:      cfg.Dialect,
-		Schema:       defaultSchema,
-		SourceSchema: sourceSchema,
-		SourceDB:     cfg.SourceURL,
-	})
-	migrationSQL, err := formatter.FormatMigration(differences, true)
-	if err != nil {
-		fmt.Printf("❌ Failed to generate migration: %v\n", err)
-		os.Exit(1)
-	}
-	// The migration is in the target's dialect, creates tables with their columns, and never
-	// uses a connection URL as a schema name.
+	// Test 6: Generate the migration the way `dbdiff migrate` does, run it on the target, and
+	// compare again: the target must now match the source.
+	fmt.Println("\n--- Test 6: Migrate target to source ---")
+	migrationSQL, remaining, err := testhelper.MigrationRoundTrip(ctx, sourceDriver, targetDriver)
 	begin := map[string]string{"postgresql": "BEGIN;", "mysql": "START TRANSACTION;"}[cfg.Dialect]
-	if !strings.Contains(migrationSQL, begin) || !strings.Contains(migrationSQL, "CREATE TABLE posts (\n  id ") ||
-		strings.Contains(migrationSQL, "://") {
-		fmt.Printf("❌ Unexpected migration SQL:\n%s\n", migrationSQL)
+	if err != nil || len(remaining) > 0 || !strings.Contains(migrationSQL, begin) || strings.Contains(migrationSQL, "://") {
+		fmt.Printf("❌ Migration failed: %v\n%s\nDifferences left: %+v\n", err, migrationSQL, remaining)
 		os.Exit(1)
 	}
-	fmt.Println("✅ Migration SQL generated")
+	fmt.Println("✅ Migration ran; target matches source")
 
 	// Test 7: Table format output
 	fmt.Println("\n--- Test 7: Table format output ---")

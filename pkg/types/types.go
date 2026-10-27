@@ -38,10 +38,14 @@ type Column struct {
 }
 
 type Index struct {
-	Name       string         `json:"name"`
-	Columns    []string       `json:"columns,omitempty"`
-	IsUnique   bool           `json:"is_unique"`
-	IsPrimary  bool           `json:"is_primary"`
+	Name      string   `json:"name"`
+	Columns   []string `json:"columns,omitempty"`
+	IsUnique  bool     `json:"is_unique"`
+	IsPrimary bool     `json:"is_primary"`
+	// IsConstraint marks an index that backs a primary key or unique constraint: it is
+	// compared and migrated through its constraint.
+	IsConstraint bool `json:"is_constraint,omitempty"`
+	// Definition is the server's CREATE INDEX statement for the index.
 	Definition string         `json:"definition"`
 	Options    map[string]any `json:"options,omitempty"`
 }

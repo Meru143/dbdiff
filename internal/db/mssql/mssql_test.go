@@ -209,8 +209,12 @@ func TestIntrospectMocked(t *testing.T) {
 		WillReturnRows(colRows)
 
 	// Mock getIndexes
-	idxRows := sqlmock.NewRows([]string{"INDEX_NAME", "is_unique", "is_primary_key", "COLUMN_NAME"}).
-		AddRow("IX_users_email", false, false, "email")
+	idxRows := sqlmock.NewRows([]string{"INDEX_NAME", "is_unique", "is_unique_constraint", "type_desc",
+		"filter_definition", "COLUMN_NAME", "is_descending_key", "is_included_column"}).
+		AddRow("IX_users_email", false, false, "NONCLUSTERED", "([deleted_at] IS NULL)", "email", true, false).
+		AddRow("IX_users_email", false, false, "NONCLUSTERED", "([deleted_at] IS NULL)", "price", false, false).
+		AddRow("IX_users_email", false, false, "NONCLUSTERED", "([deleted_at] IS NULL)", "body", false, true).
+		AddRow("UQ_users_email", true, true, "NONCLUSTERED", nil, "email", false, false)
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(schema, "users").
 		WillReturnRows(idxRows)
@@ -260,6 +264,17 @@ func TestIntrospectMocked(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.Tables[0].Columns, wantColumns) {
 		t.Errorf("columns:\n got %+v\nwant %+v", result.Tables[0].Columns, wantColumns)
+	}
+	// Key columns stay apart from INCLUDE columns, and the definition keeps both, the order
+	// and the filter. The unique constraint's index is marked as the constraint's.
+	wantIndexes := []types.Index{
+		{Name: "IX_users_email", Columns: []string{"email", "price"},
+			Definition: "CREATE INDEX IX_users_email ON dbo.users (email DESC, price) INCLUDE (body) WHERE ([deleted_at] IS NULL)"},
+		{Name: "UQ_users_email", Columns: []string{"email"}, IsUnique: true, IsConstraint: true,
+			Definition: "CREATE UNIQUE INDEX UQ_users_email ON dbo.users (email)"},
+	}
+	if !reflect.DeepEqual(result.Tables[0].Indexes, wantIndexes) {
+		t.Errorf("indexes:\n got %+v\nwant %+v", result.Tables[0].Indexes, wantIndexes)
 	}
 	wantConstraints := []types.Constraint{
 		{Name: "PK_users", Type: "PRIMARY KEY", Columns: []string{"id"}, Definition: "PRIMARY KEY (id)"},
