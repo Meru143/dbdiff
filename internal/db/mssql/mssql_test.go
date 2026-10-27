@@ -304,7 +304,7 @@ func TestListTables(t *testing.T) {
 		WithArgs("dbo").
 		WillReturnRows(rows)
 
-	tables, err := d.ListTables(ctx, "dbo", DefaultIgnorePatterns)
+	tables, err := d.ListTables(ctx, "dbo", []string{"sysdiagrams"})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
