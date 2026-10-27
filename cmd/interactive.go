@@ -83,13 +83,15 @@ var InteractiveCmd = &cobra.Command{
 		preview.IsExecutable = false
 
 		// Initialize Bubble Tea Interactive CLI TUI
-		m := tui.InitialModel(differences, preview)
-		p := tea.NewProgram(&m, tea.WithAltScreen())
+		p := tea.NewProgram(tui.InitialModel(differences, preview), tea.WithAltScreen())
 
-		_, modelErr := p.Run()
+		final, modelErr := p.Run()
 		if modelErr != nil {
 			return fmt.Errorf("tui runtime error: %w", modelErr)
 		}
+		// The model's Update takes it by value: the confirmation is in the model Run ends
+		// with, not in the one it started from, which stays unconfirmed.
+		m, _ := final.(tui.Model)
 
 		// Upon UI completion check if user confirmed explicitly via Enter key
 		if !m.IsConfirmed {

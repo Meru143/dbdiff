@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `interactive` writes the migration Enter confirms. It answered every confirmation with "Migration Cancelled." and wrote nothing, since it read the TUI's starting state, which Enter never changes, instead of the state the TUI ended with
+
 ## [1.1.2] - 2026-10-28
 
 ### Fixed

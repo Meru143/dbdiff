@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"io"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -58,5 +60,23 @@ func TestModelSelectionToggle(t *testing.T) {
 	}
 	if selectedDiffs[0].Name != "email" {
 		t.Errorf("Expected 'email' to be the only selected diff, got %s", selectedDiffs[0].Name)
+	}
+}
+
+// Enter confirms in the model the program ends with. Update takes the model by value, so
+// the one the program started from stays unconfirmed: interactive read that one, and
+// answered every confirmation with "Migration Cancelled.".
+func TestEnterConfirmsFinalModel(t *testing.T) {
+	diffs := types.DiffList{{Type: types.DiffAdd, Object: types.ObjectTable, Name: "users"}}
+	m := InitialModel(diffs, output.FormatOptions{Format: "sql"})
+	final, err := tea.NewProgram(m, tea.WithInput(strings.NewReader("\r")), tea.WithOutput(io.Discard)).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := final.(Model); !ok || !got.IsConfirmed || len(got.GetSelectedDiffs()) != 1 {
+		t.Errorf("expected a confirmed model with its diff selected, got %#v", final)
+	}
+	if m.IsConfirmed {
+		t.Error("the initial model changed")
 	}
 }
