@@ -41,9 +41,10 @@ func NewDriver(connStr string) (Driver, error) {
 	}
 }
 
-// withoutMigrationsTable leaves MigrationsTable and its grants out of the schemas a driver
-// reads. Otherwise, once apply had run on a target, every comparison with a source that
-// lacks the table would report it, and the next migration would drop it with the history.
+// withoutMigrationsTable leaves MigrationsTable, its grants and its triggers out of the
+// schemas a driver reads. Otherwise, once apply had run on a target, every comparison with
+// a source that lacks the table would report it, and the next migration would drop it with
+// the history.
 type withoutMigrationsTable struct{ Driver }
 
 func (d withoutMigrationsTable) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
@@ -51,7 +52,16 @@ func (d withoutMigrationsTable) Introspect(ctx context.Context, schema string, i
 	if err != nil {
 		return nil, err
 	}
-	s.Tables = slices.DeleteFunc(s.Tables, func(t types.Table) bool { return t.Name == MigrationsTable })
-	s.Grants = slices.DeleteFunc(s.Grants, func(g types.Grant) bool { return g.Table == MigrationsTable })
+	s.Tables = slices.DeleteFunc(s.Tables, func(t types.Table) bool { return isMigrationsTable(t.Name) })
+	s.Grants = slices.DeleteFunc(s.Grants, func(g types.Grant) bool { return isMigrationsTable(g.Table) })
+	s.Triggers = slices.DeleteFunc(s.Triggers, func(t types.Trigger) bool { return isMigrationsTable(t.Table) })
 	return s, nil
+}
+
+// isMigrationsTable ignores case: SQL Server's default collation and MySQL on macOS match
+// table names case-insensitively, so apply records into a _DBDIFF_MIGRATIONS that already
+// exists. ponytail: on PostgreSQL that also hides a quoted "_DBDIFF_MIGRATIONS", a
+// look-alike of dbdiff's own name; leaving a table out can't lose data, dropping it can.
+func isMigrationsTable(name string) bool {
+	return strings.EqualFold(name, MigrationsTable)
 }
