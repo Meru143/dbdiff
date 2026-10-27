@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - Schema comparisons leave out `_dbdiff_migrations`, the table `dbdiff apply` records applied migrations in, with its grants and triggers, whatever the case of its name: once a migration had been applied, `compare`, `diff`, `migrate` and `interactive` reported the table as a difference, and the next migration dropped it along with the migration history
+- The header of `migrate` and `interactive` migrations names the schema actually read: `dbo` on SQL Server when `--schema` is left at its default, and on MySQL no schema line, since each side then reads its connection's own database, named in the URLs. Both used to print `-- Schema: public`
 
 ### Security
 - pgx is upgraded from v5.8.0 to v5.11.0. v5.8.0 has three vulnerabilities, fixed in v5.9.0 and v5.9.2: GO-2026-4771, GO-2026-4772 and GO-2026-5004 (SQL injection via placeholder confusion with dollar-quoted strings)

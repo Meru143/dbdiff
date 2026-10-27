@@ -86,3 +86,25 @@ func TestTypeNormalizer(t *testing.T) {
 		t.Error("expected the source's normalizer across engines")
 	}
 }
+
+// The header used to print "-- Schema: public" for every engine.
+func TestMigrationHeader(t *testing.T) {
+	tests := []struct {
+		dialect, schema, line string
+	}{
+		{"postgresql", "public", "-- Schema: public\n"},
+		{"postgresql", "app", "-- Schema: app\n"},
+		{"sqlserver", "public", "-- Schema: dbo\n"},
+		{"sqlserver", "sales", "-- Schema: sales\n"},
+		{"mysql", "public", ""},
+		{"mysql", "", ""},
+		{"mysql", "shop", "-- Schema: shop\n"},
+	}
+	for _, tt := range tests {
+		got := migrationHeader("DBDiff Migration", "src", "tgt", tt.dialect, tt.schema)
+		want := "-- DBDiff Migration\n-- Source: src\n-- Target: tgt\n" + tt.line + "\n"
+		if got != want {
+			t.Errorf("%s, --schema %q: got %q, want %q", tt.dialect, tt.schema, got, want)
+		}
+	}
+}
