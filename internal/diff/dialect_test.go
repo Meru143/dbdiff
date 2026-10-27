@@ -145,7 +145,20 @@ func TestSQLGenerator_DialectStatements(t *testing.T) {
 			want: "-- Alter column: users.status\nALTER TABLE users ALTER COLUMN status DROP DEFAULT;",
 		},
 		{
-			name: "postgresql/type change", dialect: "postgresql",
+			name: "postgresql/type change drops the old default first", dialect: "postgresql",
+			diff: column(types.DiffAlter, "org_id", "integer", "bigint", columnTypeChanged),
+			want: "-- Alter column: users.org_id\nALTER TABLE users ALTER COLUMN org_id DROP DEFAULT;\n" +
+				"ALTER TABLE users ALTER COLUMN org_id TYPE bigint USING (org_id::bigint);",
+		},
+		{
+			name: "postgresql/type change restores the source default", dialect: "postgresql",
+			diff: column(types.DiffAlter, "status", "integer", "varchar(20)", columnTypeChanged),
+			want: "-- Alter column: users.status\nALTER TABLE users ALTER COLUMN status DROP DEFAULT;\n" +
+				"ALTER TABLE users ALTER COLUMN status TYPE varchar(20) USING (status::varchar(20));\n" +
+				"ALTER TABLE users ALTER COLUMN status SET DEFAULT 'active';",
+		},
+		{
+			name: "postgresql/type change without the source schema", dialect: "postgresql", noSource: true,
 			diff: column(types.DiffAlter, "org_id", "integer", "bigint", columnTypeChanged),
 			want: "-- Alter column: users.org_id\nALTER TABLE users ALTER COLUMN org_id TYPE bigint USING (org_id::bigint);",
 		},

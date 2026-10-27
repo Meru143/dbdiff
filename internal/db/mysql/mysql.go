@@ -104,6 +104,12 @@ func (d *Driver) NormalizeType(dataType string) string {
 
 // Introspect performs full schema introspection for MySQL
 func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
+	// Index definitions name their table the way the rest of the migration does: qualified
+	// when --schema picks a database, plain when it is the connection's own.
+	qualifier := ""
+	if schema != "" && schema != "public" {
+		qualifier = schema + "."
+	}
 	schema, err := d.databaseName(ctx, schema)
 	if err != nil {
 		return nil, err
@@ -125,7 +131,7 @@ func (d *Driver) Introspect(ctx context.Context, schema string, ignorePatterns [
 		}
 		table.Columns = filterColumns(columns, ignorePatterns)
 
-		indexes, err := getIndexes(ctx, d.db, schema, tableName)
+		indexes, err := getIndexes(ctx, d.db, schema, tableName, qualifier)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get indexes for table %s: %w", tableName, err)
 		}

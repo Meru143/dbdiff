@@ -170,7 +170,7 @@ var phases = map[types.DiffObject][2]int{
 	types.ObjectSequence:         {4, 9},
 	types.ObjectTable:            {5, 8},
 	types.ObjectColumn:           {6, 7},
-	types.ObjectFunction:         {13, 17},
+	types.ObjectFunction:         {13, 9}, // dropped before the types their signatures use
 }
 
 // plan puts the diffs in execution order. Recreating an index, constraint or foreign key is
@@ -497,8 +497,18 @@ func (g *SQLGenerator) alterColumnSQL(diff *types.Diff, table string) string {
 			}
 			return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;", head, table, diff.Name, diff.NewValue)
 		default:
-			return fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s TYPE %s USING (%s::%s);",
-				head, table, diff.Name, diff.NewValue, diff.Name, diff.NewValue)
+			alter := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING (%s::%s);",
+				table, diff.Name, diff.NewValue, diff.Name, diff.NewValue)
+			if col == nil {
+				return head + alter
+			}
+			// The old default may not cast to the new type ('active' to integer), so it goes
+			// first and the source's default comes back after.
+			stmt := fmt.Sprintf("%sALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;\n%s", head, table, diff.Name, alter)
+			if col.DefaultValue != nil && *col.DefaultValue != "" {
+				stmt += fmt.Sprintf("\nALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;", table, diff.Name, *col.DefaultValue)
+			}
+			return stmt
 		}
 	}
 }
