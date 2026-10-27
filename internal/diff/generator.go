@@ -499,7 +499,8 @@ func (g *SQLGenerator) alterColumnSQL(diff *types.Diff, table string) string {
 		default:
 			alter := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING (%s::%s);",
 				table, diff.Name, diff.NewValue, diff.Name, diff.NewValue)
-			if col == nil {
+			if col == nil || !g.targetHasDefault(diff, col) {
+				// Nothing to drop. An identity column has no default, and DROP DEFAULT fails on one.
 				return head + alter
 			}
 			// The old default may not cast to the new type ('active' to integer), so it goes
@@ -523,6 +524,19 @@ func (g *SQLGenerator) dropDefaultSQL(table, column string) string {
 		" FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID(N'%[2]s')"+
 		" AND parent_column_id = COLUMNPROPERTY(OBJECT_ID(N'%[2]s'), N'%[3]s', 'ColumnId'));\nEXEC (%[1]s);",
 		v, table, column)
+}
+
+// targetHasDefault reports whether a column has a default on the target: the old value of the
+// column's default change when the migration has one, or else the source's default.
+func (g *SQLGenerator) targetHasDefault(column *types.Diff, source *types.Column) bool {
+	for i := range g.diffs {
+		d := &g.diffs[i]
+		if d.Object == types.ObjectColumn && d.Type == types.DiffAlter && d.TableName == column.TableName &&
+			d.Name == column.Name && columnChange(d) == columnDefaultChanged {
+			return d.OldValue != ""
+		}
+	}
+	return source.DefaultValue != nil && *source.DefaultValue != ""
 }
 
 // sourceTable finds a table of the source (desired) schema.

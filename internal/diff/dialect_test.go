@@ -55,6 +55,7 @@ func TestSQLGenerator_DialectStatements(t *testing.T) {
 		schema   string
 		noSource bool
 		diff     types.Diff
+		also     types.DiffList // the migration's other diffs
 		want     string
 	}{
 		// CREATE TABLE and ADD COLUMN spell out the source definition.
@@ -145,10 +146,17 @@ func TestSQLGenerator_DialectStatements(t *testing.T) {
 			want: "-- Alter column: users.status\nALTER TABLE users ALTER COLUMN status DROP DEFAULT;",
 		},
 		{
-			name: "postgresql/type change drops the old default first", dialect: "postgresql",
+			// An identity column has no default, and PostgreSQL refuses DROP DEFAULT on one.
+			name: "postgresql/type change of a column without a default", dialect: "postgresql",
 			diff: column(types.DiffAlter, "org_id", "integer", "bigint", columnTypeChanged),
+			want: "-- Alter column: users.org_id\nALTER TABLE users ALTER COLUMN org_id TYPE bigint USING (org_id::bigint);",
+		},
+		{
+			name: "postgresql/type change drops the target's default first", dialect: "postgresql",
+			diff: column(types.DiffAlter, "org_id", "varchar(10)", "int", columnTypeChanged),
+			also: types.DiffList{column(types.DiffAlter, "org_id", "'x'::character varying", "", columnDefaultChanged)},
 			want: "-- Alter column: users.org_id\nALTER TABLE users ALTER COLUMN org_id DROP DEFAULT;\n" +
-				"ALTER TABLE users ALTER COLUMN org_id TYPE bigint USING (org_id::bigint);",
+				"ALTER TABLE users ALTER COLUMN org_id TYPE int USING (org_id::int);",
 		},
 		{
 			name: "postgresql/type change restores the source default", dialect: "postgresql",
@@ -250,7 +258,7 @@ func TestSQLGenerator_DialectStatements(t *testing.T) {
 			if tt.noSource {
 				source = nil
 			}
-			gen := NewSQLGeneratorWithSchema(types.DiffList{tt.diff}, tt.schema, source, tt.dialect)
+			gen := NewSQLGeneratorWithSchema(append(types.DiffList{tt.diff}, tt.also...), tt.schema, source, tt.dialect)
 			if got := gen.generateStatement(&tt.diff); got != tt.want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
 			}
