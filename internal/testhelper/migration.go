@@ -14,8 +14,9 @@ import (
 
 // MigrationRoundTrip generates the migration from target to source the way `dbdiff migrate`
 // does by default (the target's dialect, the default schema, definitions from the source
-// schema, one transaction), runs it on target, and returns it with the differences left
-// afterwards: none when the migration is complete and correct.
+// schema, one transaction), applies it to target the way `dbdiff apply` does, recording it
+// in the migrations table, and returns it with the differences left afterwards: none when
+// the migration is complete and correct and the migrations table stays out of the schema.
 func MigrationRoundTrip(ctx context.Context, source, target db.Driver) (string, types.DiffList, error) {
 	const schema = "public" // the CLI's default; MySQL and SQL Server map it to their own
 	src, err := source.Introspect(ctx, schema, nil)
@@ -38,8 +39,14 @@ func MigrationRoundTrip(ctx context.Context, source, target db.Driver) (string, 
 	if err != nil {
 		return "", nil, err
 	}
+	if err := target.EnsureMigrationsTable(ctx); err != nil {
+		return migration, nil, fmt.Errorf("create migrations table: %w", err)
+	}
 	if err := target.Exec(ctx, migration); err != nil {
 		return migration, nil, fmt.Errorf("run migration: %w", err)
+	}
+	if err := target.RecordMigration(ctx, "migration.sql"); err != nil {
+		return migration, nil, fmt.Errorf("record migration: %w", err)
 	}
 
 	after, err := target.Introspect(ctx, schema, nil)

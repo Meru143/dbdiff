@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -143,8 +144,9 @@ func runIntegrationTest(cfg DBTestConfig) {
 	differences := diff.Compare(sourceSchema, targetSchema)
 	fmt.Printf("✅ Found %d differences\n", len(differences))
 
-	// Test 6: Generate the migration the way `dbdiff migrate` does, run it on the target, and
-	// compare again: the target must now match the source.
+	// Test 6: Generate the migration the way `dbdiff migrate` does, apply it to the target the
+	// way `dbdiff apply` does, and compare again: the target, which now has a migrations
+	// table, must match the source.
 	fmt.Println("\n--- Test 6: Migrate target to source ---")
 	migrationSQL, remaining, err := testhelper.MigrationRoundTrip(ctx, sourceDriver, targetDriver)
 	begin := map[string]string{"postgresql": "BEGIN;", "mysql": "START TRANSACTION;"}[cfg.Dialect]
@@ -191,8 +193,8 @@ func runIntegrationTest(cfg DBTestConfig) {
 		fmt.Printf("❌ Failed to get applied migrations: %v\n", err)
 		os.Exit(1)
 	}
-	if len(applied) != 0 {
-		fmt.Printf("❌ Expected 0 applied migrations, got %d\n", len(applied))
+	if len(applied) != 1 || applied[0] != "migration.sql" {
+		fmt.Printf("❌ Expected the migration Test 6 applied, got %v\n", applied)
 		os.Exit(1)
 	}
 
@@ -203,7 +205,7 @@ func runIntegrationTest(cfg DBTestConfig) {
 	}
 
 	applied, err = targetDriver.GetAppliedMigrations(ctx)
-	if err != nil || len(applied) != 1 || applied[0] != "001_init.sql" {
+	if err != nil || len(applied) != 2 || !slices.Contains(applied, "001_init.sql") {
 		fmt.Printf("❌ Failed to verify recorded migration\n")
 		os.Exit(1)
 	}
