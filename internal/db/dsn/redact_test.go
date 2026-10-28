@@ -54,6 +54,7 @@ func TestRedact(t *testing.T) {
 		{"mysql password without @address", "mysql://root:s3cret", "mysql://root:***"},
 		{"IPv6 host and port", "postgres://[::1]:5432/app", "postgres://[::1]:5432/app"},
 		{"hosts and ports", "postgres://h1:5432,h2:5433/app", "postgres://h1:5432,h2:5433/app"},
+		{"password after a later host", "postgres://h1:5432,app:s3cret/app", "postgres://h1:5432,app:***/app"},
 		{"empty port", "postgres://host:/app", "postgres://host:/app"},
 
 		// nothing to hide

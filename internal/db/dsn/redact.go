@@ -141,14 +141,13 @@ func passwordEnd(rest string, at int) int {
 // portPassword returns where a password may stand in place of a port in rest, the part of
 // a URL after its scheme, when no '@' ends a user name and password in its host part:
 // after the ':' of a host whose "port" is no number, as in postgres://app:s3cret, which
-// lacks its "@host". It returns 0, 0 if there is none. A port that is a number stays, as
-// does one followed by more hosts (h1:5432,h2:5433), and a ':' in brackets ([::1]) or
-// parentheses (tcp(host:3306)) is no port's.
+// lacks its "@host", up to the end of the host part. It returns 0, 0 if there is none. A
+// port that is a number stays, after each host of a list (h1:5432,h2:5433), and a ':' in
+// brackets ([::1]) or parentheses (tcp(host:3306)) is no port's.
 func portPassword(rest string) (start, end int) {
-	depth, colon := 0, -1
+	depth, bad := 0, -1
 	end = len(rest)
-scan:
-	for i := 0; i < len(rest); i++ {
+	for i := 0; i < end; i++ {
 		switch c := rest[i]; {
 		case c == '[' || c == '(':
 			depth++
@@ -157,21 +156,22 @@ scan:
 		case depth > 0:
 		case strings.IndexByte("/?#&;", c) >= 0: // no port or host holds one
 			end = i
-			break scan
 		case c == '@':
 			return 0, 0
-		case c == ':' && colon < 0:
-			colon = i
+		case c == ':' && bad < 0:
+			j := i + 1
+			for j < len(rest) && '0' <= rest[j] && rest[j] <= '9' {
+				j++
+			}
+			if j < len(rest) && strings.IndexByte(",/?#&;", rest[j]) < 0 {
+				bad = i + 1
+			}
 		}
 	}
-	if colon < 0 {
+	if bad < 0 {
 		return 0, 0
 	}
-	port := rest[colon+1 : end]
-	if digits := len(port) - len(strings.TrimLeft(port, "0123456789")); digits == len(port) || port[digits] == ',' {
-		return 0, 0
-	}
-	return colon + 1, end
+	return bad, end
 }
 
 // userinfo returns the index after the ':' that starts a password in rest, the part of a
