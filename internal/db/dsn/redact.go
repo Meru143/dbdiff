@@ -111,6 +111,8 @@ func redactOne(t string) string {
 	head, rest := t[:n], t[n:]
 	if colon := userinfo(rest, n > 0); colon > 0 {
 		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@')):]
+	} else if start, end := portPassword(rest); n > 0 && start > 0 {
+		rest = rest[:start] + mask + rest[end:]
 	}
 	if n > 0 {
 		return head + redactParams(rest, inQuery)
@@ -134,6 +136,42 @@ func passwordEnd(rest string, at int) int {
 		}
 	}
 	return at
+}
+
+// portPassword returns where a password may stand in place of a port in rest, the part of
+// a URL after its scheme, when no '@' ends a user name and password in its host part:
+// after the ':' of a host whose "port" is no number, as in postgres://app:s3cret, which
+// lacks its "@host". It returns 0, 0 if there is none. A port that is a number stays, as
+// does one followed by more hosts (h1:5432,h2:5433), and a ':' in brackets ([::1]) or
+// parentheses (tcp(host:3306)) is no port's.
+func portPassword(rest string) (start, end int) {
+	depth, colon := 0, -1
+	end = len(rest)
+scan:
+	for i := 0; i < len(rest); i++ {
+		switch c := rest[i]; {
+		case c == '[' || c == '(':
+			depth++
+		case (c == ']' || c == ')') && depth > 0:
+			depth--
+		case depth > 0:
+		case strings.IndexByte("/?#&;", c) >= 0: // no port or host holds one
+			end = i
+			break scan
+		case c == '@':
+			return 0, 0
+		case c == ':' && colon < 0:
+			colon = i
+		}
+	}
+	if colon < 0 {
+		return 0, 0
+	}
+	port := rest[colon+1 : end]
+	if digits := len(port) - len(strings.TrimLeft(port, "0123456789")); digits == len(port) || port[digits] == ',' {
+		return 0, 0
+	}
+	return colon + 1, end
 }
 
 // userinfo returns the index after the ':' that starts a password in rest, the part of a
@@ -250,7 +288,8 @@ func secretKey(name string) bool {
 
 // valueLen is the length of the parameter value v starts with: up to the next byte of ends
 // outside braces or quotes (password={a;b}), where a doubled closing brace or quote stands
-// for itself.
+// for itself. A value that holds a URL, outside braces or quotes, runs to the end of v:
+// what ends it is the URL's own, like the '@' after its password.
 func valueLen(v, ends string) int {
 	start := 0
 	if v != "" && strings.IndexByte("{\"'`", v[0]) >= 0 {
@@ -270,7 +309,7 @@ func valueLen(v, ends string) int {
 			}
 		}
 	}
-	if i := strings.IndexAny(v[start:], ends); i >= 0 {
+	if i := strings.IndexAny(v[start:], ends); i >= 0 && (start > 0 || !strings.Contains(v[:i], "://")) {
 		return start + i
 	}
 	return len(v)
