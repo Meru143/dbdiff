@@ -307,8 +307,10 @@ func TestParseDSN(t *testing.T) {
 // from the password, and quotes it in its error; Connect's error holds none of it.
 func TestConnectParseErrorHidesPassword(t *testing.T) {
 	for _, url := range []string{
-		"mysql://root:QZXa/QZYb@tcp(db:3306)",    // go-sql-driver: default addr for network 'root:QZXa' unknown
-		"mysql://root:QZXa/QZYb%zz@tcp(db:3306)", // go-sql-driver: invalid dbname "QZYb%zz@tcp(db:3306)"
+		"mysql://root:QZXa/QZYb@tcp(db:3306)",     // go-sql-driver: default addr for network 'root:QZXa' unknown
+		"mysql://root:QZXa/QZYb%zz@tcp(db:3306)",  // go-sql-driver: invalid dbname "QZYb%zz@tcp(db:3306)"
+		"mysql://ro=ot:QZXa/QZYb%zz@tcp(db:3306)", // Redact reads a bare DSN whose user name has a '=' as prose
+		"ro=ot:QZXa/QZYb%zz@tcp(db:3306)",
 	} {
 		err := New().Connect(context.Background(), url, "disable", time.Second)
 		if err == nil || strings.Contains(err.Error(), "QZX") || strings.Contains(err.Error(), "QZY") {

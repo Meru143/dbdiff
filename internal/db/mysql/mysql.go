@@ -33,11 +33,14 @@ func parseDSN(connStr string) (*gomysql.Config, error) {
 	if err != nil {
 		// go-sql-driver's reason can quote part of the password: without a /database after
 		// the address, it reads the database, or the network, from the password. The redacted
-		// DSN fails only if the rest of it does, and its error holds no password.
-		if _, rerr := gomysql.ParseDSN(dbdsn.Redact(dsn)); rerr != nil {
+		// DSN fails only if the rest of it does, and its error holds no password. It is
+		// redacted as a URL: Redact reads a DSN without a scheme as prose when its user name
+		// holds a '=' or a space.
+		redacted := dbdsn.Redact("mysql://" + dsn)
+		if _, rerr := gomysql.ParseDSN(strings.TrimPrefix(redacted, "mysql://")); rerr != nil {
 			return nil, fmt.Errorf("invalid mysql connection string: %w", rerr)
 		}
-		return nil, fmt.Errorf("invalid mysql connection string %q", dbdsn.Redact(connStr))
+		return nil, fmt.Errorf("invalid mysql connection string %q", redacted)
 	}
 	return cfg, nil
 }
