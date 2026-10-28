@@ -10,12 +10,14 @@ import (
 // mask replaces each secret Redact hides.
 const mask = "***"
 
-// What ends a parameter's value: in a URL's query only '&', as pgx, net/url and go-sql-driver
-// read it, which take a ';' for part of the value; in settings (server=host;password=x) a ';'
-// too.
+// What ends a parameter's value. In a URL's query only '&', as pgx, net/url and go-sql-driver
+// read it, which take a ';' for part of the value: CheckPassword reads values so. Redact ends
+// a password-like value nowhere, and hides it with all that follows it (toEnd): a driver
+// reads ?password=P&Q as the password P and a parameter Q, but Q may be the rest of the
+// password the user meant, and neither the driver nor Redact can tell.
 const (
-	inQuery    = "&"
-	inSettings = "&;"
+	inQuery = "&"
+	toEnd   = ""
 )
 
 // dsnAddr matches what follows the '@' of a go-sql-driver DSN: a network with its address
@@ -30,8 +32,8 @@ var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 //
 // A URL's password runs from the first ':' after the scheme to the last '@', so one that
 // holds '@', ':', '/', spaces or %-escapes is hidden whole, and so is the password of a
-// malformed URL; that can hide more than the password, never less. If that '@' is in the
-// value of a password parameter, as in host:1433?password=p@ss, the rest of the value is
+// malformed URL; that can hide more than the password, never less. If that '@' follows the
+// '=' of a password parameter, as in host:1433?password=p@ss, all that follows the ':' is
 // hidden with it. The last '@' is that of the whole string, unless the URL is in double
 // quotes (Go's %q, as cobra and net/url quote one in an error) or backticks (pgx), which
 // then bound it; quoted text is read the same way, URLs anywhere in it included. A URL is
@@ -39,8 +41,9 @@ var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 // cobra's error for a URL glued to a flag: unknown flag: --sourcepostgres://user:***@host/db.
 // A DSN without a scheme, like go-sql-driver's user:pass@tcp(host:3306)/db, is hidden the
 // same way, in quotes or as the whole of s, quotes in its password included. The value of a
-// password-like parameter (see secretValues) is hidden whole wherever it is, before any
-// quote in it is read.
+// password-like parameter (see secretValues) is hidden wherever it is, before any quote in
+// it is read, and so is all that follows it, to the end of s or of the quotes around it
+// (see toEnd): postgres://host/db?sslmode=disable&password=***.
 //
 // A driver that reads part of what Redact hides as the host or the database, not the
 // password, quotes that part in its errors: CheckPassword refuses such URLs.
@@ -69,7 +72,7 @@ func Redact(s string) string {
 			if secretKey(s[key:i]) {
 				v := i + 1 + len(s[i+1:]) - len(strings.TrimLeft(s[i+1:], " \t"))
 				flush(v)
-				if n := valueLen(s[v:], inSettings); n > 0 {
+				if n := valueLen(s[v:], toEnd); n > 0 {
 					b.WriteString(mask)
 					text = v + n
 				}
@@ -104,33 +107,30 @@ func Redact(s string) string {
 }
 
 // redactOne hides the secrets of one connection string: the password between the first
-// ':' after the scheme and the last '@' (see passwordEnd), and the value of each
-// password-like parameter, read as a URL's query if t has a scheme.
+// ':' after the scheme and the last '@' (see passwordEnd), and the value of a password-like
+// parameter with all that follows it.
 func redactOne(t string) string {
 	n := schemeLen(t)
 	head, rest := t[:n], t[n:]
 	if colon := userinfo(rest, n > 0); colon > 0 {
-		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@')):]
+		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@'), toEnd):]
 	} else if start, end := portPassword(rest); n > 0 && start > 0 {
 		rest = rest[:start] + mask + rest[end:]
 	}
-	if n > 0 {
-		return head + redactParams(rest, inQuery)
-	}
-	return redactParams(rest, inSettings)
+	return head + redactParams(rest)
 }
 
 // passwordEnd returns where the password that ends at rest[at], the last '@', is hidden to:
 // at, unless that '@' is in the value of a password-like parameter in the query, as in
-// host:1433?password=p@ss, where it starts no host. Then all of rest is hidden: whether the
-// '@' ends a password with a '?' in it or is part of the value, both are secret, and what
-// follows the value is no host to show.
-func passwordEnd(rest string, at int) int {
+// host:1433?password=p@ss, where it starts no host; ends says what ends that value (see
+// valueLen). Then all of rest is hidden: whether the '@' ends a password with a '?' in it or
+// is part of the value, both are secret, and what follows the value is no host to show.
+func passwordEnd(rest string, at int, ends string) int {
 	q := strings.IndexByte(rest, '?')
 	if q < 0 || q > at {
 		return at
 	}
-	for _, v := range secretValues(rest[q:], inQuery) {
+	for _, v := range secretValues(rest[q:], ends) {
 		if q+v[0] <= at && at < q+v[1] {
 			return len(rest)
 		}
@@ -207,7 +207,7 @@ func CheckPassword(connStr string) error {
 	at := strings.LastIndexByte(rest, '@')
 	end := at
 	if colon > 0 {
-		end = passwordEnd(rest, at)
+		end = passwordEnd(rest, at, inQuery)
 	}
 	var ambiguous bool
 	var fix string
@@ -238,11 +238,12 @@ func CheckPassword(connStr string) error {
 	return fmt.Errorf("can't tell where the password ends in %q; %s", Redact(connStr), fix)
 }
 
-// redactParams hides the value of each password-like parameter in t (see secretValues).
-func redactParams(t, ends string) string {
+// redactParams hides the value of the first password-like parameter in t (see secretValues)
+// and all that follows it (see toEnd).
+func redactParams(t string) string {
 	var b strings.Builder
 	written := 0
-	for _, v := range secretValues(t, ends) {
+	for _, v := range secretValues(t, toEnd) {
 		if v[1] > v[0] {
 			b.WriteString(t[written:v[0]])
 			b.WriteString(mask)
@@ -254,9 +255,9 @@ func redactParams(t, ends string) string {
 }
 
 // secretValues returns where the value of each password-like parameter in t starts and
-// ends, in a URL's query (?password=x&...) or in semicolon-separated settings (user
-// id=sa;password=x), whichever ends says t holds: one whose name, read percent-decoded and
-// in any case, ends in password, passwd or pwd (password, sslpassword, Pwd, pass%77ord).
+// ends, in a URL's query (?password=x&...) or in settings (user id=sa;password=x), a value
+// ending at a byte of ends (see valueLen): one whose name, read percent-decoded and in any
+// case, ends in password, passwd or pwd (password, sslpassword, Pwd, pass%77ord).
 func secretValues(t, ends string) [][2]int {
 	var values [][2]int
 	key := 0 // where the name before the next '=' starts
