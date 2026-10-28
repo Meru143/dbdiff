@@ -40,6 +40,23 @@ func TestConnectParseErrorHidesPassword(t *testing.T) {
 	}
 }
 
+// A password parameter's value may run past an '&' (password=Sec&ret); the URL Connect
+// parses again hides all that follows the '=', so the error for a URL net/url can't parse
+// holds none of it.
+func TestConnectParseErrorHidesPasswordParameter(t *testing.T) {
+	for url, reason := range map[string]string{
+		"sqlserver://localhost:1x?database=app&password=Sec&ret":  "invalid port",
+		"sqlserver://local host?database=app&password=Sec&ret":    "invalid character",
+		"sqlserver://localhost?database=app&password=Sec&ret\x7f": "percent-encode", // the URL parsed again doesn't fail
+	} {
+		err := New().Connect(context.Background(), url, "disable", time.Second)
+		if err == nil || strings.Contains(err.Error(), "Sec") || strings.Contains(err.Error(), "ret") ||
+			!strings.Contains(err.Error(), "password=***") || !strings.Contains(err.Error(), reason) {
+			t.Errorf("%q: expected an error with %q, without the password, got %v", url, reason, err)
+		}
+	}
+}
+
 func TestEnsureMigrationsTable(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

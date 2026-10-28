@@ -25,3 +25,21 @@ func TestConnectParseErrorHidesPassword(t *testing.T) {
 		t.Errorf("an sslmode error should keep its reason, not the password, got %v", err)
 	}
 }
+
+// pgx ends a password parameter's value at the next '&', and when what follows fails to
+// parse, its reason quotes it, though it may be the rest of the password. The URL
+// connectOnce parses again hides all that follows the '=', so its error holds none of it.
+func TestConnectParseErrorHidesPasswordParameter(t *testing.T) {
+	for _, url := range []string{
+		"postgres://app@localhost:5432/db?sslmode=disable&password=QZXa&QZYb", // missing key/value separator "=" in URI query parameter: "QZYb"
+		"postgres://app@localhost/db?password=QZXa&QZYb",
+		"postgres://app@localhost:5432/db?password=QZXa&QZYb=QZYc=QZYd", // extra key/value separator "=" in URI query parameter: "QZYb"
+		"postgres://app:QZXa@localhost:5432/db?sslmode=disable&sslpassword=QZXb&QZYb",
+		"postgres://app@localhost:5x/db?password=QZXa&QZYb", // invalid port: the URL parsed again fails too
+	} {
+		_, err := connectOnce(context.Background(), url, "disable", time.Second)
+		if err == nil || strings.Contains(err.Error(), "QZX") || strings.Contains(err.Error(), "QZY") || !strings.Contains(err.Error(), "password=") {
+			t.Errorf("%s: expected an error naming the URL without its password, got %v", url, err)
+		}
+	}
+}

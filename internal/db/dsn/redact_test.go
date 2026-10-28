@@ -32,17 +32,27 @@ func TestRedact(t *testing.T) {
 		{"user with @, as on Azure", "postgres://admin@server:s3cret@host/app", "postgres://admin@server:***@host/app"},
 		{"empty user", "postgres://:s3cret@host/app", "postgres://:***@host/app"},
 
-		// without a scheme: go-sql-driver's DSN, and semicolon-separated settings
+		// without a scheme: go-sql-driver's DSN, and semicolon-separated settings, whose password
+		// is hidden with all that follows it, as in a URL
 		{"DSN without a scheme", "root:s3cret@tcp(localhost:3306)/app", "root:***@tcp(localhost:3306)/app"},
 		{"DSN with a space in the password", "root:my s3cret@tcp(host)/app", "root:***@tcp(host)/app"},
 		{"DSN with quote pairs in the password", "root:a\"s3\"c`r`et@tcp(host)/app", "root:***@tcp(host)/app"},
-		{"settings", "server=host;user id=sa;password=s3cret;database=app", "server=host;user id=sa;password=***;database=app"},
-		{"settings with a quoted password", `server=host;pwd="s3c;ret";database=app`, "server=host;pwd=***;database=app"},
-		{"settings with quotes in a password", `server=host;password=a"s3"c` + "`r`" + `et;database=app`, "server=host;password=***;database=app"},
+		{"settings", "server=host;user id=sa;password=s3cret;database=app", "server=host;user id=sa;password=***"},
+		{"settings with a quoted password", `server=host;pwd="s3c;ret";database=app`, "server=host;pwd=***"},
+		{"settings with quotes in a password", `server=host;password=a"s3"c` + "`r`" + `et;database=app`, "server=host;password=***"},
 		{"settings in text, password quoted", `failed with server=host;pwd="s3cret";database=app here`,
-			`failed with server=host;pwd=***;database=app here`},
+			`failed with server=host;pwd=***`},
 		{"settings in text, quotes in a braced password", `failed with server=host;pwd={a"s3cret"c};database=app`,
-			`failed with server=host;pwd=***;database=app`},
+			`failed with server=host;pwd=***`},
+		// go-mssqldb reads password=P&Q in settings as the password P&Q, and pgx in keyword/value
+		// ones; go-sql-driver reads a DSN's parameters as a URL's.
+		{"'&' in a password setting", "server=host;password=s3cret&s3cret;database=app", "server=host;password=***"},
+		{"'&' in a keyword/value password", "host=db password=s3cret&s3cret dbname=app", "host=db password=***"},
+		{"'&' in a DSN's password parameter", "root@tcp(host:3306)/app?password=s3cret&s3cret", "root@tcp(host:3306)/app?password=***"},
+		{"'&' in a password parameter in prose", "failed: ?sslmode=disable&password=s3cret&s3cret here",
+			"failed: ?sslmode=disable&password=***"},
+		{"'&' in quoted settings", `unknown command "server=host;password=s3cret&s3cret" for "dbdiff"`,
+			`unknown command "server=host;password=***" for "dbdiff"`},
 		{"URL inside quoted prose", `error: "connecting to postgres://user:s3cret@host/db failed"`,
 			`error: "connecting to postgres://user:***@host/db failed"`},
 
@@ -70,28 +80,53 @@ func TestRedact(t *testing.T) {
 		{"password parameter", "postgres://user@host/app?sslmode=disable&password=s3cret",
 			"postgres://user@host/app?sslmode=disable&password=***"},
 		{"pwd parameter, any case", "sqlserver://host?database=app&PWD=s3cret&encrypt=disable",
-			"sqlserver://host?database=app&PWD=***&encrypt=disable"},
+			"sqlserver://host?database=app&PWD=***"},
 		{"sslpassword", "postgres://user:s3cret@host/app?sslpassword=k3y", "postgres://user:***@host/app?sslpassword=***"},
-		// In a URL's query, only '&' ends a value, as pgx, net/url and go-sql-driver read it, so
-		// settings in a value are hidden from the password on.
+		// A driver reads ?password=P&Q as the password P and a parameter Q, but Q may be the rest of
+		// the password: a password parameter's value is hidden with all that follows it, to the
+		// end of the URL or of the quotes around it.
+		{"'&' in a password parameter", "postgres://app@host/db?password=s3cret&s3cret", "postgres://app@host/db?password=***"},
+		{"'&' in a password parameter after another", "postgres://app@host:5432/db?sslmode=disable&password=s3cret&s3cret",
+			"postgres://app@host:5432/db?sslmode=disable&password=***"},
+		{"'&' and two '=' in a password parameter", "postgres://app@host/db?password=s3cret&a=b=s3cret", "postgres://app@host/db?password=***"},
+		{"'&' and '=' in a password parameter", "postgres://app@host/db?password=s3cret&s3cret=s3cret", "postgres://app@host/db?password=***"},
+		{"'&' in sslpassword", "postgres://app@host/db?sslpassword=k3y&k3y", "postgres://app@host/db?sslpassword=***"},
+		{"'&' in sslpassword after another", "postgres://app:s3cret@host:5432/db?sslmode=disable&sslpassword=k3y&k3y",
+			"postgres://app:***@host:5432/db?sslmode=disable&sslpassword=***"},
+		{"'&' and two '=' in sslpassword", "postgres://app@host/db?sslpassword=k3y&a=b=k3y", "postgres://app@host/db?sslpassword=***"},
+		{"'&' and '=' in sslpassword", "postgres://app@host/db?sslpassword=k3y&k3y=k3y", "postgres://app@host/db?sslpassword=***"},
+		{"'&' in a SQL Server password parameter", "sqlserver://host?database=db&password=s3cret&s3cret",
+			"sqlserver://host?database=db&password=***"},
+		{"'&' in a MySQL password parameter", "mysql://root@tcp(host:3306)/db?password=s3cret&s3cret",
+			"mysql://root@tcp(host:3306)/db?password=***"},
+		{"'&' then '@' in a password parameter, after a port", "postgres://app@host:5432/db?password=s3cret&s3cret@s3cret",
+			"postgres://app@host:***"},
+		{"'&' then '@' in a password parameter, after a password", "postgres://app:s3cret@host/db?password=s3cret&s3cret@s3cret",
+			"postgres://app:***"},
+		{"'&' in a password parameter, in double quotes", `invalid argument "postgres://app@host/db?password=s3cret&s3cret" for "--timeout" flag`,
+			`invalid argument "postgres://app@host/db?password=***" for "--timeout" flag`},
+		{"'&' in a password parameter, in pgx's backticks",
+			"cannot parse `postgres://app@host/db?sslmode=bogus&password=xxxxx&s3cret=s3cret`: failed to configure TLS (sslmode is invalid)",
+			"cannot parse `postgres://app@host/db?sslmode=bogus&password=***`: failed to configure TLS (sslmode is invalid)"},
+		{"'&' in a password parameter, in prose", "connecting to postgres://app@host/db?password=s3cret&s3cret failed: timeout",
+			"connecting to postgres://app@host/db?password=***"},
 		{"settings in a value", "sqlserver://host?database=app&odbc=user id=sa;Password=s3cret;app name=x",
 			"sqlserver://host?database=app&odbc=user id=sa;Password=***"},
 		{"';' in a password parameter", "postgres://app@host/db?password=s3cret;s3cret&sslmode=disable",
-			"postgres://app@host/db?password=***&sslmode=disable"},
-		// a password parameter whose value holds a URL runs to the end
+			"postgres://app@host/db?password=***"},
 		{"URL in a password setting", "password=postgres://u:first;s3cret@host/db", "password=***"},
 		{"URL in a password setting, in prose", "failed: pwd=postgres://u:first;s3cret@host/db", "failed:***@host/db"},
 		{"spaces around =", "sqlserver://host?user id=sa&password = s3cret", "sqlserver://host?user id=sa&password = ***"},
-		{"value with spaces", "sqlserver://host?password=my s3cret&database=app", "sqlserver://host?password=***&database=app"},
+		{"value with spaces", "sqlserver://host?password=my s3cret&database=app", "sqlserver://host?password=***"},
 		{"value in braces", "sqlserver://host?odbc=uid=sa;pwd={a&b}}c}&database=app",
-			"sqlserver://host?odbc=uid=sa;pwd=***&database=app"},
+			"sqlserver://host?odbc=uid=sa;pwd=***"},
 		{"value in quotes", "sqlserver://host?odbc=uid=sa;pwd='a&b''c'&database=app",
-			"sqlserver://host?odbc=uid=sa;pwd=***&database=app"},
+			"sqlserver://host?odbc=uid=sa;pwd=***"},
 		{"text after the closing brace", "sqlserver://host?odbc=pwd={a&b}s3cret&database=app",
-			"sqlserver://host?odbc=pwd=***&database=app"},
+			"sqlserver://host?odbc=pwd=***"},
 		{"percent-encoded name", "postgres://app@host/db?pass%77ord=s3cret&sslmode=disable",
-			"postgres://app@host/db?pass%77ord=***&sslmode=disable"},
-		// A value runs to ';' or '&', so here one hides the rest: more than the password, not less.
+			"postgres://app@host/db?pass%77ord=***"},
+		// Here one hides the rest: more than the password, not less.
 		{"keyword=value settings", "cannot parse `host=db sslpassword=k3y password=s3cret`", "cannot parse `host=db sslpassword=***`"},
 		{"userinfo and parameter", "sqlserver://sa:s3cret@host?database=app&password=s3cret",
 			"sqlserver://sa:***@host?database=app&password=***"},
@@ -147,7 +182,8 @@ func TestRedact(t *testing.T) {
 // scheme, in a percent-encoded query parameter, and in braces in settings (go test -fuzz
 // FuzzRedactPassword explores beyond these seeds).
 func FuzzRedactPassword(f *testing.F) {
-	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}", "a\"b\"c", "x`y`z", "a?pwd=b"} {
+	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}", "a\"b\"c", "x`y`z", "a?pwd=b",
+		"s3&cret", "a&b=c=d", "a&b@c:d"} {
 		f.Add("app", p)
 	}
 	f.Fuzz(func(t *testing.T, user, pass string) {
@@ -157,8 +193,15 @@ func FuzzRedactPassword(f *testing.F) {
 			t.Skip()
 		}
 		cases := map[string]string{
-			"server=host;user id=" + user + ";password={" + strings.ReplaceAll(pass, "}", "}}") + "};database=db": "server=host;user id=" + user + ";password=***;database=db",
-			"postgres://" + user + "@host/db?pass%77ord=" + url.QueryEscape(pass) + "&sslmode=disable":            "postgres://" + user + "@host/db?pass%77ord=***&sslmode=disable",
+			"server=host;user id=" + user + ";password={" + strings.ReplaceAll(pass, "}", "}}") + "};database=db": "server=host;user id=" + user + ";password=***",
+			"postgres://" + user + "@host/db?pass%77ord=" + url.QueryEscape(pass) + "&sslmode=disable":            "postgres://" + user + "@host/db?pass%77ord=***",
+		}
+		// A password parameter written raw, '&', '@' and quotes included, is hidden to the end
+		// (the spaces after its '=' stay).
+		if strings.TrimLeft(pass, " \t") == pass {
+			cases["postgres://"+user+"@host/db?sslmode=disable&password="+pass] = "postgres://" + user + "@host/db?sslmode=disable&password=***"
+			cases["sqlserver://host?database=db&password="+pass] = "sqlserver://host?database=db&password=***"
+			cases["server=host;user id="+user+";password="+pass] = "server=host;user id=" + user + ";password=***"
 		}
 		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db", "%s@tcp(host:3306)/db",
 			"unknown flag: --sourcepostgres://%s@host/db", "unknown shorthand flag: 'p' in -postgres://%s@host/db"} {
@@ -177,8 +220,8 @@ func FuzzRedactPassword(f *testing.F) {
 }
 
 // CheckPassword lets through each URL whose driver reads as the password all that Redact
-// hides, and refuses, without the password, those whose driver would read part of it as the
-// host or the database.
+// hides in its userinfo, and refuses, without the password, those whose driver would read
+// part of it as the host or the database.
 func TestCheckPassword(t *testing.T) {
 	for _, tt := range []struct {
 		url string
@@ -210,6 +253,13 @@ func TestCheckPassword(t *testing.T) {
 		{"postgres://host?sslmode=disable&password=s3cret@s3cret", false}, // pgx: user host?sslmode=disable&password=s3cret
 		{"sqlserver://host:1433?database=db&password=s3cret@s3cret", false},
 		{"mysql://root@tcp(host:3306)/db?password=s3cret@s3cret&x=/", false},
+		// As before, CheckPassword reads a password parameter's value up to the next '&', as the
+		// drivers do. Its error hides all after the '=', as Redact does.
+		{"postgres://app@host:5432/db?sslmode=disable&password=s3cret&s3cret", true},
+		{"sqlserver://host?database=db&password=s3cret&s3cret", true},
+		{"postgres://app@host:5432/db?password=s3cret&s3cret@s3cret", false},
+		{"sqlserver://host:1433?database=db&password=s3cret&s3cret@s3cret", false},
+		{"mysql://root@tcp(host:3306)/db?password=s3cret&s3cret@s3cret", false},
 	} {
 		err := CheckPassword(tt.url)
 		if tt.ok != (err == nil) || err != nil && (strings.Contains(err.Error(), "s3cret") || !strings.Contains(err.Error(), "***")) {
@@ -223,8 +273,9 @@ func TestCheckPassword(t *testing.T) {
 }
 
 // A URL CheckPassword lets through is one whose driver, parsing it the way dbdiff's driver
-// does, reads as the password all that Redact hides, or fails (go test -fuzz
-// FuzzCheckPassword explores beyond these seeds).
+// does, reads as the password all that CheckPassword takes for it, or fails (go test -fuzz
+// FuzzCheckPassword explores beyond these seeds). Redact hides that, and all that follows a
+// password parameter's '=' too.
 func FuzzCheckPassword(f *testing.F) {
 	for _, s := range [][3]string{{"app", "s3cret", "host:5432/db?sslmode=disable"}, {"app", "s3cret?#:x", "host/db"},
 		{"app", "p%40ss%2Fw", "host/db"}, {"sa", "p@ss:w", "host?database=db"}, {"root", "p@ss/w:rd?#", "tcp(host:3306)/db"},
@@ -239,7 +290,7 @@ func FuzzCheckPassword(f *testing.F) {
 				continue
 			}
 			at := strings.LastIndexByte(rest, '@')
-			hidden := rest[strings.IndexByte(rest[:at], ':')+1 : passwordEnd(rest, at)]
+			hidden := rest[strings.IndexByte(rest[:at], ':')+1 : passwordEnd(rest, at, inQuery)]
 			var got, want string
 			switch scheme {
 			case "postgres://":
