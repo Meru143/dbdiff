@@ -35,7 +35,7 @@ go install github.com/meru143/dbdiff@latest
 brew install meru143/homebrew-dbdiff/dbdiff
 
 # Via release binary (Linux x86-64 shown)
-curl -fsSL https://github.com/Meru143/dbdiff/releases/download/v1.1.4/dbdiff_1.1.4_linux_amd64.tar.gz | tar -xz dbdiff
+curl -fsSL https://github.com/Meru143/dbdiff/releases/download/v1.1.5/dbdiff_1.1.5_linux_amd64.tar.gz | tar -xz dbdiff
 sudo mv dbdiff /usr/local/bin/
 ```
 
