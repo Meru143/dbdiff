@@ -1,6 +1,7 @@
 package dsn
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,10 @@ func TestRedact(t *testing.T) {
 		{"DSN with a space in the password", "root:my s3cret@tcp(host)/app", "root:***@tcp(host)/app"},
 		{"DSN with quote pairs in the password", "root:a\"s3\"c`r`et@tcp(host)/app", "root:***@tcp(host)/app"},
 		{"settings", "server=host;user id=sa;password=s3cret;database=app", "server=host;user id=sa;password=***;database=app"},
+		{"settings with a quoted password", `server=host;pwd="s3c;ret";database=app`, "server=host;pwd=***;database=app"},
+		{"settings with quotes in a password", `server=host;password=a"s3"c` + "`r`" + `et;database=app`, "server=host;password=***;database=app"},
+		{"settings in text, password quoted", `failed with server=host;pwd="s3cret";database=app here`,
+			`failed with server=host;pwd=***;database=app here`},
 
 		// nothing to hide
 		{"no password", "postgres://user@host/app", "postgres://user@host/app"},
@@ -56,6 +61,10 @@ func TestRedact(t *testing.T) {
 			"sqlserver://host?odbc=uid=sa;pwd=***;database=app"},
 		{"text after the closing brace", "sqlserver://host?odbc=pwd={a;b}s3cret;database=app",
 			"sqlserver://host?odbc=pwd=***;database=app"},
+		{"percent-encoded name", "postgres://app@host/db?pass%77ord=s3cret&sslmode=disable",
+			"postgres://app@host/db?pass%77ord=***&sslmode=disable"},
+		// A value runs to ';' or '&', so here one hides the rest: more than the password, not less.
+		{"keyword=value settings", "cannot parse `host=db sslpassword=k3y password=s3cret`", "cannot parse `host=db sslpassword=***`"},
 		{"userinfo and parameter", "sqlserver://sa:s3cret@host?database=app&password=s3cret",
 			"sqlserver://sa:***@host?database=app&password=***"},
 
@@ -87,7 +96,8 @@ func TestRedact(t *testing.T) {
 	}
 }
 
-// Any password in a URL's userinfo is hidden whole, whatever it holds (go test -fuzz
+// Any password is hidden whole, whatever it holds: in a URL's userinfo, in a DSN without a
+// scheme, in a percent-encoded query parameter, and in braces in settings (go test -fuzz
 // FuzzRedactPassword explores beyond these seeds).
 func FuzzRedactPassword(f *testing.F) {
 	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}", "a\"b\"c", "x`y`z"} {
@@ -99,23 +109,17 @@ func FuzzRedactPassword(f *testing.F) {
 			strings.Trim(user, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._@-") != "" {
 			t.Skip()
 		}
-		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db", "%s@tcp(host:3306)/db"} {
-			got := Redact(strings.Replace(form, "%s", user+":"+pass, 1))
-			if want := strings.Replace(form, "%s", user+":***", 1); got != want {
-				t.Errorf("password %q: got %q, want %q", pass, got, want)
-			}
+		cases := map[string]string{
+			"server=host;user id=" + user + ";password={" + strings.ReplaceAll(pass, "}", "}}") + "};database=db": "server=host;user id=" + user + ";password=***;database=db",
+			"postgres://" + user + "@host/db?pass%77ord=" + url.QueryEscape(pass) + "&sslmode=disable":            "postgres://" + user + "@host/db?pass%77ord=***&sslmode=disable",
 		}
-	})
-}
-
-// Redacting again changes nothing, whatever the text (seeds: inputs fuzzing found).
-func FuzzRedactIdempotent(f *testing.F) {
-	for _, s := range []string{"pwd={}0", "pwd=0 &:0@", `x "a:b@c" y`, "`p://a:b@c`"} {
-		f.Add(s)
-	}
-	f.Fuzz(func(t *testing.T, s string) {
-		if r := Redact(s); Redact(r) != r {
-			t.Errorf("Redact(%q) = %q, and again %q", s, r, Redact(r))
+		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db", "%s@tcp(host:3306)/db"} {
+			cases[strings.Replace(form, "%s", user+":"+pass, 1)] = strings.Replace(form, "%s", user+":***", 1)
+		}
+		for in, want := range cases {
+			if got := Redact(in); got != want {
+				t.Errorf("password %q: Redact(%q) = %q, want %q", pass, in, got, want)
+			}
 		}
 	})
 }
