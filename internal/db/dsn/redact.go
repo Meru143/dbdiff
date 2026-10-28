@@ -9,12 +9,10 @@ import (
 // mask replaces each secret Redact hides.
 const mask = "***"
 
-// dsnAddr matches what follows the '@' of a go-sql-driver DSN: a network and its address,
-// both optional, then the '/' before the database: tcp(host:3306)/db, unix(/tmp/sock)/db, /db.
-var dsnAddr = regexp.MustCompile(`^[A-Za-z0-9]*(\([^)]*\))?/`)
-
-// settings matches the start of semicolon-separated settings: server=host;user id=sa;...
-var settings = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9 _.%-]*=`)
+// dsnAddr matches what follows the '@' of a go-sql-driver DSN: a network with its address
+// in parentheses, or nothing, then the '/' before the database: tcp(host:3306)/db,
+// unix(/tmp/sock)/db, /db.
+var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 
 // Redact hides the secrets in s, a connection string or text that quotes them, and keeps
 // the rest, user and host included, since they tell a reviewer which database is meant:
@@ -25,45 +23,50 @@ var settings = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9 _.%-]*=`)
 // holds '@', ':', '/', spaces or %-escapes is hidden whole, and so is the password of a
 // malformed URL; that can hide more than the password, never less. The last '@' is that of
 // the whole string, unless the URL is in double quotes (Go's %q, as cobra and net/url quote
-// one in an error) or backticks (pgx), which then bound it. A DSN without a scheme, like
-// go-sql-driver's user:pass@tcp(host:3306)/db, is hidden the same way, in quotes or as the
-// whole of s, quotes in its password included. Password-like parameters are hidden
-// wherever they are (see redactParams); in settings like server=host;pwd=x, before
-// anything else, so that their values' quotes are read as such.
+// one in an error) or backticks (pgx), which then bound it; quoted text is read the same
+// way, URLs anywhere in it included. A DSN without a scheme, like go-sql-driver's
+// user:pass@tcp(host:3306)/db, is hidden the same way, in quotes or as the whole of s,
+// quotes in its password included. The value of a password-like parameter (see
+// redactParams) is hidden whole wherever it is, before any quote in it is read.
 func Redact(s string) string {
-	if schemeLen(s) == 0 {
-		if userinfo(s, false) > 0 && dsnAddr.MatchString(s[strings.LastIndexByte(s, '@')+1:]) {
-			return redactOne(s)
-		}
-		if settings.MatchString(s) {
-			s = redactParams(s)
-		}
+	if schemeLen(s) == 0 && userinfo(s, false) > 0 && dsnAddr.MatchString(s[strings.LastIndexByte(s, '@')+1:]) {
+		return redactOne(s)
 	}
 	var b strings.Builder
-	quoted, text := false, 0 // text: where the text not yet written starts
+	quoted := false
+	text, key := 0, 0 // where the text not yet written, and the name before the next '=', start
+	flush := func(end int) {
+		b.WriteString(redactOne(s[text:end]))
+		text = end
+	}
 	for i := 0; i < len(s); {
 		c := s[i]
-		if c == '"' || c == '`' {
-			if end := closingQuote(s, i); end > 0 {
-				before := s[text:i]
-				p := redactOne(before)
-				b.WriteString(p)
-				if secretValueNext(before) { // pwd="x": the quotes hold a password
-					if !strings.HasSuffix(p, mask) { // else they end a value already hidden
-						b.WriteString(mask)
-					}
-					i += valueLen(s[i:])
-				} else {
-					b.WriteByte(c)
-					b.WriteString(redactOne(s[i+1 : end]))
-					b.WriteByte(c)
-					i = end + 1
+		switch {
+		case c == '?' || c == '&' || c == ';':
+			key = i + 1
+		case c == '=':
+			if secretKey(s[key:i]) {
+				v := i + 1 + len(s[i+1:]) - len(strings.TrimLeft(s[i+1:], " \t"))
+				flush(v)
+				if n := valueLen(s[v:]); n > 0 {
+					b.WriteString(mask)
+					text = v + n
 				}
-				text, quoted = i, true
+				i, key = text, text
 				continue
 			}
-		} else if (i == 0 || !isSchemeChar(s[i-1])) && schemeLen(s[i:]) > 0 {
-			b.WriteString(redactOne(s[text:i]))
+			key = i + 1
+		case c == '"' || c == '`':
+			if end := closingQuote(s, i); end > 0 {
+				flush(i)
+				b.WriteByte(c)
+				b.WriteString(Redact(s[i+1 : end]))
+				b.WriteByte(c)
+				i, text, key, quoted = end+1, end+1, end+1, true
+				continue
+			}
+		case (i == 0 || !isSchemeChar(s[i-1])) && schemeLen(s[i:]) > 0:
+			flush(i)
 			b.WriteString(redactOne(s[i:]))
 			return b.String()
 		}
@@ -72,7 +75,7 @@ func Redact(s string) string {
 	if !quoted {
 		return redactOne(s)
 	}
-	b.WriteString(redactOne(s[text:]))
+	flush(len(s))
 	return b.String()
 }
 
@@ -141,17 +144,6 @@ func secretKey(name string) bool {
 	}
 	name = strings.ToLower(strings.TrimSpace(name))
 	return strings.HasSuffix(name, "password") || strings.HasSuffix(name, "passwd") || strings.HasSuffix(name, "pwd")
-}
-
-// secretValueNext reports whether t ends with a password-like parameter's name and '=',
-// so that what follows t is its value.
-func secretValueNext(t string) bool {
-	t = strings.TrimRight(t, " \t")
-	if !strings.HasSuffix(t, "=") {
-		return false
-	}
-	t = t[:len(t)-1]
-	return secretKey(t[strings.LastIndexAny(t, "?&;=")+1:])
 }
 
 // valueLen is the length of the parameter value v starts with: up to the next '&' or ';'
