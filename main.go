@@ -194,6 +194,7 @@ func main() {
 	})
 
 	hideHelpTopicPasswords(rootCmd)
+	hideCompletionPasswords(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", dsn.Redact(err.Error()))
@@ -215,6 +216,25 @@ func hideHelpTopicPasswords(root *cobra.Command) {
 				}
 				run(cmd, args)
 			}
+		}
+	}
+}
+
+// hideCompletionPasswords hides the passwords in the arguments of cobra's hidden __complete
+// command, which shells run for completions: cobra prints those it can't place itself, on
+// stderr ([Error] unable to find a command for arguments: [postgres://...]). cobra adds the
+// command only once Execute runs, so root's PersistentPreRun, which cobra runs for it with
+// the arguments it then passes to its Run, hides them. No completion here reads a URL.
+func hideCompletionPasswords(root *cobra.Command) {
+	pre := root.PersistentPreRun
+	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if cmd.Name() == cobra.ShellCompRequestCmd {
+			for i := range args {
+				args[i] = dsn.Redact(args[i])
+			}
+		}
+		if pre != nil {
+			pre(cmd, args)
 		}
 	}
 }
