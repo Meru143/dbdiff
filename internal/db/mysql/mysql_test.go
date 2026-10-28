@@ -311,10 +311,23 @@ func TestConnectParseErrorHidesPassword(t *testing.T) {
 		"mysql://root:QZXa/QZYb%zz@tcp(db:3306)",  // go-sql-driver: invalid dbname "QZYb%zz@tcp(db:3306)"
 		"mysql://ro=ot:QZXa/QZYb%zz@tcp(db:3306)", // Redact reads a bare DSN whose user name has a '=' as prose
 		"ro=ot:QZXa/QZYb%zz@tcp(db:3306)",
+		"mysql://root:QZXa/QZYb?password=%zz",              // without the bad escape: default addr for network 'root:QZXa'
+		"mysql://u:p@tcp(db:3306)/app?password=QZX%zz;QZY", // Redact used to end the value at the ';'
+		"mysql://u:p@tcp(db:3306)/app?password=%zz&strict=true",
 	} {
 		err := New().Connect(context.Background(), url, "disable", time.Second)
-		if err == nil || strings.Contains(err.Error(), "QZX") || strings.Contains(err.Error(), "QZY") {
+		if err == nil || strings.Contains(err.Error(), "QZX") || strings.Contains(err.Error(), "QZY") || strings.Contains(err.Error(), "zz") {
 			t.Errorf("%s: expected an error without the password, got %v", url, err)
 		}
+	}
+	// Errors that quote nothing of the DSN are passed on.
+	if err := New().Connect(context.Background(), "mysql://root:QZXa@tcp(db:3306/app", "disable", time.Second); err == nil ||
+		!strings.Contains(err.Error(), "invalid DSN: network address not terminated (missing closing brace)") {
+		t.Errorf("expected go-sql-driver's own reason, got %v", err)
+	}
+	// go-sql-driver panics on strict, a parameter it dropped: Connect returns an error instead.
+	if err := New().Connect(context.Background(), "mysql://root:QZXa@tcp(db:3306)/app?strict=true", "disable", time.Second); err == nil ||
+		!strings.Contains(err.Error(), "strict mode has been removed") {
+		t.Errorf("expected an error for strict, got %v", err)
 	}
 }

@@ -3,12 +3,12 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
-	dbdsn "github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -24,23 +24,26 @@ func New() *Driver {
 
 // parseDSN reads connStr, a go-sql-driver DSN after mysql:// or mysql+tcp:// in any case
 // (mysql://user:pass@tcp(host:3306)/db), as go-sql-driver does.
-func parseDSN(connStr string) (*gomysql.Config, error) {
+func parseDSN(connStr string) (cfg *gomysql.Config, err error) {
 	dsn := connStr
 	if lower := strings.ToLower(dsn); strings.HasPrefix(lower, "mysql://") || strings.HasPrefix(lower, "mysql+tcp://") {
 		dsn = dsn[strings.Index(dsn, "://")+3:]
 	}
-	cfg, err := gomysql.ParseDSN(dsn)
-	if err != nil {
-		// go-sql-driver's reason can quote part of the password: without a /database after
-		// the address, it reads the database, or the network, from the password. The redacted
-		// DSN fails only if the rest of it does, and its error holds no password. It is
-		// redacted as a URL: Redact reads a DSN without a scheme as prose when its user name
-		// holds a '=' or a space.
-		redacted := dbdsn.Redact("mysql://" + dsn)
-		if _, rerr := gomysql.ParseDSN(strings.TrimPrefix(redacted, "mysql://")); rerr != nil {
-			return nil, fmt.Errorf("invalid mysql connection string: %w", rerr)
+	defer func() {
+		// go-sql-driver panics on strict, a parameter it dropped, with a message that quotes
+		// nothing of the DSN.
+		if r := recover(); r != nil {
+			cfg, err = nil, fmt.Errorf("invalid mysql connection string: %v", r)
 		}
-		return nil, fmt.Errorf("invalid mysql connection string %q", redacted)
+	}()
+	if cfg, err = gomysql.ParseDSN(dsn); err != nil {
+		// Its errors that start "invalid DSN: " quote nothing of the DSN. The others quote a
+		// part of it, which can be part of the password: the database name or the network it
+		// reads from a DSN without /database after the address, or a parameter's value.
+		if !strings.HasPrefix(err.Error(), "invalid DSN: ") {
+			err = errors.New("go-sql-driver can't read it; it should look like mysql://user:password@tcp(host:3306)/database?name=value")
+		}
+		return nil, fmt.Errorf("invalid mysql connection string: %w", err)
 	}
 	return cfg, nil
 }
