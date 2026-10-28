@@ -4,6 +4,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	gomysql "github.com/go-sql-driver/mysql"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestRedact(t *testing.T) {
@@ -135,6 +138,95 @@ func FuzzRedactPassword(f *testing.F) {
 		for in, want := range cases {
 			if got := Redact(in); got != want {
 				t.Errorf("password %q: Redact(%q) = %q, want %q", pass, in, got, want)
+			}
+		}
+	})
+}
+
+// CheckPassword lets through each URL whose driver reads as the password all that Redact
+// hides, and refuses, without the password, those whose driver would read part of it as the
+// host or the database.
+func TestCheckPassword(t *testing.T) {
+	for _, tt := range []struct {
+		url string
+		ok  bool
+	}{
+		{"postgres://app:s3cret@host:5432/db?sslmode=disable", true},
+		{"postgresql://app:s3cret?#:x@host/db", true}, // pgx's password runs to the first '@'
+		{"postgres://app:p%40ss%2Fw@host/db", true},
+		{"postgres://app@host/db?application_name=a@b", true}, // no password in the userinfo
+		{"postgres://host/db?password=s3cret", true},
+		{"sqlserver://sa:p@ss:w@host?database=db", true},     // net/url's runs to the host's last '@'
+		{"mysql://root:p@ss/w:rd?#@tcp(host:3306)/db", true}, // go-sql-driver's, to the last '@' before the last '/'
+		{"MYSQL+TCP://root:s3cret@tcp(host:3306)/db?parseTime=true", true},
+		{"mariadb://app:a/s3cret@host/db", true}, // no driver: NewDriver refuses the scheme
+
+		{"postgres://app:/s3cret@host:5432/db", false}, // pgx: host app, database s3cret@host:5432/db
+		{"postgres://app:4321/s3cret@host/db", false},  // pgx: port 4321
+		{"postgres://app:p@s3cret@host/db", false},     // pgx: password p, host s3cret@host
+		{"postgres://app:s3cret@host/db?x=a@b", false}, // the password Redact hides runs to a@
+		{"sqlserver://sa:4321/s3cret@host?database=db", false},
+		{"sqlserver://sa:a?s3cret@host?database=db", false},
+		{"mysql://root:s3cret/x@tcp(host:3306)", false}, // go-sql-driver: database x@tcp(host:3306)
+		{"mysql://root:s3cret@tcp(host:3306)", false},
+		{"mysql+tcp://root:s3cret@tcp(host:3306)/db?x=a@b", false},
+	} {
+		err := CheckPassword(tt.url)
+		if tt.ok != (err == nil) || err != nil && (strings.Contains(err.Error(), "s3cret") || !strings.Contains(err.Error(), ":***@")) {
+			t.Errorf("CheckPassword(%q) = %v, want ok=%v and no password", tt.url, err, tt.ok)
+		}
+	}
+}
+
+// A URL CheckPassword lets through is one whose driver, parsing it the way dbdiff's driver
+// does, reads as the password all that Redact hides, or fails (go test -fuzz
+// FuzzCheckPassword explores beyond these seeds).
+func FuzzCheckPassword(f *testing.F) {
+	for _, s := range [][3]string{{"app", "s3cret", "host:5432/db?sslmode=disable"}, {"app", "s3cret?#:x", "host/db"},
+		{"app", "p%40ss%2Fw", "host/db"}, {"sa", "p@ss:w", "host?database=db"}, {"root", "p@ss/w:rd?#", "tcp(host:3306)/db"},
+		{"app", "4321/s3cret", "host/db"}, {"app", "s3cret", "host/db?x=a@b"}, {"a@b", "s3cret", "host"}} {
+		f.Add(s[0], s[1], s[2])
+	}
+	f.Fuzz(func(t *testing.T, user, pass, tail string) {
+		for _, scheme := range []string{"postgres://", "sqlserver://", "mysql://"} {
+			u := scheme + user + ":" + pass + "@" + tail
+			rest := u[len(scheme):]
+			if CheckPassword(u) != nil || userinfo(rest, true) == 0 {
+				continue
+			}
+			at := strings.LastIndexByte(rest, '@')
+			hidden := rest[strings.IndexByte(rest[:at], ':')+1 : at]
+			var got, want string
+			switch scheme {
+			case "postgres://":
+				// pgx drops the spaces around a password, then looks for one elsewhere.
+				var err error
+				if want, err = url.PathUnescape(strings.Trim(hidden, " ")); err != nil || want == "" {
+					continue
+				}
+				cfg, err := pgconn.ParseConfig(u)
+				if err != nil {
+					continue
+				}
+				got = cfg.Password
+			case "sqlserver://":
+				p, err := url.Parse(u)
+				if err != nil {
+					continue
+				}
+				if p.User != nil {
+					got, _ = p.User.Password()
+				}
+				want, _ = url.PathUnescape(hidden)
+			case "mysql://":
+				cfg, err := gomysql.ParseDSN(rest)
+				if err != nil {
+					continue
+				}
+				got, want = cfg.Passwd, hidden
+			}
+			if got != want {
+				t.Errorf("%q: the driver reads the password %q, Redact hides %q", u, got, hidden)
 			}
 		}
 	})
