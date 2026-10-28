@@ -238,10 +238,11 @@ func CheckPassword(connStr string) error {
 		// go-sql-driver has no password parameter: it sends an unknown one, password among
 		// them, to the server as a SET, where it never logs anyone in and, for an account with
 		// no password, the server's syntax error quotes its value (and with a quoted value it
-		// would run SET password on the logged-in account). So refuse one outright. The query
-		// is what follows the userinfo's '@', after the address and its '/database'.
-		if host := rest[at+1:]; strings.IndexByte(host, '?') >= 0 &&
-			len(secretValues(host[strings.IndexByte(host, '?'):], inQuery)) > 0 {
+		// would run SET password on the logged-in account). So refuse one outright. Scan from
+		// the first '?', not after the last '@', which an '@' in a query value moves past; a
+		// '?' inside a userinfo password only reaches a value whose '@' then makes the URL
+		// ambiguous and refused below anyway, so this never wrongly refuses a connectable URL.
+		if q := strings.IndexByte(rest, '?'); q >= 0 && len(secretValues(rest[q:], inQuery)) > 0 {
 			// No URL in the message: embedding one with tcp(host)/db would trip the scheme-less
 			// DSN heuristic when main redacts the error again. The user knows their own URL.
 			return fmt.Errorf("a MySQL password must be in the user info of the URL, not a query parameter; a password query parameter is sent to the server as a SET and never logs in")

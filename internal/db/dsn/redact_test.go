@@ -271,14 +271,14 @@ func TestCheckPassword(t *testing.T) {
 		{"postgres://host:5432/db?password=s3cret@s3cret", false},
 		{"postgres://host?sslmode=disable&password=s3cret@s3cret", false}, // pgx: user host?sslmode=disable&password=s3cret
 		{"sqlserver://host:1433?database=db&password=s3cret@s3cret", false},
-		{"mysql://root@tcp(host:3306)/db?password=s3cret@s3cret&x=/", false},
+		// A MySQL password parameter is refused by its own rule (see TestCheckPasswordMySQLParam),
+		// without the URL; the raw-'&' MySQL cases below moved there too.
 		// As before, CheckPassword reads a password parameter's value up to the next '&', as the
 		// drivers do. Its error hides all after the '=', as Redact does.
 		{"postgres://app@host:5432/db?sslmode=disable&password=s3cret&s3cret", true},
 		{"sqlserver://host?database=db&password=s3cret&s3cret", true},
 		{"postgres://app@host:5432/db?password=s3cret&s3cret@s3cret", false},
 		{"sqlserver://host:1433?database=db&password=s3cret&s3cret@s3cret", false},
-		{"mysql://root@tcp(host:3306)/db?password=s3cret&s3cret@s3cret", false},
 	} {
 		err := CheckPassword(tt.url)
 		if tt.ok != (err == nil) || err != nil && (strings.Contains(err.Error(), "s3cret") || !strings.Contains(err.Error(), "***")) {
@@ -302,7 +302,11 @@ func TestCheckPasswordMySQLParam(t *testing.T) {
 		"mysql://root@tcp(host:3306)/db?sql_mode=ANSI&password=s3cret",
 		"mysql+tcp://root@tcp(host:3306)/db?password=s3cret&x=y",
 		"mysql://root@tcp(host:3306)/db?Pwd=s3cret&z",
-		"mysql://root@tcp(host:3306)/db?password=" + strings.Repeat("s3cret", 16), // over 80 characters
+		"mysql://root@tcp(host:3306)/db?password=" + strings.Repeat("s3cret", 16),   // over 80 characters
+		"mysql://root@tcp(host:3306)/db?password=p@ss",                              // an '@' in the value
+		"mysql://root@tcp(host:3306)/db?password=s3cret@s3cret&x=/",                 // '@' in the value, then a '/'
+		"mysql://root@tcp(host:3306)/db?password=s3cret&s3cret@s3cret",              // raw '&', then '@'
+		"mysql://root@tcp(host:3306)/db?connectionAttributes=a@b/c&password=s3cret", // an '@' in an earlier value moves the last '@' past the query
 	} {
 		err := CheckPassword(u)
 		if err == nil || strings.Contains(err.Error(), "s3cret") {
