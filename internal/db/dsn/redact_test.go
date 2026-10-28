@@ -82,6 +82,17 @@ func TestRedact(t *testing.T) {
 			"cannot parse `POSTGRES://user:***@host/app`: failed to parse as keyword/value"},
 		{"quoted DSN without a scheme", `unknown command "root:s3cret@tcp(host:3306)/app" for "dbdiff"`,
 			`unknown command "root:***@tcp(host:3306)/app" for "dbdiff"`},
+		// pflag quotes a URL glued to a flag whole, after the flag's dashes or letters
+		{"URL glued to a shorthand flag", "unknown shorthand flag: 'p' in -postgres://user:s3cret@host/app",
+			"unknown shorthand flag: 'p' in -postgres://user:***@host/app"},
+		{"URL glued to a long flag", "unknown flag: --sourcepostgres://user:s3cret@host/app",
+			"unknown flag: --sourcepostgres://user:***@host/app"},
+		{"URL after two dashes", "unknown flag: --mysql://root:s3cret@tcp(host:3306)/app",
+			"unknown flag: --mysql://root:***@tcp(host:3306)/app"},
+		{"URL after three dashes", "bad flag syntax: ---sqlserver://sa:s3cret@host?database=app",
+			"bad flag syntax: ---sqlserver://sa:***@host?database=app"},
+		{"URL after a digit", "unknown shorthand flag: '1' in -1postgres://user:s3cret@host/app",
+			"unknown shorthand flag: '1' in -1postgres://user:***@host/app"},
 		{"quoted prose", `reason: "user root: denied to root@host"`, `reason: "user root: denied to root@host"`},
 		{"driver error prose", "Error 1045 (28000): Access denied for user 'root'@'172.17.0.1' (using password: YES)",
 			"Error 1045 (28000): Access denied for user 'root'@'172.17.0.1' (using password: YES)"},
@@ -117,7 +128,8 @@ func FuzzRedactPassword(f *testing.F) {
 			"server=host;user id=" + user + ";password={" + strings.ReplaceAll(pass, "}", "}}") + "};database=db": "server=host;user id=" + user + ";password=***;database=db",
 			"postgres://" + user + "@host/db?pass%77ord=" + url.QueryEscape(pass) + "&sslmode=disable":            "postgres://" + user + "@host/db?pass%77ord=***&sslmode=disable",
 		}
-		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db", "%s@tcp(host:3306)/db"} {
+		for _, form := range []string{"postgres://%s@host/db", "mysql://%s@tcp(host:3306)/db", "sqlserver://%s@host?database=db", "%s@tcp(host:3306)/db",
+			"unknown flag: --sourcepostgres://%s@host/db", "unknown shorthand flag: 'p' in -postgres://%s@host/db"} {
 			cases[strings.Replace(form, "%s", user+":"+pass, 1)] = strings.Replace(form, "%s", user+":***", 1)
 		}
 		for in, want := range cases {
