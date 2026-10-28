@@ -1,6 +1,7 @@
 package dsn
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -30,6 +31,9 @@ var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 // user:pass@tcp(host:3306)/db, is hidden the same way, in quotes or as the whole of s,
 // quotes in its password included. The value of a password-like parameter (see
 // redactParams) is hidden whole wherever it is, before any quote in it is read.
+//
+// A driver that reads part of what Redact hides as the host or the database, not the
+// password, quotes that part in its errors: CheckPassword refuses such URLs.
 func Redact(s string) string {
 	if schemeLen(s) == 0 && userinfo(s, false) > 0 && dsnAddr.MatchString(s[strings.LastIndexByte(s, '@')+1:]) {
 		return redactOne(s)
@@ -108,6 +112,34 @@ func userinfo(rest string, scheme bool) int {
 		return 0
 	}
 	return colon + 1
+}
+
+// CheckPassword returns an error, naming connStr redacted, if the driver for connStr would
+// read part of what Redact hides as its password as the host, the database or the query,
+// which the driver's errors quote: failed to connect to `user=app database=s3cret@host/db`.
+// Redact ends a password at the last '@'. pgx (postgres://, postgresql://) ends the user
+// name and password at the first '@', or at a '/' before it; net/url, which the SQL Server
+// driver parses with, ends the host at the first '/', '?' or '#'; and go-sql-driver (mysql://,
+// mysql+tcp://) reads the database after the last '/'.
+func CheckPassword(connStr string) error {
+	n := schemeLen(connStr)
+	rest := connStr[n:]
+	if n == 0 || userinfo(rest, true) == 0 {
+		return nil
+	}
+	at := strings.LastIndexByte(rest, '@')
+	var fix string
+	switch scheme := strings.ToLower(connStr[:n]); {
+	case (scheme == "postgres://" || scheme == "postgresql://") && strings.ContainsAny(rest[:at], "@/"):
+		fix = "percent-encode '@' and '/' in its user name and password, and any '@' after its host"
+	case scheme == "sqlserver://" && strings.ContainsAny(rest[:at], "/?#"):
+		fix = "percent-encode '/', '?' and '#' in its user name and password, and any '@' after its host"
+	case (scheme == "mysql://" || scheme == "mysql+tcp://") && !strings.Contains(rest[at:], "/"):
+		fix = "end it with /database after the address, and percent-encode any '@' after that '/'"
+	default:
+		return nil
+	}
+	return fmt.Errorf("can't tell where the password ends in %q: %s", Redact(connStr), fix)
 }
 
 // redactParams hides the value of each password-like parameter in t, in a URL's query

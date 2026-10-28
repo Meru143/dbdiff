@@ -34,9 +34,14 @@ func TestIntrospectLeavesOutMigrationsTable(t *testing.T) {
 	}
 }
 
-// A URL NewDriver refuses stays out of its error: it may hold a password.
+// A URL NewDriver refuses stays out of its error: it may hold a password. It refuses those
+// whose driver would read part of the password as the host or the database, which the
+// driver's errors quote: failed to connect to `user=me database=s3cret@host:5432/db`.
 func TestNewDriverErrorHidesURL(t *testing.T) {
-	for _, url := range []string{"postgress://app:s3cret@host/db", "root:s3cret@tcp(host:3306)/db"} {
+	for _, url := range []string{"postgress://app:s3cret@host/db", "root:s3cret@tcp(host:3306)/db",
+		"postgres://app:/s3cret@host:5432/db", "postgres://app:4321/s3cret@host:5432/db",
+		"mysql://app:x/s3cret%zz@tcp(host:3306)", "mysql://app:s3cret/x@tcp(host:3306)",
+		"sqlserver://sa:4321/s3cret@host:1433?database=db"} {
 		_, err := NewDriver(url)
 		if err == nil || strings.Contains(err.Error(), "s3cret") {
 			t.Errorf("%s: expected an error without the password, got %v", url, err)

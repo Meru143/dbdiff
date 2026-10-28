@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/db/mssql"
 	"github.com/meru143/dbdiff/internal/db/mysql"
 	"github.com/meru143/dbdiff/internal/db/postgres"
@@ -21,7 +22,13 @@ const MigrationsTable = "_dbdiff_migrations"
 //   - postgres://, postgresql:// → PostgreSQL driver
 //   - mysql://, mysql+tcp://     → MySQL driver
 //   - sqlserver://               → SQL Server driver
+//
+// It refuses a URL its driver would read part of the password of as the host or the
+// database, which the driver's errors quote (see dsn.CheckPassword).
 func NewDriver(connStr string) (Driver, error) {
+	if err := dsn.CheckPassword(connStr); err != nil {
+		return nil, err
+	}
 	lower := strings.ToLower(connStr)
 
 	switch {
