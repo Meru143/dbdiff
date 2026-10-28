@@ -10,6 +10,14 @@ import (
 // mask replaces each secret Redact hides.
 const mask = "***"
 
+// What ends a parameter's value: in a URL's query only '&', as pgx, net/url and go-sql-driver
+// read it, which take a ';' for part of the value; in settings (server=host;password=x) a ';'
+// too.
+const (
+	inQuery    = "&"
+	inSettings = "&;"
+)
+
 // dsnAddr matches what follows the '@' of a go-sql-driver DSN: a network with its address
 // in parentheses, or nothing, then the '/' before the database: tcp(host:3306)/db,
 // unix(/tmp/sock)/db, /db.
@@ -56,7 +64,7 @@ func Redact(s string) string {
 			if secretKey(s[key:i]) {
 				v := i + 1 + len(s[i+1:]) - len(strings.TrimLeft(s[i+1:], " \t"))
 				flush(v)
-				if n := valueLen(s[v:]); n > 0 {
+				if n := valueLen(s[v:], inSettings); n > 0 {
 					b.WriteString(mask)
 					text = v + n
 				}
@@ -89,14 +97,17 @@ func Redact(s string) string {
 
 // redactOne hides the secrets of one connection string: the password between the first
 // ':' after the scheme and the last '@' (see passwordEnd), and the value of each
-// password-like parameter.
+// password-like parameter, read as a URL's query if t has a scheme.
 func redactOne(t string) string {
 	n := schemeLen(t)
 	head, rest := t[:n], t[n:]
 	if colon := userinfo(rest, n > 0); colon > 0 {
 		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@')):]
 	}
-	return head + redactParams(rest)
+	if n > 0 {
+		return head + redactParams(rest, inQuery)
+	}
+	return redactParams(rest, inSettings)
 }
 
 // passwordEnd returns where the password that ends at rest[at], the last '@', is hidden to:
@@ -109,7 +120,7 @@ func passwordEnd(rest string, at int) int {
 	if q < 0 || q > at {
 		return at
 	}
-	for _, v := range secretValues(rest[q:]) {
+	for _, v := range secretValues(rest[q:], inQuery) {
 		if q+v[0] <= at && at < q+v[1] {
 			return q + v[1]
 		}
@@ -162,7 +173,7 @@ func CheckPassword(connStr string) error {
 			// No password ends at an '@', but pgx still ends a user name at the first one,
 			// even in a password parameter's value: it would read the start of the value
 			// as part of the user name, and the rest as the host.
-			secrets := secretValues(rest)
+			secrets := secretValues(rest, inQuery)
 			ambiguous = len(secrets) > 0 && secrets[0][0] < first
 		}
 	case "sqlserver://":
@@ -181,10 +192,10 @@ func CheckPassword(connStr string) error {
 }
 
 // redactParams hides the value of each password-like parameter in t (see secretValues).
-func redactParams(t string) string {
+func redactParams(t, ends string) string {
 	var b strings.Builder
 	written := 0
-	for _, v := range secretValues(t) {
+	for _, v := range secretValues(t, ends) {
 		if v[1] > v[0] {
 			b.WriteString(t[written:v[0]])
 			b.WriteString(mask)
@@ -197,9 +208,9 @@ func redactParams(t string) string {
 
 // secretValues returns where the value of each password-like parameter in t starts and
 // ends, in a URL's query (?password=x&...) or in semicolon-separated settings (user
-// id=sa;password=x): one whose name, read percent-decoded and in any case, ends in
-// password, passwd or pwd (password, sslpassword, Pwd, pass%77ord).
-func secretValues(t string) [][2]int {
+// id=sa;password=x), whichever ends says t holds: one whose name, read percent-decoded and
+// in any case, ends in password, passwd or pwd (password, sslpassword, Pwd, pass%77ord).
+func secretValues(t, ends string) [][2]int {
 	var values [][2]int
 	key := 0 // where the name before the next '=' starts
 	for i := 0; i < len(t); i++ {
@@ -212,7 +223,7 @@ func secretValues(t string) [][2]int {
 				continue
 			}
 			v := i + 1 + len(t[i+1:]) - len(strings.TrimLeft(t[i+1:], " \t"))
-			end := v + valueLen(t[v:])
+			end := v + valueLen(t[v:], ends)
 			values = append(values, [2]int{v, end})
 			i, key = end-1, end
 		}
@@ -229,10 +240,10 @@ func secretKey(name string) bool {
 	return strings.HasSuffix(name, "password") || strings.HasSuffix(name, "passwd") || strings.HasSuffix(name, "pwd")
 }
 
-// valueLen is the length of the parameter value v starts with: up to the next '&' or ';'
+// valueLen is the length of the parameter value v starts with: up to the next byte of ends
 // outside braces or quotes (password={a;b}), where a doubled closing brace or quote stands
 // for itself.
-func valueLen(v string) int {
+func valueLen(v, ends string) int {
 	start := 0
 	if v != "" && strings.IndexByte("{\"'`", v[0]) >= 0 {
 		closer := v[0]
@@ -251,7 +262,7 @@ func valueLen(v string) int {
 			}
 		}
 	}
-	if i := strings.IndexAny(v[start:], "&;"); i >= 0 {
+	if i := strings.IndexAny(v[start:], ends); i >= 0 {
 		return start + i
 	}
 	return len(v)
