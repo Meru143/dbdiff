@@ -238,6 +238,37 @@ func CheckPassword(connStr string) error {
 	return fmt.Errorf("can't tell where the password ends in %q; %s", Redact(connStr), fix)
 }
 
+// HideParams returns err, the error for connecting with connStr, unless it quotes part of
+// what Redact hides after the '=' of a password parameter in connStr's query: the value, or a
+// name or value after an '&' in it. A driver reads password=pass&word=x as the password pass
+// and a parameter word, and can quote that parameter, or the server it sends it to, when it
+// refuses it (unrecognized configuration parameter "word"), but it may be the rest of the
+// password. MySQL's driver sends a parameter it doesn't know, password too, to the server as a
+// SET, whose errors quote its value. Then it returns an error that names connStr redacted.
+func HideParams(connStr string, err error) error {
+	n := schemeLen(connStr)
+	q := strings.IndexByte(connStr[n:], '?')
+	if err == nil || n == 0 || q < 0 {
+		return err
+	}
+	query, text := connStr[n+q:], strings.ToLower(err.Error())
+	for _, v := range secretValues(query, toEnd) {
+		for _, param := range strings.Split(query[v[0]:v[1]], "&") {
+			for _, part := range strings.SplitN(param, "=", 2) {
+				path, _ := url.PathUnescape(part)
+				form, _ := url.QueryUnescape(part)
+				for _, s := range []string{part, path, form} {
+					s = strings.ToLower(strings.TrimSpace(s))
+					if s != "" && (strings.Contains(text, `"`+s+`"`) || strings.Contains(text, "'"+s+"'")) {
+						return fmt.Errorf("connecting with %q failed with an error that quotes part of what follows the '=' of its password parameter, which may be part of the password, so the error is left out: put the password after the user name, or write an '&' in it as %%26", Redact(connStr))
+					}
+				}
+			}
+		}
+	}
+	return err
+}
+
 // redactParams hides the value of the first password-like parameter in t (see secretValues)
 // and all that follows it (see toEnd).
 func redactParams(t string) string {

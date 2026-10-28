@@ -2,8 +2,10 @@ package db
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/meru143/dbdiff/pkg/types"
 )
@@ -46,5 +48,26 @@ func TestNewDriverErrorHidesURL(t *testing.T) {
 		if err == nil || strings.Contains(err.Error(), "s3cret") {
 			t.Errorf("%s: expected an error without the password, got %v", url, err)
 		}
+	}
+}
+
+type failingConnect struct {
+	Driver
+	err error
+}
+
+func (f failingConnect) Connect(context.Context, string, string, time.Duration) error { return f.err }
+
+// Every driver NewDriver makes connects through dsn.HideParams: an error that quotes what
+// follows a password parameter's '=' is left out, and the others pass through.
+func TestConnectHidesParamsAfterPassword(t *testing.T) {
+	quoting := errors.New(`server error: FATAL: unrecognized configuration parameter "k3y" (SQLSTATE 42704)`)
+	err := withoutMigrationsTable{failingConnect{err: quoting}}.Connect(context.Background(), "postgres://app@host/db?password=s3cret&k3y=x", "disable", time.Second)
+	if err == nil || strings.Contains(err.Error(), "k3y") || strings.Contains(err.Error(), "s3cret") {
+		t.Errorf("expected an error without the parameter, got %v", err)
+	}
+	other := errors.New("connection refused")
+	if err := (withoutMigrationsTable{failingConnect{err: other}}).Connect(context.Background(), "postgres://app@host/db?password=s3cret&k3y=x", "disable", time.Second); err != other {
+		t.Errorf("expected the driver's error, got %v", err)
 	}
 }

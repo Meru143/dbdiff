@@ -1,6 +1,7 @@
 package dsn
 
 import (
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -325,6 +326,37 @@ func FuzzCheckPassword(f *testing.F) {
 			}
 		}
 	})
+}
+
+// A driver reads what follows an '&' in a password parameter's value as parameters, and its
+// error, or the server's, can quote one of them: HideParams leaves such an error out, and
+// keeps the others. The errors are the ones PostgreSQL 16, go-mssqldb and MySQL 8.0 give.
+func TestHideParams(t *testing.T) {
+	const pgConnect = "failed to ping: failed to connect to `user=app database=db`: 127.0.0.1:5432 (127.0.0.1): server error: FATAL: "
+	for _, tt := range []struct {
+		url, err string
+		hidden   bool
+	}{
+		{"postgres://app@host/db?password=s3cret&K3y=x", pgConnect + `unrecognized configuration parameter "K3y" (SQLSTATE 42704)`, true},
+		{"postgres://app:s3cret@host/db?sslmode=disable&sslpassword=s3cret&k3y=x", pgConnect + `unrecognized configuration parameter "k3y" (SQLSTATE 42704)`, true},
+		{"postgres://app@host/db?password=s3cret&statement_timeout=k3y", pgConnect + `invalid value for parameter "statement_timeout": "k3y" (SQLSTATE 22023)`, true},
+		{"postgres://app@host/db?password=s3cret&k%33y=x", pgConnect + `unrecognized configuration parameter "k3y" (SQLSTATE 42704)`, true},
+		{"sqlserver://host?database=db&password=s3cret&log=k3y", `invalid log parameter 'k3y': strconv.ParseUint: parsing "k3y": invalid syntax`, true},
+		{"mysql://app@tcp(host:3306)/db?password=s3cret", "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds " +
+			"to your MySQL server version for the right syntax to use near 's3cret' at line 1", true},
+		{"postgres://app@host/db?password=s3cret&sslmode=disable", pgConnect + `password authentication failed for user "app" (SQLSTATE 28P01)`, false},
+		{"postgres://app:s3cret@host/db?sslmode=disable", pgConnect + `database "db" does not exist (SQLSTATE 3D000)`, false},
+		{"sqlserver://host?database=db&password=s3cret&k3y", "login error: mssql: Login failed for user 'app'.", false},
+	} {
+		in := errors.New(tt.err)
+		got := HideParams(tt.url, in)
+		if tt.hidden == (got == in) || strings.Contains(got.Error(), "s3cret") || strings.Contains(got.Error(), "k3y") && tt.hidden {
+			t.Errorf("HideParams(%q, %q) = %q, want hidden=%v", tt.url, tt.err, got, tt.hidden)
+		}
+	}
+	if HideParams("postgres://app@host/db?password=s3cret&k3y=x", nil) != nil {
+		t.Error("HideParams should keep a nil error")
+	}
 }
 
 // Redact takes time linear in its input: a long run of letters, or of quotes that never
