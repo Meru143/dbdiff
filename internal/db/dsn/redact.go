@@ -175,7 +175,9 @@ func CheckPassword(connStr string) error {
 	if !ambiguous {
 		return nil
 	}
-	return fmt.Errorf("can't tell where the password ends in %q: %s", Redact(connStr), fix)
+	// No ':' after the URL: Redact, which main prints errors through, would take one before
+	// the '@' in fix for a password's start.
+	return fmt.Errorf("can't tell where the password ends in %q; %s", Redact(connStr), fix)
 }
 
 // redactParams hides the value of each password-like parameter in t (see secretValues).
