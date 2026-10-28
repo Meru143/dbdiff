@@ -122,9 +122,9 @@ func redactOne(t string) string {
 
 // passwordEnd returns where the password that ends at rest[at], the last '@', is hidden to:
 // at, unless that '@' is in the value of a password-like parameter in the query, as in
-// host:1433?password=p@ss, where it starts no host. The rest of that value is hidden with
-// it: whether the '@' ends a password with a '?' in it or is part of the value, both are
-// secret.
+// host:1433?password=p@ss, where it starts no host. Then all of rest is hidden: whether the
+// '@' ends a password with a '?' in it or is part of the value, both are secret, and what
+// follows the value is no host to show.
 func passwordEnd(rest string, at int) int {
 	q := strings.IndexByte(rest, '?')
 	if q < 0 || q > at {
@@ -132,7 +132,7 @@ func passwordEnd(rest string, at int) int {
 	}
 	for _, v := range secretValues(rest[q:], inQuery) {
 		if q+v[0] <= at && at < q+v[1] {
-			return q + v[1]
+			return len(rest)
 		}
 	}
 	return at
@@ -141,7 +141,8 @@ func passwordEnd(rest string, at int) int {
 // portPassword returns where a password may stand in place of a port in rest, the part of
 // a URL after its scheme, when no '@' ends a user name and password in its host part:
 // after the ':' of a host whose "port" is no number, as in postgres://app:s3cret, which
-// lacks its "@host", up to the end of the host part. It returns 0, 0 if there is none. A
+// lacks its "@host", up to the '/', '?' or '#' that ends the host part, as only those end
+// one in a URL (a password may hold a ';' or an '&'). It returns 0, 0 if there is none. A
 // port that is a number stays, after each host of a list (h1:5432,h2:5433), and a ':' in
 // brackets ([::1]) or parentheses (tcp(host:3306)) is no port's.
 func portPassword(rest string) (start, end int) {
@@ -154,7 +155,7 @@ func portPassword(rest string) (start, end int) {
 		case (c == ']' || c == ')') && depth > 0:
 			depth--
 		case depth > 0:
-		case strings.IndexByte("/?#&;", c) >= 0: // no port or host holds one
+		case c == '/' || c == '?' || c == '#':
 			end = i
 		case c == '@':
 			return 0, 0
@@ -163,7 +164,7 @@ func portPassword(rest string) (start, end int) {
 			for j < len(rest) && '0' <= rest[j] && rest[j] <= '9' {
 				j++
 			}
-			if j < len(rest) && strings.IndexByte(",/?#&;", rest[j]) < 0 {
+			if j < len(rest) && strings.IndexByte(",/?#", rest[j]) < 0 {
 				bad = i + 1
 			}
 		}

@@ -56,6 +56,8 @@ func TestRedact(t *testing.T) {
 		{"hosts and ports", "postgres://h1:5432,h2:5433/app", "postgres://h1:5432,h2:5433/app"},
 		{"password after a later host", "postgres://h1:5432,app:s3cret/app", "postgres://h1:5432,app:***/app"},
 		{"empty port", "postgres://host:/app", "postgres://host:/app"},
+		{"';' in a password without @host", "postgres://app:s3;cret", "postgres://app:***"},
+		{"'&' in a password without @host", "sqlserver://sa:s3&cret?database=app", "sqlserver://sa:***?database=app"},
 
 		// nothing to hide
 		{"no password", "postgres://user@host/app", "postgres://user@host/app"},
@@ -98,7 +100,7 @@ func TestRedact(t *testing.T) {
 		{"parameter holding an @, after a port", "sqlserver://host:1433?database=app&password=s3cret@s3cret",
 			"sqlserver://host:***"},
 		{"parameter holding an @, then others", "postgres://host:5432/app?password=s3cret@s3cret&sslmode=disable",
-			"postgres://host:***&sslmode=disable"},
+			"postgres://host:***"},
 		{"parameter holding an @, without a port", "sqlserver://host?database=app&password=s3cret@s3cret",
 			"sqlserver://host?database=app&password=***"},
 
