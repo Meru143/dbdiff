@@ -24,7 +24,9 @@ var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 // malformed URL; that can hide more than the password, never less. The last '@' is that of
 // the whole string, unless the URL is in double quotes (Go's %q, as cobra and net/url quote
 // one in an error) or backticks (pgx), which then bound it; quoted text is read the same
-// way, URLs anywhere in it included. A DSN without a scheme, like go-sql-driver's
+// way, URLs anywhere in it included. A URL is found wherever "://" follows a scheme, even
+// one glued to the text before it, as in cobra's error for a URL glued to a flag: unknown
+// flag: --sourcepostgres://user:***@host/db. A DSN without a scheme, like go-sql-driver's
 // user:pass@tcp(host:3306)/db, is hidden the same way, in quotes or as the whole of s,
 // quotes in its password included. The value of a password-like parameter (see
 // redactParams) is hidden whole wherever it is, before any quote in it is read.
@@ -65,7 +67,7 @@ func Redact(s string) string {
 				i, text, key, quoted = end+1, end+1, end+1, true
 				continue
 			}
-		case (i == 0 || !isSchemeChar(s[i-1])) && schemeLen(s[i:]) > 0:
+		case schemeLen(s[i:]) > 0:
 			flush(i)
 			b.WriteString(redactOne(s[i:]))
 			return b.String()
