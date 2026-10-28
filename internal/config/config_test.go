@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -125,6 +126,15 @@ schema: testschema
 
 	if cfg.Schema != "testschema" {
 		t.Errorf("Expected schema from config file, got %s", cfg.Schema)
+	}
+}
+
+// A URL given for --config isn't read: viper takes what follows its last '.' for the file's
+// type, and quoted that in its error (Unsupported Config Type "QZYb@localhost:5432").
+func TestLoad_ConfigURL(t *testing.T) {
+	_, err := Load(map[string]interface{}{"config": "postgres://app:QZXa.QZYb@localhost:5432"})
+	if err == nil || strings.Contains(err.Error(), "QZ") || !strings.Contains(err.Error(), "postgres://app:***@localhost:5432") {
+		t.Errorf("expected an error naming the URL without its password, got %v", err)
 	}
 }
 

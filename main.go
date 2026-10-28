@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/meru143/dbdiff/cmd"
@@ -85,8 +86,11 @@ func init() {
 
 	// Add PersistentPreRun for setup
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Load config file if specified
-		if cfg := viper.GetString("config"); cfg != "" {
+		// Load config file if specified. A URL in its place is no file, and isn't read as one
+		// (see config.Load).
+		if cfg := viper.GetString("config"); strings.Contains(cfg, "://") {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to read config file: --config takes a file, not a URL: %s\n", dsn.Redact(cfg))
+		} else if cfg != "" {
 			viper.SetConfigFile(cfg)
 			if err := viper.ReadInConfig(); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to read config file: %v\n", dsn.Redact(err.Error()))

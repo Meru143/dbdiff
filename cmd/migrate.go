@@ -153,7 +153,7 @@ var MigrateCmd = &cobra.Command{
 
 		// Confirmation prompt (only for non-dry-run, non-force)
 		if !cfg.DryRun && !cfg.Force && cfg.Output != "stdout" {
-			fmt.Printf("\nMigration will write to: %s\n", cfg.Output)
+			fmt.Printf("\nMigration will write to: %s\n", dsn.Redact(cfg.Output))
 			if !confirmPrompt() {
 				logging.Info("Migration cancelled")
 				return nil
@@ -182,7 +182,7 @@ var MigrateCmd = &cobra.Command{
 			if err := output.WriteFile(cfg.Output, fullSQL); err != nil {
 				return fmt.Errorf("failed to write migration: %w", err)
 			}
-			logging.Info(fmt.Sprintf("Migration written to: %s", cfg.Output))
+			logging.Info(fmt.Sprintf("Migration written to: %s", dsn.Redact(cfg.Output)))
 		}
 
 		return nil

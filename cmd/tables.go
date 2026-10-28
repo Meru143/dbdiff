@@ -47,7 +47,7 @@ var TablesCmd = &cobra.Command{
 		}
 
 		if len(tables) == 0 {
-			fmt.Printf("No tables found in schema: %s\n", cfg.Schema)
+			fmt.Printf("No tables found in schema: %s\n", dsn.Redact(cfg.Schema))
 			return nil
 		}
 
