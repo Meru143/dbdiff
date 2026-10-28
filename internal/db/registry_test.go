@@ -70,4 +70,10 @@ func TestConnectHidesParamsAfterPassword(t *testing.T) {
 	if err := (withoutMigrationsTable{failingConnect{err: other}}).Connect(context.Background(), "postgres://app@host/db?password=s3cret&k3y=x", "disable", time.Second); err != other {
 		t.Errorf("expected the driver's error, got %v", err)
 	}
+	// go-mssqldb names a duplicated key without quotes; it is hidden too when it follows the
+	// password parameter.
+	dupKey := errors.New("key k3y provided more than once")
+	if err := (withoutMigrationsTable{failingConnect{err: dupKey}}).Connect(context.Background(), "sqlserver://host?database=db&password=s3cret&k3y&k3y", "disable", time.Second); err == nil || strings.Contains(err.Error(), "k3y") || strings.Contains(err.Error(), "s3cret") {
+		t.Errorf("expected the duplicate key hidden, got %v", err)
+	}
 }

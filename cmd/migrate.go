@@ -169,9 +169,10 @@ var MigrateCmd = &cobra.Command{
 				existingContent, _ := os.ReadFile(cfg.Output)
 				backupPath, err := backupMgr.Backup("migration", existingContent)
 				if err != nil {
-					logging.Warn(fmt.Sprintf("Failed to create backup: %v", err))
+					// --backup-dir, like -o, may hold a URL, which the path and the error echo.
+					logging.Warn(fmt.Sprintf("Failed to create backup: %v", dsn.Redact(err.Error())))
 				} else {
-					logging.Info(fmt.Sprintf("Backup created: %s", backupPath))
+					logging.Info(fmt.Sprintf("Backup created: %s", dsn.Redact(backupPath)))
 				}
 			}
 		}

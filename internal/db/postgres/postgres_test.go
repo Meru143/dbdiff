@@ -43,3 +43,20 @@ func TestConnectParseErrorHidesPasswordParameter(t *testing.T) {
 		}
 	}
 }
+
+// A parameter after the password that pgx rejects keeps its reason in the error, with the
+// password hidden. Ending the redaction at the password hid the faulty parameter too and left
+// only a generic hint; connectOnce re-parses a copy that keeps the parameters (a raw '&' tail,
+// which pgx can't tell from one, still gets the hint — see the test above).
+func TestConnectParseErrorKeepsParamReason(t *testing.T) {
+	for _, tt := range []struct{ url, reason string }{
+		{"postgres://app@127.0.0.1:1/db?password=QZXa&sslmode=disabled", "sslmode is invalid"},
+		{"postgres://app@127.0.0.1:1/db?password=QZXa&target_session_attrs=primary-only", "target_session_attrs"},
+		{"postgres://127.0.0.1:1/db?password=QZXa&user=app&port=abc", "invalid port"},
+	} {
+		_, err := connectOnce(context.Background(), tt.url, "disable", time.Second)
+		if err == nil || strings.Contains(err.Error(), "QZX") || !strings.Contains(err.Error(), tt.reason) {
+			t.Errorf("%s: want the reason %q without the password, got %v", tt.url, tt.reason, err)
+		}
+	}
+}
