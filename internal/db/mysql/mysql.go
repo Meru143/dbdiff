@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
+	dbdsn "github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/pkg/types"
 )
 
@@ -20,24 +22,31 @@ func New() *Driver {
 	return &Driver{}
 }
 
-// Connect establishes a connection to the MySQL database
-func (d *Driver) Connect(ctx context.Context, connStr string, sslMode string, timeout time.Duration) error {
-	// Clean up the connStr if it starts with mysql:// as go-sql-driver expects user:pass@tcp(host:port)/dbname
-	// This simple conversion handles standard format but might need more logic
-	// e.g. mysql://user:pass@host:port/dbname -> user:pass@tcp(host:port)/dbname
-	// First, let's let the DB connect with standard sql.Open
-
-	// Remove the "mysql://" prefix for the go-sql-driver
+// parseDSN reads connStr, a go-sql-driver DSN after mysql:// or mysql+tcp:// in any case
+// (mysql://user:pass@tcp(host:3306)/db), as go-sql-driver does.
+func parseDSN(connStr string) (*gomysql.Config, error) {
 	dsn := connStr
-	if len(dsn) > 8 && dsn[:8] == "mysql://" {
-		dsn = dsn[8:]
-		// Replace the first '/' with '@tcp(host)/' if no '@' or 'tcp(' exists?
-		// A full parser might be better here, but let's assume valid go-sql-driver DSN for now if they strip it
+	if lower := strings.ToLower(dsn); strings.HasPrefix(lower, "mysql://") || strings.HasPrefix(lower, "mysql+tcp://") {
+		dsn = dsn[strings.Index(dsn, "://")+3:]
 	}
-
 	cfg, err := gomysql.ParseDSN(dsn)
 	if err != nil {
-		return fmt.Errorf("invalid mysql connection string: %w", err)
+		// go-sql-driver's reason can quote part of the password: without a /database after
+		// the address, it reads the database, or the network, from the password. The redacted
+		// DSN fails only if the rest of it does, and its error holds no password.
+		if _, rerr := gomysql.ParseDSN(dbdsn.Redact(dsn)); rerr != nil {
+			return nil, fmt.Errorf("invalid mysql connection string: %w", rerr)
+		}
+		return nil, fmt.Errorf("invalid mysql connection string %q", dbdsn.Redact(connStr))
+	}
+	return cfg, nil
+}
+
+// Connect establishes a connection to the MySQL database
+func (d *Driver) Connect(ctx context.Context, connStr string, sslMode string, timeout time.Duration) error {
+	cfg, err := parseDSN(connStr)
+	if err != nil {
+		return err
 	}
 	// A migration file holds many statements, and apply runs it in one Exec.
 	cfg.MultiStatements = true
