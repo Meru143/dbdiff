@@ -193,8 +193,28 @@ func main() {
 		},
 	})
 
+	hideHelpTopicPasswords(rootCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", dsn.Redact(err.Error()))
 		os.Exit(1)
+	}
+}
+
+// hideHelpTopicPasswords hides the passwords in the topics given to root's help command:
+// cobra's prints one it can't find itself (Unknown help topic [`postgres://...`]), not
+// through main's error print.
+func hideHelpTopicPasswords(root *cobra.Command) {
+	root.InitDefaultHelpCmd()
+	for _, help := range root.Commands() {
+		if help.Name() == "help" && help.Run != nil {
+			run := help.Run
+			help.Run = func(cmd *cobra.Command, args []string) {
+				for i := range args {
+					args[i] = dsn.Redact(args[i])
+				}
+				run(cmd, args)
+			}
+		}
 	}
 }
