@@ -59,27 +59,29 @@
             <div class="schema-card source">
               <p class="label">Source</p>
               <pre><code>users
-id bigint pk
-email text unique
-name text
-created_at timestamptz</code></pre>
+id bigserial pk
+email text not null
+last_seen timestamptz</code></pre>
             </div>
             <div class="schema-card target">
               <p class="label">Target</p>
               <pre><code>users
-id bigint pk
-email varchar(255) unique
-display_name text
-created_at timestamptz
-updated_at timestamptz</code></pre>
+id bigserial pk
+email varchar(255) not null
+
+legacy_sessions
+id bigserial pk
+token text</code></pre>
             </div>
             <div class="schema-card sql">
               <p class="label">Generated SQL</p>
-              <pre><code>ALTER TABLE users
-  RENAME COLUMN name TO display_name;
+              <pre><code>ALTER TABLE users ADD COLUMN
+  last_seen timestamp with time zone NULL;
 
-ALTER TABLE users
-  ADD COLUMN updated_at timestamptz;</code></pre>
+ALTER TABLE users ALTER COLUMN email
+  TYPE text USING (email::text);
+
+DROP TABLE IF EXISTS legacy_sessions CASCADE;</code></pre>
             </div>
           </div>
         </section>
@@ -105,8 +107,8 @@ ALTER TABLE users
               <p>Produce migration scripts in SQL, JSON, or table output depending on where the result needs to go next.</p>
             </article>
             <article class="card">
-              <h3>Dry run by default</h3>
-              <p>Review is the default posture, which makes it easier to trust the tool inside a delivery workflow.</p>
+              <h3>Review, then apply</h3>
+              <p>compare and migrate only read the databases. apply asks before it changes one, unless --force, and records each migration in a tracking table.</p>
             </article>
           </div>
         </section>
@@ -152,12 +154,14 @@ ALTER TABLE users
 
 dbdiff compare postgres://source postgres://target
 dbdiff migrate -s postgres://source -t postgres://target -o migration.sql</code></pre>
-            <pre><code>Output modes:
+            <pre><code>Output formats:
 
 - sql
 - table
 - json
-- dry-run review first</code></pre>
+
+apply asks [y/N] before it writes:
+dbdiff apply migration.sql postgres://target</code></pre>
           </div>
         </section>
       </main>
