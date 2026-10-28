@@ -179,6 +179,24 @@ func TestRedact(t *testing.T) {
 	}
 }
 
+// RedactToSeparator hides the password but ends a password parameter's value at the next '&',
+// keeping the parameters after it, so connectOnce can re-parse a URL that failed and still
+// learn what is wrong with a later parameter. A raw '&' tail stays, since connectOnce only
+// re-parses this, never shows it.
+func TestRedactToSeparator(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"postgres://app@host/db?password=s3cret&sslmode=disabled", "postgres://app@host/db?password=***&sslmode=disabled"},
+		{"postgres://app@host/db?sslmode=disabled&password=s3cret", "postgres://app@host/db?sslmode=disabled&password=***"},
+		{"postgres://app@host/db?password=s3cret&tail", "postgres://app@host/db?password=***&tail"},
+		{"postgres://app:s3cret@host/db?connect_timeout=ten", "postgres://app:***@host/db?connect_timeout=ten"},
+		{"postgres://app@host/db?sslmode=disable", "postgres://app@host/db?sslmode=disable"},
+	} {
+		if got := RedactToSeparator(tt.in); got != tt.want {
+			t.Errorf("RedactToSeparator(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 // Any password is hidden whole, whatever it holds: in a URL's userinfo, in a DSN without a
 // scheme, in a percent-encoded query parameter, and in braces in settings (go test -fuzz
 // FuzzRedactPassword explores beyond these seeds).
@@ -273,6 +291,39 @@ func TestCheckPassword(t *testing.T) {
 	}
 }
 
+// go-sql-driver has no password parameter: it sends one to the server as a SET, which never
+// logs in (and would run SET password on a quoted value), so a MySQL URL carrying one is
+// refused whatever follows it — a second parameter or a value over 80 characters included,
+// where the server's error used to echo part of it. The refusal names no URL, so nothing
+// leaks and Redact leaves it as it is.
+func TestCheckPasswordMySQLParam(t *testing.T) {
+	for _, u := range []string{
+		"mysql://root@tcp(host:3306)/db?password=s3cret",
+		"mysql://root@tcp(host:3306)/db?sql_mode=ANSI&password=s3cret",
+		"mysql+tcp://root@tcp(host:3306)/db?password=s3cret&x=y",
+		"mysql://root@tcp(host:3306)/db?Pwd=s3cret&z",
+		"mysql://root@tcp(host:3306)/db?password=" + strings.Repeat("s3cret", 16), // over 80 characters
+	} {
+		err := CheckPassword(u)
+		if err == nil || strings.Contains(err.Error(), "s3cret") {
+			t.Errorf("CheckPassword(%q) = %v, want a refusal without the password", u, err)
+		}
+		if msg := "Error: failed to initialize driver: " + err.Error(); Redact(msg) != msg {
+			t.Errorf("CheckPassword(%q): Redact changes its error to %q", u, Redact(msg))
+		}
+	}
+	// A non-password query parameter, and a password in the user info, still connect.
+	for _, u := range []string{
+		"mysql://root:s3cret@tcp(host:3306)/db?parseTime=true",
+		"mysql://root@tcp(host:3306)/db?charset=utf8mb4&parseTime=true",
+		"mysql://root:s3cret@tcp(host:3306)/db?connectionAttributes=owner:ops%40example",
+	} {
+		if err := CheckPassword(u); err != nil {
+			t.Errorf("CheckPassword(%q) = %v, want nil", u, err)
+		}
+	}
+}
+
 // A URL CheckPassword lets through is one whose driver, parsing it the way dbdiff's driver
 // does, reads as the password all that CheckPassword takes for it, or fails (go test -fuzz
 // FuzzCheckPassword explores beyond these seeds). Redact hides that, and all that follows a
@@ -344,6 +395,15 @@ func TestHideParams(t *testing.T) {
 		{"sqlserver://host?database=db&password=s3cret&log=k3y", `invalid log parameter 'k3y': strconv.ParseUint: parsing "k3y": invalid syntax`, true},
 		{"mysql://app@tcp(host:3306)/db?password=s3cret", "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds " +
 			"to your MySQL server version for the right syntax to use near 's3cret' at line 1", true},
+		// A '%'-escape in a name after the '&' decodes to a space, tab or control byte the
+		// server keeps inside the quotes it prints, or an options value carries the setting
+		// name; the region still matches the quoted token after a trim. go-mssqldb names a
+		// duplicated key without quotes.
+		{"postgres://app@host/db?password=s3cret&k3y%20=x", pgConnect + `unrecognized configuration parameter "k3y " (SQLSTATE 42704)`, true},
+		{"postgres://app@host/db?sslmode=disable&password=s3cret&%20k3y=x", pgConnect + `unrecognized configuration parameter " k3y" (SQLSTATE 42704)`, true},
+		{"postgres://app@host/db?password=s3cret&k3y%0D=x", pgConnect + "unrecognized configuration parameter \"k3y\r\" (SQLSTATE 42704)", true},
+		{"postgres://app@host/db?password=s3cret&options=-c%20k3y%3D1", pgConnect + `unrecognized configuration parameter "k3y" (SQLSTATE 42704)`, true},
+		{"sqlserver://host?database=db&password=s3cret&k3y&k3y", "key k3y provided more than once", true},
 		{"postgres://app@host/db?password=s3cret&sslmode=disable", pgConnect + `password authentication failed for user "app" (SQLSTATE 28P01)`, false},
 		{"postgres://app:s3cret@host/db?sslmode=disable", pgConnect + `database "db" does not exist (SQLSTATE 3D000)`, false},
 		{"sqlserver://host?database=db&password=s3cret&k3y", "login error: mssql: Login failed for user 'app'.", false},

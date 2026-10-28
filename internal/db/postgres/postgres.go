@@ -80,10 +80,13 @@ func connectOnce(ctx context.Context, connStr, sslMode string, timeout time.Dura
 	if err != nil {
 		// pgx hides the password in the URL it quotes, but its reason can quote part of it:
 		// in a malformed URL the password spills into the host or the path, and pgx quotes
-		// an invalid escape there. The redacted URL fails only if the rest of it does, and
-		// its error holds no password.
-		if _, rerr := pgxpool.ParseConfig(dsn.Redact(connStr)); rerr != nil {
-			return nil, fmt.Errorf("failed to parse connection string: %w", rerr)
+		// an invalid escape there. Re-parse a copy whose password is masked but whose other
+		// parameters stay (RedactToSeparator), so pgx still reports a genuinely bad one
+		// (sslmode, connect_timeout, port). Show that reason, redacted, unless it quotes
+		// password material — a raw '&' tail pgx read as its own parameter — when only the
+		// hint is safe. The redacted URL parsing (no reason to show) also falls to the hint.
+		if _, rerr := pgxpool.ParseConfig(dsn.RedactToSeparator(connStr)); rerr != nil && dsn.HideParams(connStr, rerr) == rerr {
+			return nil, fmt.Errorf("failed to parse connection string: %s", dsn.Redact(rerr.Error()))
 		}
 		return nil, fmt.Errorf("failed to parse connection string %q: percent-encode the special characters in its user name and password", dsn.Redact(connStr))
 	}

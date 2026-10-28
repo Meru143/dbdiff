@@ -49,13 +49,13 @@ var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 // password, quotes that part in its errors: CheckPassword refuses such URLs.
 func Redact(s string) string {
 	if schemeLen(s) == 0 && userinfo(s, false) > 0 && dsnAddr.MatchString(s[strings.LastIndexByte(s, '@')+1:]) {
-		return redactOne(s)
+		return redactOne(s, toEnd)
 	}
 	var b strings.Builder
 	quoted := false
 	text, key := 0, 0 // where the text not yet written, and the name before the next '=', start
 	flush := func(end int) {
-		b.WriteString(redactOne(s[text:end]))
+		b.WriteString(redactOne(s[text:end], toEnd))
 		text = end
 	}
 	starts := schemeStarts(s)
@@ -94,30 +94,38 @@ func Redact(s string) string {
 			continue
 		case len(starts) > 0 && starts[0] == i:
 			flush(i)
-			b.WriteString(redactOne(s[i:]))
+			b.WriteString(redactOne(s[i:], toEnd))
 			return b.String()
 		}
 		i++
 	}
 	if !quoted {
-		return redactOne(s)
+		return redactOne(s, toEnd)
 	}
 	flush(len(s))
 	return b.String()
 }
 
+// RedactToSeparator hides the password in connStr, a single connection URL, like Redact, but
+// ends a password parameter's value at the next '&', the way a driver reads it, keeping the
+// parameters after it instead of hiding them. connectOnce re-parses the result: a parameter
+// the driver rejects still reports what is wrong with it, while the password is gone.
+func RedactToSeparator(connStr string) string {
+	return redactOne(connStr, inQuery)
+}
+
 // redactOne hides the secrets of one connection string: the password between the first
 // ':' after the scheme and the last '@' (see passwordEnd), and the value of a password-like
 // parameter with all that follows it.
-func redactOne(t string) string {
+func redactOne(t, ends string) string {
 	n := schemeLen(t)
 	head, rest := t[:n], t[n:]
 	if colon := userinfo(rest, n > 0); colon > 0 {
-		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@'), toEnd):]
+		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@'), ends):]
 	} else if start, end := portPassword(rest); n > 0 && start > 0 {
 		rest = rest[:start] + mask + rest[end:]
 	}
-	return head + redactParams(rest)
+	return head + redactParams(rest, ends)
 }
 
 // passwordEnd returns where the password that ends at rest[at], the last '@', is hidden to:
@@ -227,6 +235,17 @@ func CheckPassword(connStr string) error {
 		fix = "percent-encode '/', '?' and '#' in its user name and password, and any '@' after its host"
 		ambiguous = colon > 0 && strings.ContainsAny(rest[:end], "/?#")
 	case "mysql://", "mysql+tcp://":
+		// go-sql-driver has no password parameter: it sends an unknown one, password among
+		// them, to the server as a SET, where it never logs anyone in and, for an account with
+		// no password, the server's syntax error quotes its value (and with a quoted value it
+		// would run SET password on the logged-in account). So refuse one outright. The query
+		// is what follows the userinfo's '@', after the address and its '/database'.
+		if host := rest[at+1:]; strings.IndexByte(host, '?') >= 0 &&
+			len(secretValues(host[strings.IndexByte(host, '?'):], inQuery)) > 0 {
+			// No URL in the message: embedding one with tcp(host)/db would trip the scheme-less
+			// DSN heuristic when main redacts the error again. The user knows their own URL.
+			return fmt.Errorf("a MySQL password must be in the user info of the URL, not a query parameter; a password query parameter is sent to the server as a SET and never logs in")
+		}
 		fix = "end it with /database after the address, and percent-encode any '@' after that '/'"
 		ambiguous = colon > 0 && (end != at || !strings.Contains(rest[at:], "/"))
 	}
@@ -239,42 +258,71 @@ func CheckPassword(connStr string) error {
 }
 
 // HideParams returns err, the error for connecting with connStr, unless it quotes part of
-// what Redact hides after the '=' of a password parameter in connStr's query: the value, or a
-// name or value after an '&' in it. A driver reads password=pass&word=x as the password pass
-// and a parameter word, and can quote that parameter, or the server it sends it to, when it
-// refuses it (unrecognized configuration parameter "word"), but it may be the rest of the
-// password. MySQL's driver sends a parameter it doesn't know, password too, to the server as a
-// SET, whose errors quote its value. Then it returns an error that names connStr redacted.
+// what Redact hides after the '=' of the first password parameter in connStr's query. A
+// driver reads password=pass&word=x as the password pass and a parameter word, and can quote
+// that parameter, or the server it sends it to, when it refuses it (unrecognized
+// configuration parameter "word"), but word may be the rest of the password. The server
+// quotes a name or value it read from that region, sometimes padded with the spaces, tabs or
+// control bytes a '%'-escape decoded to (parameter "word "), or holding a setting name inside
+// an options value, so each quoted token of the error is tested against the region, raw and
+// percent-decoded, rather than matched parameter by parameter. go-mssqldb names a duplicated
+// key without quotes (key word provided more than once), so that one word is tested too. Then
+// HideParams returns an error that names connStr redacted. An error that quotes none of the
+// region passes through, password authentication failed included.
 func HideParams(connStr string, err error) error {
 	n := schemeLen(connStr)
 	q := strings.IndexByte(connStr[n:], '?')
 	if err == nil || n == 0 || q < 0 {
 		return err
 	}
-	query, text := connStr[n+q:], strings.ToLower(err.Error())
-	for _, v := range secretValues(query, toEnd) {
-		for _, param := range strings.Split(query[v[0]:v[1]], "&") {
-			for _, part := range strings.SplitN(param, "=", 2) {
-				path, _ := url.PathUnescape(part)
-				form, _ := url.QueryUnescape(part)
-				for _, s := range []string{part, path, form} {
-					s = strings.ToLower(strings.TrimSpace(s))
-					if s != "" && (strings.Contains(text, `"`+s+`"`) || strings.Contains(text, "'"+s+"'")) {
-						return fmt.Errorf("connecting with %q failed with an error that quotes part of what follows the '=' of its password parameter, which may be part of the password, so the error is left out: put the password after the user name, or write an '&' in it as %%26", Redact(connStr))
-					}
-				}
-			}
-		}
+	secrets := secretValues(connStr[n+q:], toEnd)
+	if len(secrets) == 0 {
+		return err
+	}
+	start := n + q + secrets[0][0]
+	region := strings.ToLower(connStr[start:])
+	decoded := region
+	if d, derr := url.PathUnescape(connStr[start:]); derr == nil {
+		decoded = strings.ToLower(d)
+	}
+	fromRegion := func(tok string) bool {
+		tok = strings.ToLower(strings.TrimSpace(tok))
+		return len(tok) >= 3 && (strings.Contains(region, tok) || strings.Contains(decoded, tok))
+	}
+	text := strings.ToLower(err.Error())
+	hidden := false
+	for _, tok := range quotedTokens(err.Error()) {
+		hidden = hidden || fromRegion(tok)
+	}
+	if _, after, ok := strings.Cut(text, "key "); ok {
+		hidden = hidden || fromRegion(strings.SplitN(after, " ", 2)[0])
+	}
+	if hidden {
+		return fmt.Errorf("connecting with %q failed with an error that quotes part of what follows the '=' of its password parameter, which may be part of the password, so the error is left out: put the password after the user name, or write an '&' in it as %%26", Redact(connStr))
 	}
 	return err
 }
 
-// redactParams hides the value of the first password-like parameter in t (see secretValues)
-// and all that follows it (see toEnd).
-func redactParams(t string) string {
+// quotedTokens returns the text inside each "..." and '...' pair in s, left to right within
+// each quote kind. An unpaired final quote starts no token.
+func quotedTokens(s string) []string {
+	var toks []string
+	for _, q := range []string{`"`, "'"} {
+		parts := strings.Split(s, q)
+		for i := 1; i < len(parts); i += 2 {
+			toks = append(toks, parts[i])
+		}
+	}
+	return toks
+}
+
+// redactParams hides the value of each password-like parameter in t (see secretValues),
+// each ending at a byte of ends: with toEnd the first value runs to the end of t, so all that
+// follows a password parameter is hidden; with inQuery each value ends at the next '&'.
+func redactParams(t, ends string) string {
 	var b strings.Builder
 	written := 0
-	for _, v := range secretValues(t, toEnd) {
+	for _, v := range secretValues(t, ends) {
 		if v[1] > v[0] {
 			b.WriteString(t[written:v[0]])
 			b.WriteString(mask)
