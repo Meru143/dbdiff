@@ -263,11 +263,13 @@ func FuzzCheckPassword(f *testing.F) {
 // Redact takes time linear in its input: a long run of letters, or of quotes that never
 // close, made it scan the rest of the input again at each byte.
 func TestRedactTakesLinearTime(t *testing.T) {
-	for _, s := range []string{strings.Repeat("a", 300000), strings.Repeat(`"\`, 150000), strings.Repeat("`a", 150000)} {
+	for _, s := range []string{strings.Repeat("a", 300000), strings.Repeat(`"\`, 300000), strings.Repeat("`a", 150000)} {
 		in := s + " postgres://app:s3cret@host/db"
 		start := time.Now()
 		got := Redact(in)
-		if d := time.Since(start); d > 2*time.Second || strings.Contains(got, "s3cret") {
+		// ponytail: a wall-clock bound, wide enough for -race on a slow runner; the quadratic
+		// scans took about 30 s for the first two, without -race.
+		if d := time.Since(start); d > 10*time.Second || strings.Contains(got, "s3cret") {
 			t.Errorf("Redact of %d bytes took %v, and left the password: %v", len(in), d, strings.Contains(got, "s3cret"))
 		}
 	}
