@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/db/mssql"
@@ -55,6 +56,12 @@ func NewDriver(connStr string) (Driver, error) {
 // a source that lacks the table would report it, and the next migration would drop it with
 // the history.
 type withoutMigrationsTable struct{ Driver }
+
+// Connect leaves out a driver's error that quotes what Redact hides after a password
+// parameter (see dsn.HideParams): every driver NewDriver makes connects through it.
+func (d withoutMigrationsTable) Connect(ctx context.Context, connStr, sslMode string, timeout time.Duration) error {
+	return dsn.HideParams(connStr, d.Driver.Connect(ctx, connStr, sslMode, timeout))
+}
 
 func (d withoutMigrationsTable) Introspect(ctx context.Context, schema string, ignorePatterns []string) (*types.Schema, error) {
 	s, err := d.Driver.Introspect(ctx, schema, ignorePatterns)
