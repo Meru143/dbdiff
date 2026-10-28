@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // dbdiff --help opens with what dbdiff does: all three databases, not only PostgreSQL.
@@ -85,5 +86,30 @@ func TestCompletionHidesPassword(t *testing.T) {
 		} else if args[1] != "comp" && !strings.Contains(got, "app:***@") {
 			t.Errorf("%q should show the URL with its password hidden, got:\n%s", args, got)
 		}
+	}
+}
+
+// root's PersistentPreRun doesn't give viper a URL given for --config, or in DBDIFF_CONFIG,
+// to read as a file. (config.Load, which reads --config again, printed part of the password
+// viper took for the file's type: Unsupported Config Type "QZYb@localhost:5432".)
+func TestConfigURLIsNotRead(t *testing.T) {
+	viper.Set("config", "postgres://app:QZXa.QZYb@localhost:5432")
+	stderr := os.Stderr
+	t.Cleanup(func() {
+		os.Stderr = stderr
+		viper.Set("config", "")
+	})
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	rootCmd.PersistentPreRun(rootCmd, nil)
+	os.Stderr = stderr
+	w.Close()
+	printed, _ := io.ReadAll(r)
+	r.Close()
+	if got := string(printed); strings.Contains(got, "QZ") || !strings.Contains(got, "not a URL: postgres://app:***@localhost:5432\n") {
+		t.Errorf("expected a warning naming the URL without its password, got %q", got)
 	}
 }

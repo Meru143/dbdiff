@@ -93,7 +93,7 @@ var CompareCmd = &cobra.Command{
 			if err := output.WriteFile(cfg.Output, outputStr); err != nil {
 				return fmt.Errorf("failed to write output: %w", err)
 			}
-			logging.Info(fmt.Sprintf("Output written to: %s", cfg.Output))
+			logging.Info(fmt.Sprintf("Output written to: %s", dsn.Redact(cfg.Output)))
 		}
 
 		return nil

@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/spf13/viper"
 )
 
@@ -57,6 +59,11 @@ func Load(flags map[string]interface{}) (*Config, error) {
 	}
 
 	if configFile, ok := flags["config"].(string); ok && configFile != "" {
+		// viper takes what follows a path's last '.' for the file's type, and its error quotes
+		// that: in a URL, part of the password (Unsupported Config Type "word@host:5432").
+		if strings.Contains(configFile, "://") {
+			return nil, fmt.Errorf("failed to read config file: --config takes a file, not a URL: %s", dsn.Redact(configFile))
+		}
 		v.SetConfigFile(configFile)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)

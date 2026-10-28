@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/meru143/dbdiff/internal/db"
+	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/internal/diff"
 	"github.com/meru143/dbdiff/internal/logging"
 	"github.com/meru143/dbdiff/internal/output"
@@ -130,7 +131,7 @@ var InteractiveCmd = &cobra.Command{
 			return fmt.Errorf("failed to save interactive migration: %w", err)
 		}
 
-		fmt.Printf("\nSelected migration output stored securely to: %s\n", cfg.Output)
+		fmt.Printf("\nSelected migration output stored securely to: %s\n", dsn.Redact(cfg.Output))
 		return nil
 	},
 }
