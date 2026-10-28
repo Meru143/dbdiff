@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-10-28
+
+### Security
+- Passwords still reached the terminal, logs and migration files in 1.1.3 in these cases, found by running every command with a password marked in each of its parts. A URL glued to a flag (`compare -v"$URL"`, `--source"$URL"`, `--"$URL"`) was quoted whole in the error for the unknown flag (`unknown shorthand flag: 'p' in -postgres://user:password@host/db`); passwords are now hidden in a URL wherever it starts. `dbdiff help "$URL"` printed it in ``Unknown help topic [`postgres://user:password@host/db`]``, and `dbdiff __complete "$URL" ''`, which shells run for completions, in `unable to find a command for arguments: [postgres://user:password@host/db]`, on stderr and in `$BASH_COMP_DEBUG_FILE`: cobra prints both itself, and dbdiff now hides the password in their arguments first. A URL whose password lacked the `@host` after it, as in `postgres://user:password`, was printed whole, in `-v` logs and in the error for it; what stands in the place of a port is now hidden unless it is a number. A password setting whose value holds a URL (`password=postgres://u:p;word@host/db`) was hidden only up to the `;`; all of it is hidden now. MySQL's errors for a URL without `/database` after the address quoted part of the password: `mysql://user:pass/word@tcp(host:3306)` failed with `default addr for network 'user:pass' unknown`, and `mysql://user:pass/word%ZZ@tcp(host:3306)` with `invalid dbname "word%ZZ@tcp(host:3306)"`. dbdiff now passes on only go-sql-driver's errors that quote nothing of the DSN, and for the others says what a MySQL URL looks like
+- **A password parameter holding an `@`, after a port, was hidden only up to the `@`**: `sqlserver://host:1433?database=db&password=P@ssw0rd` was printed as `sqlserver://host:***@ssw0rd` in `-v` logs, errors and the migration header. Migration files written from such a URL hold the rest of the password: scrub them and rotate it. dbdiff now hides all of that value, and refuses such a URL (see below)
+- **A password parameter holding a `;` was hidden only up to the `;`**: pgx reads `postgres://app@host/db?password=pass;word` as the password `pass;word`, which the `-v` logs and the migration header showed as `?password=***;word`. Migration files written from such a URL hold the rest of the password: scrub them and rotate it. In a URL, a parameter's value now runs to the next `&`, as the drivers read it
+- dbdiff refuses a URL whose driver would read part of the password as the user name, the host or the database, which the driver's errors quote: `postgres://user:/pass@host:5432/db` failed with ``failed to connect to `user=me database=pass@host:5432/db` ``. Such URLs are a PostgreSQL URL with `@` or `/` in its user name or password, a SQL Server URL with `/`, `?` or `#` there, a MySQL URL without `/database` after the address, and one with a password parameter holding an `@` like the one above. The error names the URL with its password hidden and says what to percent-encode or add. A PostgreSQL or SQL Server URL with another `@` after its host, as in `?application_name=a@b`, can be refused too: write that `@` as `%40`
+
+### Fixed
+- `mysql+tcp://` URLs, and MySQL URLs whose scheme is in upper case, connect as the user they name. dbdiff accepted both, but read the scheme as the user name: `Access denied for user 'mysql+tcp'`
+
 ## [1.1.3] - 2026-10-28
 
 ### Security
