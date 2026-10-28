@@ -55,7 +55,12 @@ func Redact(s string) string {
 		b.WriteString(redactOne(s[text:end]))
 		text = end
 	}
+	starts := schemeStarts(s)
+	unclosed := "" // quotes that no later quote of their kind closes: none closes a later one either
 	for i := 0; i < len(s); {
+		for len(starts) > 0 && starts[0] < i {
+			starts = starts[1:]
+		}
 		c := s[i]
 		switch {
 		case c == '?' || c == '&' || c == ';':
@@ -72,16 +77,19 @@ func Redact(s string) string {
 				continue
 			}
 			key = i + 1
-		case c == '"' || c == '`':
-			if end := closingQuote(s, i); end > 0 {
-				flush(i)
-				b.WriteByte(c)
-				b.WriteString(Redact(s[i+1 : end]))
-				b.WriteByte(c)
-				i, text, key, quoted = end+1, end+1, end+1, true
-				continue
+		case (c == '"' || c == '`') && strings.IndexByte(unclosed, c) < 0:
+			end := closingQuote(s, i)
+			if end < 0 {
+				unclosed += string(c)
+				break
 			}
-		case schemeLen(s[i:]) > 0:
+			flush(i)
+			b.WriteByte(c)
+			b.WriteString(Redact(s[i+1 : end]))
+			b.WriteByte(c)
+			i, text, key, quoted = end+1, end+1, end+1, true
+			continue
+		case len(starts) > 0 && starts[0] == i:
 			flush(i)
 			b.WriteString(redactOne(s[i:]))
 			return b.String()
@@ -280,6 +288,31 @@ func closingQuote(s string, open int) int {
 		}
 	}
 	return -1
+}
+
+// schemeStarts returns where the scheme of each URL in s starts, in order: at the first
+// letter of the scheme characters before each "://", which can be glued to the text before
+// them, as in --sourcepostgres://. Each byte is looked at a bounded number of times.
+func schemeStarts(s string) []int {
+	var starts []int
+	for at := strings.Index(s, "://"); at >= 0; {
+		start := at
+		for start > 0 && isSchemeChar(s[start-1]) {
+			start--
+		}
+		for start < at && !isLetter(s[start]) {
+			start++
+		}
+		if start < at {
+			starts = append(starts, start)
+		}
+		next := strings.Index(s[at+3:], "://")
+		if next < 0 {
+			break
+		}
+		at += 3 + next
+	}
+	return starts
 }
 
 // schemeLen is the length of the URL scheme and "://" that t starts with, or 0.
