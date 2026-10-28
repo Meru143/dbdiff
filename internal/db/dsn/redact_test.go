@@ -74,6 +74,14 @@ func TestRedact(t *testing.T) {
 		{"keyword=value settings", "cannot parse `host=db sslpassword=k3y password=s3cret`", "cannot parse `host=db sslpassword=***`"},
 		{"userinfo and parameter", "sqlserver://sa:s3cret@host?database=app&password=s3cret",
 			"sqlserver://sa:***@host?database=app&password=***"},
+		// With a ':' before it, an '@' in a parameter's value would end a password that starts
+		// at the ':': the value is hidden whole with it.
+		{"parameter holding an @, after a port", "sqlserver://host:1433?database=app&password=s3cret@s3cret",
+			"sqlserver://host:***"},
+		{"parameter holding an @, then others", "postgres://host:5432/app?password=s3cret@s3cret&sslmode=disable",
+			"postgres://host:***&sslmode=disable"},
+		{"parameter holding an @, without a port", "sqlserver://host?database=app&password=s3cret@s3cret",
+			"sqlserver://host?database=app&password=***"},
 
 		// text holding connection strings, as errors and logs do
 		{"after text", "unsupported scheme in postgress://user:s3cret@host/app", "unsupported scheme in postgress://user:***@host/app"},
@@ -118,7 +126,7 @@ func TestRedact(t *testing.T) {
 // scheme, in a percent-encoded query parameter, and in braces in settings (go test -fuzz
 // FuzzRedactPassword explores beyond these seeds).
 func FuzzRedactPassword(f *testing.F) {
-	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}", "a\"b\"c", "x`y`z"} {
+	for _, p := range []string{"s3cret", "p@ss:w/rd", "a\"b`c d", "x://y@z", "pwd=a;b", "%zz%40", "{a;b}}", "a\"b\"c", "x`y`z", "a?pwd=b"} {
 		f.Add("app", p)
 	}
 	f.Fuzz(func(t *testing.T, user, pass string) {
@@ -136,7 +144,11 @@ func FuzzRedactPassword(f *testing.F) {
 			cases[strings.Replace(form, "%s", user+":"+pass, 1)] = strings.Replace(form, "%s", user+":***", 1)
 		}
 		for in, want := range cases {
-			if got := Redact(in); got != want {
+			// After a '?' in the password, a password parameter's value can hold the '@' that
+			// ends it: then all that follows the ':' is hidden (see passwordEnd).
+			got := Redact(in)
+			hidesAll := strings.Contains(pass, "?") && strings.HasSuffix(got, ":"+mask) && strings.HasPrefix(want, got)
+			if got != want && !hidesAll {
 				t.Errorf("password %q: Redact(%q) = %q, want %q", pass, in, got, want)
 			}
 		}
@@ -159,7 +171,9 @@ func TestCheckPassword(t *testing.T) {
 		{"sqlserver://sa:p@ss:w@host?database=db", true},     // net/url's runs to the host's last '@'
 		{"mysql://root:p@ss/w:rd?#@tcp(host:3306)/db", true}, // go-sql-driver's, to the last '@' before the last '/'
 		{"MYSQL+TCP://root:s3cret@tcp(host:3306)/db?parseTime=true", true},
-		{"mariadb://app:a/s3cret@host/db", true}, // no driver: NewDriver refuses the scheme
+		{"mariadb://app:a/s3cret@host/db", true},            // no driver: NewDriver refuses the scheme
+		{"postgres://host/db?password=s3cret@s3cret", true}, // pgx: no user name before the '/'
+		{"sqlserver://host?database=db&password=s3cret@s3cret", true},
 
 		{"postgres://app:/s3cret@host:5432/db", false}, // pgx: host app, database s3cret@host:5432/db
 		{"postgres://app:4321/s3cret@host/db", false},  // pgx: port 4321
@@ -170,9 +184,14 @@ func TestCheckPassword(t *testing.T) {
 		{"mysql://root:s3cret/x@tcp(host:3306)", false}, // go-sql-driver: database x@tcp(host:3306)
 		{"mysql://root:s3cret@tcp(host:3306)", false},
 		{"mysql+tcp://root:s3cret@tcp(host:3306)/db?x=a@b", false},
+		// an '@' in a password parameter's value, with a ':' before it, or, for pgx, before any '/'
+		{"postgres://host:5432/db?password=s3cret@s3cret", false},
+		{"postgres://host?sslmode=disable&password=s3cret@s3cret", false}, // pgx: user host?sslmode=disable&password=s3cret
+		{"sqlserver://host:1433?database=db&password=s3cret@s3cret", false},
+		{"mysql://root@tcp(host:3306)/db?password=s3cret@s3cret&x=/", false},
 	} {
 		err := CheckPassword(tt.url)
-		if tt.ok != (err == nil) || err != nil && (strings.Contains(err.Error(), "s3cret") || !strings.Contains(err.Error(), ":***@")) {
+		if tt.ok != (err == nil) || err != nil && (strings.Contains(err.Error(), "s3cret") || !strings.Contains(err.Error(), "***")) {
 			t.Errorf("CheckPassword(%q) = %v, want ok=%v and no password", tt.url, err, tt.ok)
 		}
 	}
@@ -195,7 +214,7 @@ func FuzzCheckPassword(f *testing.F) {
 				continue
 			}
 			at := strings.LastIndexByte(rest, '@')
-			hidden := rest[strings.IndexByte(rest[:at], ':')+1 : at]
+			hidden := rest[strings.IndexByte(rest[:at], ':')+1 : passwordEnd(rest, at)]
 			var got, want string
 			switch scheme {
 			case "postgres://":

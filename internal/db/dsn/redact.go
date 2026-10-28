@@ -22,15 +22,17 @@ var dsnAddr = regexp.MustCompile(`^([A-Za-z0-9]+\([^)]*\))?/`)
 //
 // A URL's password runs from the first ':' after the scheme to the last '@', so one that
 // holds '@', ':', '/', spaces or %-escapes is hidden whole, and so is the password of a
-// malformed URL; that can hide more than the password, never less. The last '@' is that of
-// the whole string, unless the URL is in double quotes (Go's %q, as cobra and net/url quote
-// one in an error) or backticks (pgx), which then bound it; quoted text is read the same
-// way, URLs anywhere in it included. A URL is found wherever "://" follows a scheme, even
-// one glued to the text before it, as in cobra's error for a URL glued to a flag: unknown
-// flag: --sourcepostgres://user:***@host/db. A DSN without a scheme, like go-sql-driver's
-// user:pass@tcp(host:3306)/db, is hidden the same way, in quotes or as the whole of s,
-// quotes in its password included. The value of a password-like parameter (see
-// redactParams) is hidden whole wherever it is, before any quote in it is read.
+// malformed URL; that can hide more than the password, never less. If that '@' is in the
+// value of a password parameter, as in host:1433?password=p@ss, the rest of the value is
+// hidden with it. The last '@' is that of the whole string, unless the URL is in double
+// quotes (Go's %q, as cobra and net/url quote one in an error) or backticks (pgx), which
+// then bound it; quoted text is read the same way, URLs anywhere in it included. A URL is
+// found wherever "://" follows a scheme, even one glued to the text before it, as in
+// cobra's error for a URL glued to a flag: unknown flag: --sourcepostgres://user:***@host/db.
+// A DSN without a scheme, like go-sql-driver's user:pass@tcp(host:3306)/db, is hidden the
+// same way, in quotes or as the whole of s, quotes in its password included. The value of a
+// password-like parameter (see secretValues) is hidden whole wherever it is, before any
+// quote in it is read.
 //
 // A driver that reads part of what Redact hides as the host or the database, not the
 // password, quotes that part in its errors: CheckPassword refuses such URLs.
@@ -86,15 +88,33 @@ func Redact(s string) string {
 }
 
 // redactOne hides the secrets of one connection string: the password between the first
-// ':' after the scheme and the last '@', and the value of each password-like parameter.
+// ':' after the scheme and the last '@' (see passwordEnd), and the value of each
+// password-like parameter.
 func redactOne(t string) string {
 	n := schemeLen(t)
 	head, rest := t[:n], t[n:]
 	if colon := userinfo(rest, n > 0); colon > 0 {
-		at := strings.LastIndexByte(rest, '@')
-		rest = rest[:colon] + mask + rest[at:]
+		rest = rest[:colon] + mask + rest[passwordEnd(rest, strings.LastIndexByte(rest, '@')):]
 	}
 	return head + redactParams(rest)
+}
+
+// passwordEnd returns where the password that ends at rest[at], the last '@', is hidden to:
+// at, unless that '@' is in the value of a password-like parameter in the query, as in
+// host:1433?password=p@ss, where it starts no host. The rest of that value is hidden with
+// it: whether the '@' ends a password with a '?' in it or is part of the value, both are
+// secret.
+func passwordEnd(rest string, at int) int {
+	q := strings.IndexByte(rest, '?')
+	if q < 0 || q > at {
+		return at
+	}
+	for _, v := range secretValues(rest[q:]) {
+		if q+v[0] <= at && at < q+v[1] {
+			return q + v[1]
+		}
+	}
+	return at
 }
 
 // userinfo returns the index after the ':' that starts a password in rest, the part of a
@@ -115,39 +135,70 @@ func userinfo(rest string, scheme bool) int {
 }
 
 // CheckPassword returns an error, naming connStr redacted, if the driver for connStr would
-// read part of what Redact hides as its password as the host, the database or the query,
-// which the driver's errors quote: failed to connect to `user=app database=s3cret@host/db`.
-// Redact ends a password at the last '@'. pgx (postgres://, postgresql://) ends the user
-// name and password at the first '@', or at a '/' before it; net/url, which the SQL Server
-// driver parses with, ends the host at the first '/', '?' or '#'; and go-sql-driver (mysql://,
+// read part of what Redact hides in it as something other than a password, like the user
+// name, the host or the database, which the driver's errors quote: failed to connect to
+// `user=app database=s3cret@host/db`. Redact ends a URL's password at the last '@' (see
+// passwordEnd). pgx (postgres://, postgresql://) ends the user name and password at the
+// first '@' before any '/', even one after a '?'; net/url, which the SQL Server driver
+// parses with, ends the host at the first '/', '?' or '#'; and go-sql-driver (mysql://,
 // mysql+tcp://) reads the database after the last '/'.
 func CheckPassword(connStr string) error {
 	n := schemeLen(connStr)
 	rest := connStr[n:]
-	if n == 0 || userinfo(rest, true) == 0 {
-		return nil
-	}
+	colon := userinfo(rest, true)
 	at := strings.LastIndexByte(rest, '@')
+	end := at
+	if colon > 0 {
+		end = passwordEnd(rest, at)
+	}
+	var ambiguous bool
 	var fix string
-	switch scheme := strings.ToLower(connStr[:n]); {
-	case (scheme == "postgres://" || scheme == "postgresql://") && strings.ContainsAny(rest[:at], "@/"):
+	switch strings.ToLower(connStr[:n]) {
+	case "postgres://", "postgresql://":
 		fix = "percent-encode '@' and '/' in its user name and password, and any '@' after its host"
-	case scheme == "sqlserver://" && strings.ContainsAny(rest[:at], "/?#"):
+		if colon > 0 {
+			ambiguous = strings.ContainsAny(rest[:end], "@/")
+		} else if first := strings.IndexAny(rest, "@/"); first >= 0 && rest[first] == '@' {
+			// No password ends at an '@', but pgx still ends a user name at the first one,
+			// even in a password parameter's value: it would read the start of the value
+			// as part of the user name, and the rest as the host.
+			secrets := secretValues(rest)
+			ambiguous = len(secrets) > 0 && secrets[0][0] < first
+		}
+	case "sqlserver://":
 		fix = "percent-encode '/', '?' and '#' in its user name and password, and any '@' after its host"
-	case (scheme == "mysql://" || scheme == "mysql+tcp://") && !strings.Contains(rest[at:], "/"):
+		ambiguous = colon > 0 && strings.ContainsAny(rest[:end], "/?#")
+	case "mysql://", "mysql+tcp://":
 		fix = "end it with /database after the address, and percent-encode any '@' after that '/'"
-	default:
+		ambiguous = colon > 0 && (end != at || !strings.Contains(rest[at:], "/"))
+	}
+	if !ambiguous {
 		return nil
 	}
 	return fmt.Errorf("can't tell where the password ends in %q: %s", Redact(connStr), fix)
 }
 
-// redactParams hides the value of each password-like parameter in t, in a URL's query
-// (?password=x&...) or in semicolon-separated settings (user id=sa;password=x): one whose
-// name, read percent-decoded and in any case, ends in password, passwd or pwd (password,
-// sslpassword, Pwd, pass%77ord).
+// redactParams hides the value of each password-like parameter in t (see secretValues).
 func redactParams(t string) string {
 	var b strings.Builder
+	written := 0
+	for _, v := range secretValues(t) {
+		if v[1] > v[0] {
+			b.WriteString(t[written:v[0]])
+			b.WriteString(mask)
+			written = v[1]
+		}
+	}
+	b.WriteString(t[written:])
+	return b.String()
+}
+
+// secretValues returns where the value of each password-like parameter in t starts and
+// ends, in a URL's query (?password=x&...) or in semicolon-separated settings (user
+// id=sa;password=x): one whose name, read percent-decoded and in any case, ends in
+// password, passwd or pwd (password, sslpassword, Pwd, pass%77ord).
+func secretValues(t string) [][2]int {
+	var values [][2]int
 	key := 0 // where the name before the next '=' starts
 	for i := 0; i < len(t); i++ {
 		switch t[i] {
@@ -159,16 +210,12 @@ func redactParams(t string) string {
 				continue
 			}
 			v := i + 1 + len(t[i+1:]) - len(strings.TrimLeft(t[i+1:], " \t"))
-			b.WriteString(t[:v])
-			n := valueLen(t[v:])
-			if n > 0 {
-				b.WriteString(mask)
-			}
-			t, i, key = t[v+n:], -1, 0
+			end := v + valueLen(t[v:])
+			values = append(values, [2]int{v, end})
+			i, key = end-1, end
 		}
 	}
-	b.WriteString(t)
-	return b.String()
+	return values
 }
 
 // secretKey reports whether a parameter name is password-like.
