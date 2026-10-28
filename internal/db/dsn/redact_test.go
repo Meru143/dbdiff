@@ -37,6 +37,10 @@ func TestRedact(t *testing.T) {
 		{"settings with quotes in a password", `server=host;password=a"s3"c` + "`r`" + `et;database=app`, "server=host;password=***;database=app"},
 		{"settings in text, password quoted", `failed with server=host;pwd="s3cret";database=app here`,
 			`failed with server=host;pwd=***;database=app here`},
+		{"settings in text, quotes in a braced password", `failed with server=host;pwd={a"s3cret"c};database=app`,
+			`failed with server=host;pwd=***;database=app`},
+		{"URL inside quoted prose", `error: "connecting to postgres://user:s3cret@host/db failed"`,
+			`error: "connecting to postgres://user:***@host/db failed"`},
 
 		// nothing to hide
 		{"no password", "postgres://user@host/app", "postgres://user@host/app"},
