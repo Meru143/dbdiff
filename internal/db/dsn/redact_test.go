@@ -194,6 +194,10 @@ func TestCheckPassword(t *testing.T) {
 		if tt.ok != (err == nil) || err != nil && (strings.Contains(err.Error(), "s3cret") || !strings.Contains(err.Error(), "***")) {
 			t.Errorf("CheckPassword(%q) = %v, want ok=%v and no password", tt.url, err, tt.ok)
 		}
+		// main prints errors through Redact, which must leave this one as it is.
+		if err != nil && Redact("Error: failed to initialize driver: "+err.Error()) != "Error: failed to initialize driver: "+err.Error() {
+			t.Errorf("CheckPassword(%q): Redact changes its error to %q", tt.url, Redact(err.Error()))
+		}
 	}
 }
 
