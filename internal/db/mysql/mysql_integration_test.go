@@ -66,6 +66,14 @@ func TestMySQLIntrospectionIntegration(t *testing.T) {
 	require.NoError(t, err)
 	defer driver.Close()
 
+	// The other schemes NewDriver takes reach the same server as the same user.
+	for _, url := range []string{"MYSQL://" + dsn, "mysql+tcp://" + dsn} {
+		other, err := db.NewDriver(url)
+		require.NoError(t, err)
+		require.NoError(t, other.Connect(ctx, url, "disable", 20*time.Second), url)
+		other.Close()
+	}
+
 	// 3. Setup dummy schema
 	setupSQL := `
 	CREATE TABLE products (

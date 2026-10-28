@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -287,5 +288,31 @@ func TestIntrospectMocked(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+// Connect reads the go-sql-driver DSN after each scheme NewDriver takes, in any case: it used
+// to strip only mysql://, so go-sql-driver read MYSQL or mysql+tcp as the user name.
+func TestParseDSN(t *testing.T) {
+	for _, url := range []string{"mysql://root:p@ss/w:rd@tcp(db:3306)/app", "MYSQL://root:p@ss/w:rd@tcp(db:3306)/app",
+		"mysql+tcp://root:p@ss/w:rd@tcp(db:3306)/app"} {
+		cfg, err := parseDSN(url)
+		if err != nil || cfg.User != "root" || cfg.Passwd != "p@ss/w:rd" || cfg.Addr != "db:3306" || cfg.DBName != "app" {
+			t.Errorf("%s: got %+v, %v", url, cfg, err)
+		}
+	}
+}
+
+// Without a /database after the address, go-sql-driver reads the database, or the network,
+// from the password, and quotes it in its error; Connect's error holds none of it.
+func TestConnectParseErrorHidesPassword(t *testing.T) {
+	for _, url := range []string{
+		"mysql://root:QZXa/QZYb@tcp(db:3306)",    // go-sql-driver: default addr for network 'root:QZXa' unknown
+		"mysql://root:QZXa/QZYb%zz@tcp(db:3306)", // go-sql-driver: invalid dbname "QZYb%zz@tcp(db:3306)"
+	} {
+		err := New().Connect(context.Background(), url, "disable", time.Second)
+		if err == nil || strings.Contains(err.Error(), "QZX") || strings.Contains(err.Error(), "QZY") {
+			t.Errorf("%s: expected an error without the password, got %v", url, err)
+		}
 	}
 }
