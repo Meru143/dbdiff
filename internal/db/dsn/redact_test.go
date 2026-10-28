@@ -46,6 +46,16 @@ func TestRedact(t *testing.T) {
 		{"URL inside quoted prose", `error: "connecting to postgres://user:s3cret@host/db failed"`,
 			`error: "connecting to postgres://user:***@host/db failed"`},
 
+		// A URL without the '@' and host after its password: what stands in the place of a
+		// port is hidden, unless it is a number.
+		{"password without @host", "postgres://app:s3cret", "postgres://app:***"},
+		{"password without @host, then a path", "postgres://app:s3cret/db?sslmode=disable", "postgres://app:***/db?sslmode=disable"},
+		{"sqlserver password without @host", "sqlserver://sa:s3cret?database=app", "sqlserver://sa:***?database=app"},
+		{"mysql password without @address", "mysql://root:s3cret", "mysql://root:***"},
+		{"IPv6 host and port", "postgres://[::1]:5432/app", "postgres://[::1]:5432/app"},
+		{"hosts and ports", "postgres://h1:5432,h2:5433/app", "postgres://h1:5432,h2:5433/app"},
+		{"empty port", "postgres://host:/app", "postgres://host:/app"},
+
 		// nothing to hide
 		{"no password", "postgres://user@host/app", "postgres://user@host/app"},
 		{"empty password", "postgres://user:@host/app", "postgres://user:@host/app"},
@@ -65,6 +75,9 @@ func TestRedact(t *testing.T) {
 			"sqlserver://host?database=app&odbc=user id=sa;Password=***"},
 		{"';' in a password parameter", "postgres://app@host/db?password=s3cret;s3cret&sslmode=disable",
 			"postgres://app@host/db?password=***&sslmode=disable"},
+		// a password parameter whose value holds a URL runs to the end
+		{"URL in a password setting", "password=postgres://u:first;s3cret@host/db", "password=***"},
+		{"URL in a password setting, in prose", "failed: pwd=postgres://u:first;s3cret@host/db", "failed:***@host/db"},
 		{"spaces around =", "sqlserver://host?user id=sa&password = s3cret", "sqlserver://host?user id=sa&password = ***"},
 		{"value with spaces", "sqlserver://host?password=my s3cret&database=app", "sqlserver://host?password=***&database=app"},
 		{"value in braces", "sqlserver://host?odbc=uid=sa;pwd={a&b}}c}&database=app",
