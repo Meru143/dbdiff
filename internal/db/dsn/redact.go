@@ -272,44 +272,41 @@ func tokens(s string) []string {
 }
 
 // hiddenRegion returns the tokens of what Redact hides after the '=' of the
-// first password parameter in connStr's query — the region raw and percent-
-// decoded both ways (url.PathUnescape, as pgx and net/url read it, and
-// url.QueryUnescape, as go-sql-driver and go-mssqldb do, where '+' is a space)
-// — and keys, the subset that name a parameter: a token right before an '='.
+// first password parameter in connStr's query: each raw token, and the tokens it
+// decodes to both ways (url.PathUnescape, as pgx and net/url read it, and
+// url.QueryUnescape, as go-sql-driver and go-mssqldb do, where '+' is a space).
+// Each token is decoded on its own, as the drivers decode each parameter, so a
+// bad escape in one (a password of 50%off) leaves the others decoded.
 // ok is false when the query holds no password parameter.
-func hiddenRegion(connStr string) (region, keys map[string]struct{}, ok bool) {
+func hiddenRegion(connStr string) (region map[string]struct{}, ok bool) {
 	n := schemeLen(connStr)
 	q := strings.IndexByte(connStr[n:], '?')
 	if n == 0 || q < 0 {
-		return nil, nil, false
+		return nil, false
 	}
 	secrets := secretValues(connStr[n+q:], toEnd)
 	if len(secrets) == 0 {
-		return nil, nil, false
-	}
-	raw := connStr[n+q+secrets[0][0]:]
-	forms := []string{raw}
-	if d, err := url.PathUnescape(raw); err == nil {
-		forms = append(forms, d)
-	}
-	if d, err := url.QueryUnescape(raw); err == nil {
-		forms = append(forms, d)
+		return nil, false
 	}
 	region = map[string]struct{}{}
-	keys = map[string]struct{}{}
-	for _, f := range forms {
-		for _, t := range tokens(f) {
-			region[t] = struct{}{}
-		}
-		for _, seg := range strings.FieldsFunc(f, func(r rune) bool { return r == '&' || r == ';' || r == ',' }) {
-			if name, _, has := strings.Cut(seg, "="); has {
-				for _, k := range tokens(name) {
-					keys[k] = struct{}{}
+	for _, t := range tokens(connStr[n+q+secrets[0][0]:]) {
+		region[t] = struct{}{}
+		for _, unescape := range []func(string) (string, error){url.PathUnescape, url.QueryUnescape} {
+			if d, err := unescape(t); err == nil {
+				for _, dt := range tokens(d) {
+					region[dt] = struct{}{}
 				}
 			}
 		}
 	}
-	return region, keys, true
+	return region, true
+}
+
+// HasPasswordParam reports whether connStr's query holds a password parameter, whose value a
+// driver ends at the next '&' while Redact hides all that follows its '='.
+func HasPasswordParam(connStr string) bool {
+	_, ok := hiddenRegion(connStr)
+	return ok
 }
 
 // HideParams returns err, the error for connecting with connStr, unless it quotes a token of
@@ -330,7 +327,7 @@ func HideParams(connStr string, err error) error {
 	if err == nil {
 		return err
 	}
-	region, _, ok := hiddenRegion(connStr)
+	region, ok := hiddenRegion(connStr)
 	if !ok {
 		return err
 	}
@@ -351,49 +348,40 @@ func HideParams(connStr string, err error) error {
 			hidden = hidden || inRegion(name)
 		}
 	}
+	// A quote inside a token breaks the pairing above (parameter "a"b" yields a), so a token
+	// that holds one is searched for whole.
+	msg := strings.ToLower(err.Error())
+	for t := range region {
+		hidden = hidden || strings.ContainsAny(t, `"'`) && hasWord(msg, t)
+	}
 	if hidden {
 		return fmt.Errorf("connecting with %q failed with an error that quotes part of what follows the '=' of its password parameter, which may be part of the password, so the error is left out: put the password after the user name, or write an '&' in it as %%26", Redact(connStr))
 	}
 	return err
 }
 
-// ReasonLeaks reports whether reason — a PostgreSQL parse message with the connection string
-// removed — names, as a whole word, a value of what Redact hides after the first password
-// parameter's '=', as opposed to only a parameter's own name. pgx repeats a parameter name
-// for a genuinely bad setting (sslmode is invalid, invalid port), which is safe to show, but
-// echoes some rejected values (unknown target_session_attrs value: X, open <sslrootcert>:
-// no such file), which may be the rest of the password. connectOnce shows the reason only
-// when this is false.
-func ReasonLeaks(connStr, reason string) bool {
-	region, keys, ok := hiddenRegion(connStr)
-	if !ok {
+// hasWord reports whether the token t occurs whole in the lowercase message s: bounded on each
+// side by an end, whitespace or a separator, or the punctuation messages wrap a value in
+// (quotes, parentheses, a trailing colon). t may hold that punctuation itself (parameter
+// "a"b"), so it is searched for as it is, not split up.
+func hasWord(s, t string) bool {
+	if t == "" {
 		return false
 	}
-	// reason is prose: a value it names sits between whitespace or the punctuation pgx wraps
-	// values in (quotes, parentheses, a trailing colon), and the value may hold that punctuation
-	// itself (unknown target_session_attrs value: x:y, open x(y): no such file), so each value
-	// token is searched for whole, bounded by such a byte or an end, rather than split up.
-	r := strings.ToLower(reason)
 	edge := func(i int) bool {
-		return i < 0 || i >= len(r) || strings.IndexByte(tokenSeps+":()[]{}\"'`", r[i]) >= 0
+		return i < 0 || i >= len(s) || strings.IndexByte(tokenSeps+":()[]{}\"'`", s[i]) >= 0
 	}
-	for t := range region {
-		if _, isKey := keys[t]; isKey {
-			continue
+	for from := 0; ; {
+		i := strings.Index(s[from:], t)
+		if i < 0 {
+			return false
 		}
-		for from := 0; ; {
-			i := strings.Index(r[from:], t)
-			if i < 0 {
-				break
-			}
-			i += from
-			if edge(i-1) && edge(i+len(t)) {
-				return true
-			}
-			from = i + 1
+		i += from
+		if edge(i-1) && edge(i+len(t)) {
+			return true
 		}
+		from = i + 1
 	}
-	return false
 }
 
 // quotedTokens returns the text inside each "..." and '...' pair in s, left to right within

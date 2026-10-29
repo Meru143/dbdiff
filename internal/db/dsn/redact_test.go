@@ -244,14 +244,14 @@ func FuzzRedactPassword(f *testing.F) {
 // password parameter is hidden, at any length (regress and leaks finding 1), and that
 // HideParams never panics on an arbitrary error.
 func FuzzHideParams(f *testing.F) {
-	for _, s := range []string{"9a", "Q", "ab", "k3y", "owner:ops", "a&b", "x=y", "a;b"} {
+	for _, s := range []string{"9a", "Q", "ab", "k3y", "owner:ops", "a&b", "x=y", "a;b", `a"b`, `"ab`, `ab"`} {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, tail string) {
 		connStr := "postgres://app@host/db?sslmode=disable&password=Secret9&" + tail
 		HideParams(connStr, errors.New("connection refused")) // crash-only, arbitrary tail
-		if strings.ContainsAny(tail, "\x00\"#?%+") {
-			return // keep raw == decoded, and the quoted name well-formed
+		if strings.ContainsAny(tail, "\x00#?%+") {
+			return // keep raw == decoded
 		}
 		for _, seg := range strings.FieldsFunc(tail, func(r rune) bool { return r == '&' || r == ';' }) {
 			name := strings.SplitN(seg, "=", 2)[0] // the server quotes the name verbatim
@@ -449,6 +449,15 @@ func TestHideParams(t *testing.T) {
 		// region, decoded that way too, still matches it (regress finding 5).
 		{"sqlserver://host?database=db&password=s3cret&log=Zq+rB", `invalid log parameter 'Zq rB': strconv.ParseUint: parsing "Zq rB": invalid syntax`, true},
 		{"sqlserver://host?database=db&password=s3cret&a+Zq&a+Zq", "key a Zq provided more than once", true},
+		// A quote inside a name or value breaks the quote pairing, so the token that holds it
+		// is searched for whole in the error.
+		{`postgres://app@host/db?password=s3cret&Zq"Zx=1`, pgConnect + `unrecognized configuration parameter "Zq"Zx" (SQLSTATE 42704)`, true},
+		{`postgres://app@host/db?password=s3cret&"Zq9=1`, pgConnect + `unrecognized configuration parameter ""Zq9" (SQLSTATE 42704)`, true},
+		{"postgres://app@host/db?password=s3cret&Zq%22Zy=1", pgConnect + `unrecognized configuration parameter "Zq"Zy" (SQLSTATE 42704)`, true},
+		{"sqlserver://host?database=db&password=s3cret&log=Zq'Zz", `invalid log parameter 'Zq'Zz': strconv.ParseUint: parsing "Zq'Zz": invalid syntax`, true},
+		// A bad escape in the password leaves the later pieces decoded, as the drivers decode
+		// each parameter on its own.
+		{"sqlserver://host?database=db&password=50%off&log=Zq%28Zz", `invalid log parameter 'Zq(Zz': strconv.ParseUint: parsing "Zq(Zz": invalid syntax`, true},
 		{"postgres://app@host/db?password=s3cret&sslmode=disable", pgConnect + `password authentication failed for user "app" (SQLSTATE 28P01)`, false},
 		{"postgres://app:s3cret@host/db?sslmode=disable", pgConnect + `database "db" does not exist (SQLSTATE 3D000)`, false},
 		{"sqlserver://host?database=db&password=s3cret&k3y", "login error: mssql: Login failed for user 'app'.", false},

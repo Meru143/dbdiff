@@ -55,7 +55,8 @@ func TestConnectParseErrorHidesPasswordParameter(t *testing.T) {
 // A parameter after the password whose value pgx echoes (unknown
 // target_session_attrs value, a bad sslrootcert path) gives the generic hint, not the value,
 // since the value may be the rest of the password (regress finding 2). connect_timeout and
-// pool_max_conns, which also quote their value, do the same.
+// pool_max_conns, which also quote their value, do the same, and so does any reason not in
+// safeReasons; a safe one is shown with the URL redacted, never pgx's quoted URL.
 func TestConnectParseErrorHintsOnParamValue(t *testing.T) {
 	for _, url := range []string{
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&target_session_attrs=QZtS",
@@ -69,6 +70,17 @@ func TestConnectParseErrorHintsOnParamValue(t *testing.T) {
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&sslrootcert=QZ:rC",
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&target_session_attrs=QZ(tS)",
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&sslrootcert=QZ(rC)",
+		// a value that also appears as a parameter name
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&target_session_attrs=QZ:tS&QZ:tS=other",
+		// values pgx escapes or trims before it repeats them
+		`postgres://app@127.0.0.1:1/db?password=Zq9simple&connect_timeout=QZ\tS`,
+		`postgres://app@127.0.0.1:1/db?password=Zq9simple&pool_max_conns="QZtS"`,
+		`postgres://app@127.0.0.1:1/db?password=Zq9simple&min_protocol_version=QZ"tS`,
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&require_auth=!QZ:tS",
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&pool_ping_timeout=QZ%C3%A9tS",
+		// a bad escape in the password, and a backtick that would end pgx's quoted URL early
+		"postgres://app@127.0.0.1:1/db?password=50%off&channel_binding=QZ%28cB%29",
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&sslmode=`QZtS`",
 	} {
 		_, err := connectOnce(context.Background(), url, "disable", time.Second)
 		if err == nil || strings.Contains(err.Error(), "QZ") || !strings.Contains(err.Error(), "password=***") {
@@ -85,6 +97,8 @@ func TestConnectParseErrorKeepsParamReason(t *testing.T) {
 	for _, tt := range []struct{ url, reason string }{
 		{"postgres://app@127.0.0.1:1/db?password=QZXa&sslmode=disabled", "sslmode is invalid"},
 		{"postgres://127.0.0.1:1/db?password=QZXa&user=app&port=abc", "invalid port"},
+		{"postgres://app@127.0.0.1:1/db?password=QZXa&connect_timeout=-5", "invalid connect_timeout (negative timeout)"},
+		{"postgres://app@127.0.0.1:1/db?password=QZXa&pool_max_conns=0", "pool_max_conns too small"},
 	} {
 		_, err := connectOnce(context.Background(), tt.url, "disable", time.Second)
 		if err == nil || strings.Contains(err.Error(), "QZX") || !strings.Contains(err.Error(), tt.reason) {
