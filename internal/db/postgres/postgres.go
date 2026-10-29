@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -78,17 +79,19 @@ func (d *Driver) Connect(ctx context.Context, connStr, sslMode string, timeout t
 func connectOnce(ctx context.Context, connStr, sslMode string, timeout time.Duration) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		// pgx hides the password in the URL it quotes, but its reason can quote part of it:
-		// in a malformed URL the password spills into the host or the path, and pgx quotes
-		// an invalid escape there. Re-parse a copy whose password is masked but whose other
+		// pgx hides the password in the URL it quotes, but its reason can quote or name part
+		// of what follows a password parameter's '=': a raw '&' pgx read as its own parameter,
+		// or a value it echoes. Re-parse a copy whose password is masked but whose other
 		// parameters stay (RedactToSeparator), so pgx still reports a genuinely bad one
-		// (sslmode, connect_timeout, port). Show that reason, redacted, unless it quotes
-		// password material — a raw '&' tail pgx read as its own parameter — when only the
-		// hint is safe. The redacted URL parsing (no reason to show) also falls to the hint.
-		if _, rerr := pgxpool.ParseConfig(dsn.RedactToSeparator(connStr)); rerr != nil && dsn.HideParams(connStr, rerr) == rerr {
+		// (sslmode is invalid, invalid port). Show that reason, redacted, only when HideParams
+		// keeps it (it quotes no region token) and the reason names no value from the region
+		// (ReasonLeaks); otherwise give the hint, which a bad parameter after the password,
+		// or the password value itself, falls to.
+		if _, rerr := pgxpool.ParseConfig(dsn.RedactToSeparator(connStr)); rerr != nil &&
+			dsn.HideParams(connStr, rerr) == rerr && !dsn.ReasonLeaks(connStr, reasonOnly(rerr.Error())) {
 			return nil, fmt.Errorf("failed to parse connection string: %s", dsn.Redact(rerr.Error()))
 		}
-		return nil, fmt.Errorf("failed to parse connection string %q: percent-encode the special characters in its user name and password", dsn.Redact(connStr))
+		return nil, fmt.Errorf("failed to parse connection string %q: percent-encode the special characters in its user name and password, or correct a parameter after the password", dsn.Redact(connStr))
 	}
 
 	if sslMode == "disable" {
@@ -122,6 +125,17 @@ func connectOnce(ctx context.Context, connStr, sslMode string, timeout time.Dura
 	}
 
 	return pool, nil
+}
+
+// reasonOnly strips the backtick-quoted connection string pgx puts in its parse error
+// (cannot parse `url`: reason), leaving the reason to test for a leaked value.
+func reasonOnly(s string) string {
+	if i := strings.IndexByte(s, '`'); i >= 0 {
+		if j := strings.IndexByte(s[i+1:], '`'); j >= 0 {
+			return s[:i] + s[i+1+j+1:]
+		}
+	}
+	return s
 }
 
 // Close closes the connection pool

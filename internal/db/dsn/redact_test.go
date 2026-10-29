@@ -3,6 +3,7 @@ package dsn
 import (
 	"errors"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -181,8 +182,9 @@ func TestRedact(t *testing.T) {
 
 // RedactToSeparator hides the password but ends a password parameter's value at the next '&',
 // keeping the parameters after it, so connectOnce can re-parse a URL that failed and still
-// learn what is wrong with a later parameter. A raw '&' tail stays, since connectOnce only
-// re-parses this, never shows it.
+// learn what is wrong with a later parameter. A raw '&' tail stays in the re-parsed copy;
+// connectOnce shows pgx's reason only when it names no token of that tail, and otherwise
+// gives the hint (see TestConnectParseErrorHidesPasswordParameter and ...HintsOnParamValue).
 func TestRedactToSeparator(t *testing.T) {
 	for _, tt := range []struct{ in, want string }{
 		{"postgres://app@host/db?password=s3cret&sslmode=disabled", "postgres://app@host/db?password=***&sslmode=disabled"},
@@ -233,6 +235,32 @@ func FuzzRedactPassword(f *testing.F) {
 			hidesAll := strings.Contains(pass, "?") && strings.HasSuffix(got, ":"+mask) && strings.HasPrefix(want, got)
 			if got != want && !hidesAll {
 				t.Errorf("password %q: Redact(%q) = %q, want %q", pass, in, got, want)
+			}
+		}
+	})
+}
+
+// FuzzHideParams checks that an error quoting any whole parameter name in what follows a
+// password parameter is hidden, at any length (regress and leaks finding 1), and that
+// HideParams never panics on an arbitrary error.
+func FuzzHideParams(f *testing.F) {
+	for _, s := range []string{"9a", "Q", "ab", "k3y", "owner:ops", "a&b", "x=y", "a;b"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, tail string) {
+		connStr := "postgres://app@host/db?sslmode=disable&password=Secret9&" + tail
+		HideParams(connStr, errors.New("connection refused")) // crash-only, arbitrary tail
+		if strings.ContainsAny(tail, "\x00\"#?%+") {
+			return // keep raw == decoded, and the quoted name well-formed
+		}
+		for _, seg := range strings.FieldsFunc(tail, func(r rune) bool { return r == '&' || r == ';' }) {
+			name := strings.SplitN(seg, "=", 2)[0] // the server quotes the name verbatim
+			if len(tokens(name)) == 0 {
+				continue
+			}
+			err := errors.New(`unrecognized configuration parameter "` + name + `" (SQLSTATE 42704)`)
+			if HideParams(connStr, err) == err {
+				t.Errorf("tail %q: a quoted name %q was not hidden", tail, name)
 			}
 		}
 	})
@@ -408,9 +436,27 @@ func TestHideParams(t *testing.T) {
 		{"postgres://app@host/db?password=s3cret&k3y%0D=x", pgConnect + "unrecognized configuration parameter \"k3y\r\" (SQLSTATE 42704)", true},
 		{"postgres://app@host/db?password=s3cret&options=-c%20k3y%3D1", pgConnect + `unrecognized configuration parameter "k3y" (SQLSTATE 42704)`, true},
 		{"sqlserver://host?database=db&password=s3cret&k3y&k3y", "key k3y provided more than once", true},
+		// A 1-2 character piece after a raw '&' must be hidden too, at any length (regress and
+		// leaks finding 1). pgx's parse quote, PostgreSQL's server quote, SQL Server's quoted
+		// value and go-mssqldb's unquoted duplicate key all name it.
+		{"postgres://app@host/db?sslmode=disable&password=s3cret&9a", `failed to parse as URL (missing key/value separator "=" in URI query parameter: "9a")`, true},
+		{"postgres://app@host/db?password=s3cret&Q", `missing key/value separator "=" in URI query parameter: "Q"`, true},
+		{"postgres://app@host/db?password=s3cret&ab=c=d", `extra key/value separator "=" in URI query parameter: "ab"`, true},
+		{"postgres://app@host/db?password=s3cret&ab", pgConnect + `unrecognized configuration parameter "ab" (SQLSTATE 42704)`, true},
+		{"sqlserver://host?database=db&password=s3cret&log=ab", `invalid log parameter 'ab': strconv.ParseUint: parsing "ab": invalid syntax`, true},
+		{"sqlserver://host?database=db&password=s3cret&Qz&Qz", "key Qz provided more than once", true},
+		// go-mssqldb reads the query with QueryUnescape, so a '+' in the tail is a space; the
+		// region, decoded that way too, still matches it (regress finding 5).
+		{"sqlserver://host?database=db&password=s3cret&log=Zq+rB", `invalid log parameter 'Zq rB': strconv.ParseUint: parsing "Zq rB": invalid syntax`, true},
+		{"sqlserver://host?database=db&password=s3cret&a+Zq&a+Zq", "key a Zq provided more than once", true},
 		{"postgres://app@host/db?password=s3cret&sslmode=disable", pgConnect + `password authentication failed for user "app" (SQLSTATE 28P01)`, false},
 		{"postgres://app:s3cret@host/db?sslmode=disable", pgConnect + `database "db" does not exist (SQLSTATE 3D000)`, false},
 		{"sqlserver://host?database=db&password=s3cret&k3y", "login error: mssql: Login failed for user 'app'.", false},
+		// A whole-token match keeps an ordinary error that only contains the user or database
+		// name inside the password value or a later value (regress finding 3): a wrong password
+		// that starts with the user name, and an application_name that starts with the database.
+		{"postgres://bob@host/db?password=bobZx9", `password authentication failed for user "bob" (SQLSTATE 28P01)`, false},
+		{"postgres://app@host/nodb?password=Zx9pw&application_name=nodb-ci", `database "nodb" does not exist (SQLSTATE 3D000)`, false},
 	} {
 		in := errors.New(tt.err)
 		got := HideParams(tt.url, in)
@@ -420,6 +466,25 @@ func TestHideParams(t *testing.T) {
 	}
 	if HideParams("postgres://app@host/db?password=s3cret&k3y=x", nil) != nil {
 		t.Error("HideParams should keep a nil error")
+	}
+}
+
+// quotedTokens returns the text inside each matched quote pair and, as its comment says,
+// starts no token at an unpaired final quote (regress finding 7).
+func TestQuotedTokens(t *testing.T) {
+	for _, tt := range []struct {
+		in   string
+		want []string
+	}{
+		{`unrecognized configuration parameter "k3y"`, []string{"k3y"}},
+		{`invalid log parameter 'ab': parsing "ab"`, []string{"ab", "ab"}},
+		{`a "b`, nil},                         // unpaired final '"' starts no token
+		{`can't connect: "x"`, []string{"x"}}, // the apostrophe in can't is an unpaired final '
+	} {
+		got := quotedTokens(tt.in)
+		if !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("quotedTokens(%q) = %#v, want %#v", tt.in, got, tt.want)
+		}
 	}
 }
 
