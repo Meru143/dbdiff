@@ -105,4 +105,9 @@ func TestConnectParseErrorKeepsParamReason(t *testing.T) {
 			t.Errorf("%s: want the reason %q without the password, got %v", tt.url, tt.reason, err)
 		}
 	}
+	// A value pgx repeats that ends like a safe reason gets the hint, not that reason.
+	url := "postgres://app@127.0.0.1:1/db?password=QZXa&target_session_attrs=x%60:%20invalid%20port"
+	if _, err := connectOnce(context.Background(), url, "disable", time.Second); err == nil || !strings.Contains(err.Error(), "percent-encode") {
+		t.Errorf("%s: want the generic hint, got %v", url, err)
+	}
 }

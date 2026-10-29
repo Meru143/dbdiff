@@ -3,9 +3,9 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/meru143/dbdiff/internal/db/dsn"
 	"github.com/meru143/dbdiff/pkg/types"
@@ -102,12 +102,16 @@ func connectOnce(ctx context.Context, connStr, sslMode string, timeout time.Dura
 		// redacted. With one, show only a reason that names no value (safeReasons), after the
 		// URL redacted, never pgx's own text; otherwise give the hint, which a bad parameter
 		// after the password, or the password value itself, falls to.
-		if _, rerr := pgxpool.ParseConfig(dsn.RedactToSeparator(connStr)); rerr != nil {
+		rs := dsn.RedactToSeparator(connStr)
+		if _, rerr := pgxpool.ParseConfig(rs); rerr != nil {
 			if !dsn.HasPasswordParam(connStr) {
 				return nil, fmt.Errorf("failed to parse connection string: %s", dsn.Redact(rerr.Error()))
 			}
+			// pgx's own prefix for rs (cannot parse `…`: ), so the whole error is compared and
+			// a value that ends in "`: invalid port" can't pass for that reason.
+			prefix := pgconn.NewParseConfigError(rs, "", nil).Error()
 			for _, r := range safeReasons {
-				if strings.HasSuffix(rerr.Error(), "`: "+r) {
+				if rerr.Error() == prefix+r {
 					return nil, fmt.Errorf("failed to parse connection string %q: %s", dsn.Redact(connStr), r)
 				}
 			}
