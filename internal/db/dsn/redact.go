@@ -369,16 +369,28 @@ func ReasonLeaks(connStr, reason string) bool {
 	if !ok {
 		return false
 	}
-	// reason is prose: split on whitespace and the punctuation pgx wraps values in (quotes,
-	// parentheses, a trailing colon), so a value it names is one word to test.
-	words := strings.FieldsFunc(strings.ToLower(reason), func(r rune) bool {
-		return r < 128 && strings.IndexByte(tokenSeps+":()[]{}\"'`", byte(r)) >= 0
-	})
-	for _, w := range words {
-		if _, inReg := region[w]; inReg {
-			if _, isKey := keys[w]; !isKey {
+	// reason is prose: a value it names sits between whitespace or the punctuation pgx wraps
+	// values in (quotes, parentheses, a trailing colon), and the value may hold that punctuation
+	// itself (unknown target_session_attrs value: x:y, open x(y): no such file), so each value
+	// token is searched for whole, bounded by such a byte or an end, rather than split up.
+	r := strings.ToLower(reason)
+	edge := func(i int) bool {
+		return i < 0 || i >= len(r) || strings.IndexByte(tokenSeps+":()[]{}\"'`", r[i]) >= 0
+	}
+	for t := range region {
+		if _, isKey := keys[t]; isKey {
+			continue
+		}
+		for from := 0; ; {
+			i := strings.Index(r[from:], t)
+			if i < 0 {
+				break
+			}
+			i += from
+			if edge(i-1) && edge(i+len(t)) {
 				return true
 			}
+			from = i + 1
 		}
 	}
 	return false

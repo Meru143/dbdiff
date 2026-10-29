@@ -63,6 +63,12 @@ func TestConnectParseErrorHintsOnParamValue(t *testing.T) {
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&sslrootcert=QZrC",
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&connect_timeout=QZen",
 		"postgres://app@127.0.0.1:1/db?password=Zq9simple&pool_max_conns=QZmy",
+		// values that hold the punctuation pgx wraps values in
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&target_session_attrs=QZ:tS",
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&channel_binding=QZ:cB",
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&sslrootcert=QZ:rC",
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&target_session_attrs=QZ(tS)",
+		"postgres://app@127.0.0.1:1/db?password=Zq9simple&sslrootcert=QZ(rC)",
 	} {
 		_, err := connectOnce(context.Background(), url, "disable", time.Second)
 		if err == nil || strings.Contains(err.Error(), "QZ") || !strings.Contains(err.Error(), "password=***") {
