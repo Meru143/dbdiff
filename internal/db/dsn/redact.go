@@ -258,45 +258,98 @@ func CheckPassword(connStr string) error {
 	return fmt.Errorf("can't tell where the password ends in %q; %s", Redact(connStr), fix)
 }
 
-// HideParams returns err, the error for connecting with connStr, unless it quotes part of
-// what Redact hides after the '=' of the first password parameter in connStr's query. A
-// driver reads password=pass&word=x as the password pass and a parameter word, and can quote
-// that parameter, or the server it sends it to, when it refuses it (unrecognized
-// configuration parameter "word"), but word may be the rest of the password. The server
-// quotes a name or value it read from that region, sometimes padded with the spaces, tabs or
-// control bytes a '%'-escape decoded to (parameter "word "), or holding a setting name inside
-// an options value, so each quoted token of the error is tested against the region, raw and
-// percent-decoded, rather than matched parameter by parameter. go-mssqldb names a duplicated
-// key without quotes (key word provided more than once), so that one word is tested too. Then
-// HideParams returns an error that names connStr redacted. An error that quotes none of the
-// region passes through, password authentication failed included.
-func HideParams(connStr string, err error) error {
+// tokenSeps separate the names and values of a query or settings string: '&'
+// between parameters, ';' and ',' in settings and host lists, '=' before a
+// value, and the whitespace a '%'-escape can decode to. A driver or server
+// quotes a token bounded by these, so what it hides is compared token by token.
+const tokenSeps = "&=;, \t\r\n"
+
+// tokens lowercases s and splits it on tokenSeps, dropping empty fields.
+func tokens(s string) []string {
+	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return r < 128 && strings.IndexByte(tokenSeps, byte(r)) >= 0
+	})
+}
+
+// hiddenRegion returns the tokens of what Redact hides after the '=' of the
+// first password parameter in connStr's query — the region raw and percent-
+// decoded both ways (url.PathUnescape, as pgx and net/url read it, and
+// url.QueryUnescape, as go-sql-driver and go-mssqldb do, where '+' is a space)
+// — and keys, the subset that name a parameter: a token right before an '='.
+// ok is false when the query holds no password parameter.
+func hiddenRegion(connStr string) (region, keys map[string]struct{}, ok bool) {
 	n := schemeLen(connStr)
 	q := strings.IndexByte(connStr[n:], '?')
-	if err == nil || n == 0 || q < 0 {
-		return err
+	if n == 0 || q < 0 {
+		return nil, nil, false
 	}
 	secrets := secretValues(connStr[n+q:], toEnd)
 	if len(secrets) == 0 {
+		return nil, nil, false
+	}
+	raw := connStr[n+q+secrets[0][0]:]
+	forms := []string{raw}
+	if d, err := url.PathUnescape(raw); err == nil {
+		forms = append(forms, d)
+	}
+	if d, err := url.QueryUnescape(raw); err == nil {
+		forms = append(forms, d)
+	}
+	region = map[string]struct{}{}
+	keys = map[string]struct{}{}
+	for _, f := range forms {
+		for _, t := range tokens(f) {
+			region[t] = struct{}{}
+		}
+		for _, seg := range strings.FieldsFunc(f, func(r rune) bool { return r == '&' || r == ';' || r == ',' }) {
+			if name, _, has := strings.Cut(seg, "="); has {
+				for _, k := range tokens(name) {
+					keys[k] = struct{}{}
+				}
+			}
+		}
+	}
+	return region, keys, true
+}
+
+// HideParams returns err, the error for connecting with connStr, unless it quotes a token of
+// what Redact hides after the '=' of the first password parameter in connStr's query. A
+// driver reads password=pass&word=x as the password pass and a parameter word, and can quote
+// that parameter, or the server it sends it to, when it refuses it (unrecognized
+// configuration parameter "word"), but word may be the rest of the password. The server or
+// driver may pad a name with the spaces, tabs or control bytes a '%'-escape decoded to
+// (parameter "word "), hold a setting name inside an options value, or turn a '+' into a
+// space, so each token of each quoted string in the error is tested for equality, at any
+// length, against a token of the region (raw and decoded both ways), not matched parameter by
+// parameter. go-mssqldb names a duplicated key without quotes (key word provided more than
+// once), so the tokens between "key " and " provided more than once" are tested too. Matching
+// whole tokens, not substrings, keeps an ordinary error that merely contains the user or
+// database name: password authentication failed, and database "db" does not exist, pass
+// through. Then HideParams returns an error that names connStr redacted.
+func HideParams(connStr string, err error) error {
+	if err == nil {
 		return err
 	}
-	start := n + q + secrets[0][0]
-	region := strings.ToLower(connStr[start:])
-	decoded := region
-	if d, derr := url.PathUnescape(connStr[start:]); derr == nil {
-		decoded = strings.ToLower(d)
+	region, _, ok := hiddenRegion(connStr)
+	if !ok {
+		return err
 	}
-	fromRegion := func(tok string) bool {
-		tok = strings.ToLower(strings.TrimSpace(tok))
-		return len(tok) >= 3 && (strings.Contains(region, tok) || strings.Contains(decoded, tok))
+	inRegion := func(s string) bool {
+		for _, t := range tokens(s) {
+			if _, ok := region[t]; ok {
+				return true
+			}
+		}
+		return false
 	}
-	text := strings.ToLower(err.Error())
 	hidden := false
 	for _, tok := range quotedTokens(err.Error()) {
-		hidden = hidden || fromRegion(tok)
+		hidden = hidden || inRegion(tok)
 	}
-	if _, after, ok := strings.Cut(text, "key "); ok {
-		hidden = hidden || fromRegion(strings.SplitN(after, " ", 2)[0])
+	if _, after, ok := strings.Cut(err.Error(), "key "); ok {
+		if name, _, ok := strings.Cut(after, " provided more than once"); ok {
+			hidden = hidden || inRegion(name)
+		}
 	}
 	if hidden {
 		return fmt.Errorf("connecting with %q failed with an error that quotes part of what follows the '=' of its password parameter, which may be part of the password, so the error is left out: put the password after the user name, or write an '&' in it as %%26", Redact(connStr))
@@ -304,13 +357,41 @@ func HideParams(connStr string, err error) error {
 	return err
 }
 
+// ReasonLeaks reports whether reason — a PostgreSQL parse message with the connection string
+// removed — names, as a whole word, a value of what Redact hides after the first password
+// parameter's '=', as opposed to only a parameter's own name. pgx repeats a parameter name
+// for a genuinely bad setting (sslmode is invalid, invalid port), which is safe to show, but
+// echoes some rejected values (unknown target_session_attrs value: X, open <sslrootcert>:
+// no such file), which may be the rest of the password. connectOnce shows the reason only
+// when this is false.
+func ReasonLeaks(connStr, reason string) bool {
+	region, keys, ok := hiddenRegion(connStr)
+	if !ok {
+		return false
+	}
+	// reason is prose: split on whitespace and the punctuation pgx wraps values in (quotes,
+	// parentheses, a trailing colon), so a value it names is one word to test.
+	words := strings.FieldsFunc(strings.ToLower(reason), func(r rune) bool {
+		return r < 128 && strings.IndexByte(tokenSeps+":()[]{}\"'`", byte(r)) >= 0
+	})
+	for _, w := range words {
+		if _, inReg := region[w]; inReg {
+			if _, isKey := keys[w]; !isKey {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // quotedTokens returns the text inside each "..." and '...' pair in s, left to right within
-// each quote kind. An unpaired final quote starts no token.
+// each quote kind. An unpaired final quote starts no token: the loop stops before the last
+// field, which Split puts whatever follows the final quote into.
 func quotedTokens(s string) []string {
 	var toks []string
 	for _, q := range []string{`"`, "'"} {
 		parts := strings.Split(s, q)
-		for i := 1; i < len(parts); i += 2 {
+		for i := 1; i < len(parts)-1; i += 2 {
 			toks = append(toks, parts[i])
 		}
 	}
