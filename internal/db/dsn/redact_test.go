@@ -243,6 +243,31 @@ func FuzzRedactPassword(f *testing.F) {
 // FuzzHideParams checks that an error quoting any whole parameter name in what follows a
 // password parameter is hidden, at any length (regress and leaks finding 1), and that
 // HideParams never panics on an arbitrary error.
+// hiddenRegion decodes piece by piece, yet must hold every token of the whole tail decoded at
+// once, as a driver reads it, raw bytes beside escapes included.
+func FuzzHiddenRegion(f *testing.F) {
+	for _, s := range []string{"9a", "a%26b", "Kq7%C3\xa9Wn=1", "\xd1%80", "x+y", "50%off&k3y"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, tail string) {
+		region, ok := hiddenRegion("postgres://app@host/db?password=Secret9&" + tail)
+		if !ok {
+			t.Fatal("no region for a password parameter")
+		}
+		for _, unescape := range []func(string) (string, error){url.PathUnescape, url.QueryUnescape} {
+			d, err := unescape("Secret9&" + tail)
+			if err != nil {
+				continue
+			}
+			for _, tok := range tokens(d) {
+				if _, in := region[tok]; !in {
+					t.Errorf("tail %q: token %q of the decoded tail is missing", tail, tok)
+				}
+			}
+		}
+	})
+}
+
 func FuzzHideParams(f *testing.F) {
 	for _, s := range []string{"9a", "Q", "ab", "k3y", "owner:ops", "a&b", "x=y", "a;b", `a"b`, `"ab`, `ab"`} {
 		f.Add(s)
@@ -458,6 +483,9 @@ func TestHideParams(t *testing.T) {
 		// A bad escape in the password leaves the later pieces decoded, as the drivers decode
 		// each parameter on its own.
 		{"sqlserver://host?database=db&password=50%off&log=Zq%28Zz", `invalid log parameter 'Zq(Zz': strconv.ParseUint: parsing "Zq(Zz": invalid syntax`, true},
+		// An escape and a raw byte beside it decode to one character (%C3 and 0xA9 are é).
+		{"postgres://app@host/db?password=s3cret&Kq7%C3\xa9Wn=1", pgConnect + `unrecognized configuration parameter "Kq7éWn" (SQLSTATE 42704)`, true},
+		{"sqlserver://host?database=db&password=s3cret&log=Zq%C3\xa9Zz", `invalid log parameter 'ZqéZz': strconv.ParseUint: parsing "ZqéZz": invalid syntax`, true},
 		{"postgres://app@host/db?password=s3cret&sslmode=disable", pgConnect + `password authentication failed for user "app" (SQLSTATE 28P01)`, false},
 		{"postgres://app:s3cret@host/db?sslmode=disable", pgConnect + `database "db" does not exist (SQLSTATE 3D000)`, false},
 		{"sqlserver://host?database=db&password=s3cret&k3y", "login error: mssql: Login failed for user 'app'.", false},

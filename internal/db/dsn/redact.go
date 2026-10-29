@@ -264,20 +264,25 @@ func CheckPassword(connStr string) error {
 // quotes a token bounded by these, so what it hides is compared token by token.
 const tokenSeps = "&=;, \t\r\n"
 
+// isTokenSep reports whether r is one of tokenSeps.
+func isTokenSep(r rune) bool {
+	return r < 128 && strings.IndexByte(tokenSeps, byte(r)) >= 0
+}
+
 // tokens lowercases s and splits it on tokenSeps, dropping empty fields.
 func tokens(s string) []string {
-	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
-		return r < 128 && strings.IndexByte(tokenSeps, byte(r)) >= 0
-	})
+	return strings.FieldsFunc(strings.ToLower(s), isTokenSep)
 }
 
 // hiddenRegion returns the tokens of what Redact hides after the '=' of the
-// first password parameter in connStr's query: each raw token, and the tokens it
-// decodes to both ways (url.PathUnescape, as pgx and net/url read it, and
-// url.QueryUnescape, as go-sql-driver and go-mssqldb do, where '+' is a space).
-// Each token is decoded on its own, as the drivers decode each parameter, so a
-// bad escape in one (a password of 50%off) leaves the others decoded.
-// ok is false when the query holds no password parameter.
+// first password parameter in connStr's query: each raw piece between
+// tokenSeps, and what it decodes to both ways (url.PathUnescape, as pgx and
+// net/url read it, and url.QueryUnescape, as go-sql-driver and go-mssqldb do,
+// where '+' is a space), all split into tokens. Each piece is decoded on its
+// own and before it is lowercased, as the drivers decode each parameter's raw
+// bytes: a bad escape in one (a password of 50%off) leaves the others decoded,
+// and a raw byte still joins the bytes an escape beside it decodes to (%C3 and
+// a raw 0xA9 are é). ok is false when the query holds no password parameter.
 func hiddenRegion(connStr string) (region map[string]struct{}, ok bool) {
 	n := schemeLen(connStr)
 	q := strings.IndexByte(connStr[n:], '?')
@@ -289,13 +294,17 @@ func hiddenRegion(connStr string) (region map[string]struct{}, ok bool) {
 		return nil, false
 	}
 	region = map[string]struct{}{}
-	for _, t := range tokens(connStr[n+q+secrets[0][0]:]) {
-		region[t] = struct{}{}
-		for _, unescape := range []func(string) (string, error){url.PathUnescape, url.QueryUnescape} {
-			if d, err := unescape(t); err == nil {
-				for _, dt := range tokens(d) {
-					region[dt] = struct{}{}
-				}
+	for _, p := range strings.FieldsFunc(connStr[n+q+secrets[0][0]:], isTokenSep) {
+		forms := []string{p}
+		if d, err := url.PathUnescape(p); err == nil {
+			forms = append(forms, d)
+		}
+		if d, err := url.QueryUnescape(p); err == nil {
+			forms = append(forms, d)
+		}
+		for _, f := range forms {
+			for _, t := range tokens(f) {
+				region[t] = struct{}{}
 			}
 		}
 	}
